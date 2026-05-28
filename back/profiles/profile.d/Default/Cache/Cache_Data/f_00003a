@@ -1,0 +1,596 @@
+window.MapModule = function (divname) {
+    var localThis = this;
+    this.initialized = false;
+    this.selfcontainer = null;
+    this.infopanel = null;
+    this.image = null;
+    
+    this.drawings = null;
+    this.drawControl = null;
+    this.popupcontainer = null;
+    var loadCssUrl = "/resources/engine/map2.css";
+    this.MapClickAllowed = true;
+    this.MapClickAllowedOverride = true;
+    this.MapClickMethods = [];
+    this.MapClickOverride = [];
+    this.MapClickAdditionalFeatures = [];
+    this.MapClickAdditionalPages = [];
+
+    this.basemap_id = 0;
+
+    this.watermark = {};
+    /*события*/
+
+    var _hoveredPointFeatures = L.geoJson([], {
+        pane: 'specialFX',
+        clickable: false,
+        interactive: false
+    });
+    
+    var _hoveredLayer = null;
+    var _selectedLayer = null;
+    var _selectedFeature = null;
+    var _selectedFeatureInfo = { layerid: 0, objectid: 0 };
+
+    this.hoverPolygon = function (_geojson, _blurry) {
+        localThis.removeHoverPolygon();
+        if (_geojson === null || typeof _geojson === "undefined") return;
+        _hoveredLayer = L.geoJson(_geojson, {
+            style: function (feature) {
+                return {
+                    color: "#0A95FF",
+                    weight: 6,
+                    opacity: 0.5,
+                    fillColor: "#FF0000",
+                    fillOpacity: 0.6
+                };
+            },
+            /*onEachFeature: function (feature, layer) {                
+                layer._path?.setAttribute('filter', 'url(#f1)');
+                console.log(layer);
+            },*/
+            pane: 'specialFX',
+            clickable: false,
+            interactive: false
+        });
+        _hoveredLayer.addTo(window.MAP);
+    };
+
+    this.removeHoverPolygon = function () {
+        tryRemoveGeometry(_hoveredLayer);
+    };
+
+    this.selectPolygon = function (_geojson) {
+        localThis.clearSelectedFeature();
+
+        if (_geojson === null || typeof _geojson === "undefined" || (!(_geojson?.length > 0))) return;
+
+        if (_selectedFeatureInfo.layerid == _geojson[0].layerid && _selectedFeatureInfo.objectid == _geojson[0].properties.id) {
+            _selectedFeatureInfo = { layerid: 0, objectid: 0 };
+            return;
+        }
+
+        _selectedLayer = L.geoJson(_geojson, {
+            style: function (feature) {
+                return {
+                    color: "#FF0000",
+                    weight: 3,
+                    opacity: 0.5,
+                    fillColor: "#FF0000",
+                    fillOpacity: 0.3
+                };
+            },
+            pane: 'specialFX',
+            clickable: false,
+            interactive: false
+        });
+
+        _selectedFeature = _geojson;
+
+        _selectedFeatureInfo = { layerid: _geojson[0].layerid, objectid: _geojson[0].properties.id };
+
+        _selectedLayer.addTo(window.MAP);
+    };
+
+    this.getSelectedFeature = function () {
+        return _selectedFeature;
+    };
+
+    this.clearSelectedFeature = function () {
+        tryRemoveGeometry(_selectedLayer);
+        _selectedLayer = null;
+        _selectedFeature = null;
+        _selectedFeatureInfo = { layerid: 0, objectid: 0 };
+    };
+    
+    this.onMapMoveEndActions = [];
+
+    /*--------*/
+    var onMapMoveEnd = function () {
+        if (window.MAP !== null) {
+            var bounds = window.MAP.getBounds();
+            /* Cookies.set("lastbounds", JSON.stringify(bounds), { expires: 365, domain: '.' + location.hostname.split('.').slice(1, 3).join('.') });*/
+            Cookies.set("lastbounds", JSON.stringify(bounds), { expires: 365, domain: '.' + removeFirstSubdomain(location.hostname) });
+            
+
+            for (var i = 0; i < localThis.onMapMoveEndActions.length; i++) {
+                if (typeof localThis.onMapMoveEndActions[i] == "function") {
+                    localThis.onMapMoveEndActions[i]();
+                }
+            }
+        }
+    };
+
+    /*--------*/
+    var onMapClick = function (e) {
+        console.log(e, localThis.MapClickAllowed, localThis.MapClickAllowedOverride, localThis.MapClickMethods)
+        window.lastClick = null;
+        if (localThis.MapClickAllowed) {
+            window.lastClick = [e.latlng.lng, e.latlng.lat];
+            localThis.MapClickMethods.forEach(function (o) {
+                if (typeof o === "function") {
+                    o(e.latlng);
+                }
+            });
+        } else {
+            if (localThis.MapClickAllowedOverride) {
+                window.lastClick = [e.latlng.lng, e.latlng.lat];
+                localThis.MapClickOverride.forEach(function (o) {
+                    if (typeof o === "function") {
+                        o(e.latlng);
+                    }
+                });
+            }
+        }
+    };
+
+    /*watermark*/
+    this.watermark = {
+        element: $("<div/>", { "class": "watermark-container" }),
+        appendToMap: function () {
+            $("body").append(localThis.watermark.element);
+        },
+        setAttributeMap: function (wrapMap) {
+            localThis.watermark.element.attr("watermark-theme", localThis.watermark.baseMapCheck(wrapMap));
+        },
+        baseMapCheck: function (_mapID) {
+            var themeWatermark = "";
+            switch (_mapID) {
+                case 53:
+                case 57:
+                case 51:
+                case 10:
+                case 12:
+                    themeWatermark = "dark";
+                    break;
+
+                default:
+                    themeWatermark = "light";
+            }
+            return themeWatermark;
+        }
+
+    };
+
+    /*--------*/
+    this.guessMapClickAllowedOverride = function () {
+        /*
+        if (localThis.MapClickOverride.length > 0) {
+            localThis.MapClickAllowedOverride = true;
+        } else {
+            localThis.MapClickAllowedOverride = false;
+        }
+        */
+    };
+
+    /*--------*/
+    var initPane = function (_name, _index) {
+        var _idx = 10000;
+        if (typeof _index != "undefined") {
+            _idx = _index;
+        }
+        window.MAP.createPane(_name);
+        window.MAP.getPane(_name).style.zIndex = _idx;
+    };
+
+    /*--------*/
+    var setPaneZindex = function (_name, _index) {
+        var _idx = 10000;
+        if (typeof _index != "undefined") {
+            _idx = _index;
+        }
+        window.MAP.getPane(_name).style.zIndex = _idx;
+    };
+
+    /*инициализация модуля с картой*/
+    var init = function (divname) {
+        if (localThis.initialized) {
+            return;
+        }
+
+        /*appendHeadStyle(loadCssUrl);*/
+
+        var _map_options = {
+            crs: L.CRS.EPSG3857,
+            continuousWorld: true,
+            worldCopyJump: false,
+            noWrap: false,
+            preferCanvas: true,
+            editable: true
+        };
+
+        let _linkdata = window.G.Dynamic.getValue("zoom_in_link");
+
+        let point_to_zoom = window.point;
+        let level_to_zoom = 5;
+
+        if (_linkdata) {
+            _linkdata = JSON.parse(_linkdata);
+            if (_linkdata && _linkdata.geometry) {
+                if (_linkdata && _linkdata.geometry && _linkdata.properties.zoom) {
+                    point_to_zoom = [_linkdata.geometry.coordinates[1], _linkdata.geometry.coordinates[0]];
+                    level_to_zoom = _linkdata.properties.zoom;
+                    window.G.Dynamic.setValue("zoomed_by_link", true);
+                }
+            }
+        }
+
+        window.MAP = L.map(divname, _map_options).setView(point_to_zoom, level_to_zoom);
+
+        localThis.selfcontainer = $("body").find("#" + divname);
+
+        window.MAP.doubleClickZoom.disable();
+
+        initPane("basemaps", 450);
+        initPane("basemapsZero", 500);
+        initPane("underLayers", 580);
+        initPane("geoLayers", 600);
+        initPane("poi", 900);
+        initPane("services", 999);
+        initPane("userLayers", 1000);
+
+        setPaneZindex("overlayPane", 2000);
+        setPaneZindex("markerPane", 5000);
+
+        initPane("specialFX", 9999);
+        initPane("specialFXUP", 10000);
+
+        setPaneZindex("popupPane", 100000);
+
+        localThis.drawings = new L.FeatureGroup();
+        
+        window.MAP.addLayer(localThis.drawings);
+
+        InitDrawModule();
+
+        L.Util.VincentyConstants = {
+            a: 6378137,
+            b: 6356752.3142,
+            f: 1 / 298.257223563
+        };
+
+        bindEvents();
+
+        localThis.infopanel = new ActionRibbon();
+
+        localThis.initialized = true;
+    };
+
+ 
+    /*--------*/
+    var bindEvents = function () {
+        window.MAP.on("moveend", onMapMoveEnd);
+        window.MAP.on("click", onMapClick);
+
+        window.G.DynamicFlat.addListener(GiEvents.TerraInfo, function (e) {
+            localThis.currentCity = e.value;
+        });
+    };
+
+    this.registerMapMoveEndEvent = function (func) {
+        if (func && typeof func === "function") {
+            localThis.onMapMoveEndActions.push(func);
+        }
+    };
+
+    this.registerMapClickEvent = function (func) {
+        if (func && typeof func === "function") {
+            localThis.MapClickMethods.push(func);
+        }
+    };
+
+    this.getCity = function () {
+        return "Москва";
+    };
+
+    this.currentCity = null;
+
+    this.getCenter = function () {
+        return null;
+    };
+
+    this.getExtent = function () {
+        return null;
+    };
+
+    var InitDrawModule = function () {
+        localThis.drawControl = new L.Control.Draw({
+            draw: {
+                polyline: {
+                    shapeOptions: {
+                        color: '#f357a1',
+                        weight: 10
+                    }
+                },
+                polygon: {
+                    allowIntersection: true,
+                    shapeOptions: {
+                        color: '#bada55'
+                    }
+                },
+                circle: {
+                    shapeOptions: {
+                        color: '#bada55'
+                    }
+                },
+                rectangle: {
+                    shapeOptions: {
+                        clickable: false
+                    }
+                },
+                marker: {
+                    icon: null
+                }
+            },
+            edit: {
+                featureGroup: localThis.drawings
+            }
+        });
+
+        window.MAP.on('draw:created', function (e) {
+            var type = e.layerType;
+            var layer = e.layer;
+
+            if (type === "marker") {
+                /*если это точка/маркер, то делаем с ней что-нибудь*/
+            }
+
+            window.MAP.addLayer(layer);
+        });
+    };
+
+    /*--------*/
+    $(".fixed-tools").children("[data-action=zoomin]").on("click", function () {
+        window.MAP.zoomIn();
+    });
+
+    /*--------*/
+    $(".fixed-tools").children("[data-action=zoomout]").on("click", function () {
+        window.MAP.zoomOut();
+    });
+
+    init(divname);
+    this.watermark.appendToMap();
+
+    this.CreatePixiLayer = (_data) => {
+        if (!_data) return null;
+        let _features = null;
+
+        if (_data.features?.length > 0) {
+            _features = _data.features;
+        }
+        else if (_data.length > 0) {
+            _features = _data;
+        }
+        else {
+            return null;
+        }
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const featureCache = new Map();
+        const colorCache = new Map();
+
+        // Helper function to parse color values
+        const parseColor = (color) => {
+            if (!color) return null;
+            if (colorCache.has(color)) return colorCache.get(color);
+
+            let colorNum;
+            let alpha = 1;
+
+            if (color.startsWith('#')) {
+                colorNum = Number(color.replace("#", "0x"));
+            } else if (color.startsWith('rgb')) {
+                const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+                if (match) {
+                    const r = parseInt(match[1]);
+                    const g = parseInt(match[2]);
+                    const b = parseInt(match[3]);
+                    alpha = match[4] ? parseFloat(match[4]) : 1;
+                    colorNum = (r << 16) + (g << 8) + b;
+                }
+            }
+
+            if (colorNum === undefined) {
+                colorNum = 0xFF0000;
+            }
+
+            const result = { color: colorNum, alpha };
+            colorCache.set(color, result);
+            return result;
+        };
+
+        // Pre-process features
+        const processFeature = (ft) => {
+            if (featureCache.has(ft)) return featureCache.get(ft);
+
+            const props = ft.properties || {};
+            const result = {
+                type: ft.geometry.type,
+                coordinates: null,
+                shouldDraw: true,
+                styles: {}
+            };
+
+            switch (result.type) {
+                case "Point":
+                    result.styles = {
+                        markerColor: props['marker-color'] || '#FF0000',
+                        markerSize: parseFloat(props['marker-size']) || 5,
+                        fillOpacity: parseFloat(props['fill-opacity']) || parseFloat(props['opacity']) || 0.5
+                    };
+                    result.coordinates = [ft.geometry.coordinates[1], ft.geometry.coordinates[0]];
+                    break;
+
+                case "LineString":
+                    result.styles = {
+                        stroke: props['stroke'] || '#0000FF',
+                        strokeWidth: parseFloat(props['stroke-width']) || 2,
+                        strokeOpacity: parseFloat(props['stroke-opacity']) || 1
+                    };
+                    result.coordinates = ft.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                    break;
+
+                case "Polygon":
+                    result.styles = {
+                        fill: props['fill'] || '#FF0000',
+                        fillOpacity: parseFloat(props['fill-opacity']) || 0.6,
+                        stroke: props['stroke'] || '#000000',
+                        strokeWidth: parseFloat(props['stroke-width']) || 1,
+                        strokeOpacity: parseFloat(props['stroke-opacity']) || 1
+                    };
+                    result.coordinates = ft.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
+                    break;
+
+                case "MultiPolygon":
+                    result.styles = {
+                        fill: props['fill'] || '#FF0000',
+                        fillOpacity: parseFloat(props['fill-opacity']) || 0.6,
+                        stroke: props['stroke'] || '#000000',
+                        strokeWidth: parseFloat(props['stroke-width']) || 1,
+                        strokeOpacity: parseFloat(props['stroke-opacity']) || 1
+                    };
+                    result.coordinates = ft.geometry.coordinates[0][0].map(coord => [coord[1], coord[0]]);
+                    break;
+            }
+
+            featureCache.set(ft, result);
+            return result;
+        };
+
+        const processedFeatures = _features.map(processFeature);
+        const pixiContainer = new PIXI.Container();
+        const graphicsCache = new WeakMap();
+
+        const layer = L.pixiOverlay(function (utils) {
+            const zoom = utils.getMap().getZoom();
+            const container = utils.getContainer();
+            const renderer = utils.getRenderer();
+            const project = utils.latLngToLayerPoint;
+            const scale = (getResolutionByZoom(zoom) / 100);
+
+            let frame = null;
+
+            if (frame) {
+                cancelAnimationFrame(frame);
+            }
+
+            frame = requestAnimationFrame(() => {
+                if (container.children.length === 0) {
+                    processedFeatures.forEach((ft) => {
+                        if (ft.shouldDraw) {
+                            const graphic = new PIXI.Graphics();
+                            graphicsCache.set(ft, graphic);
+                            container.addChild(graphic);
+                        }
+                    });
+                }
+
+                processedFeatures.forEach((ft) => {
+                    const graphic = graphicsCache.get(ft);
+                    if (graphic && ft.shouldDraw) {
+                        graphic.clear();
+
+                        switch (ft.type) {
+                            case "Point":
+                                const pointStyle = parseColor(ft.styles.markerColor);
+                                const point = project(ft.coordinates);
+                                const radius = ft.styles.markerSize * scale / 2.4;
+
+                                if (pointStyle) {
+                                    graphic.beginFill(pointStyle.color, pointStyle.alpha * ft.styles.fillOpacity);
+                                    graphic.drawCircle(point.x, point.y, radius);
+                                    graphic.endFill();
+                                }
+                                break;
+
+                            case "LineString":
+                                const lineStyle = parseColor(ft.styles.stroke);
+                                const lineWidth = ft.styles.strokeWidth * scale / 2.4;
+                                const projectedLine = ft.coordinates.map(coords => project(coords));
+
+                                if (lineStyle) {
+                                    graphic.lineStyle(
+                                        lineWidth,
+                                        lineStyle.color,
+                                        lineStyle.alpha * ft.styles.strokeOpacity
+                                    );
+                                    projectedLine.forEach((coords, idx) => {
+                                        if (idx === 0) graphic.moveTo(coords.x, coords.y);
+                                        else graphic.lineTo(coords.x, coords.y);
+                                    });
+                                }
+                                break;
+
+                            case "Polygon":
+                            case "MultiPolygon":
+                                const fillStyle = parseColor(ft.styles.fill);
+                                const strokeStyle = parseColor(ft.styles.stroke);
+                                const strokeWidth = ft.styles.strokeWidth * scale / 2.4;
+                                const projectedPoly = ft.coordinates.map(coords => project(coords));
+
+                                if (fillStyle) {
+                                    graphic.beginFill(
+                                        fillStyle.color,
+                                        fillStyle.alpha * ft.styles.fillOpacity
+                                    );
+                                }
+
+                                if (strokeStyle) {
+                                    graphic.lineStyle(
+                                        strokeWidth,
+                                        strokeStyle.color,
+                                        strokeStyle.alpha * ft.styles.strokeOpacity
+                                    );
+                                }
+
+                                projectedPoly.forEach((coords, idx) => {
+                                    if (idx === 0) graphic.moveTo(coords.x, coords.y);
+                                    else graphic.lineTo(coords.x, coords.y);
+                                });
+
+                                if (fillStyle) {
+                                    graphic.endFill();
+                                }
+                                break;
+                        }
+                    }
+                });
+
+                renderer.render(container);
+            });
+        }, pixiContainer, {
+            doubleBuffering: isIOS,
+            destroyInteractionManager: true,
+            clickable: false,
+            interactive: false,
+            pane: "specialFX"
+        });
+
+        return layer;
+    };
+};
+
+$(document).ready(function () {
+    window.mapModule01 = new MapModule("themap");
+});

@@ -1,0 +1,546 @@
+window.SearchMapAdv = function() {
+    
+    var localThis = this;
+    this.id = "geocoders";
+
+    var loadCssUrl = "/resources/funcparts/" + localThis.id + "/style/style.css";
+    var loadCssUrlsecondary = "/resources/styles/funcparts/search-map/style.css";
+
+    var overrides = [];
+
+    this.visible = false;
+    this.text = "";
+    this.searchResult = [];
+    this.topPanelButton = null;
+    this.startSearchTime = null;
+    this.minSearchPulseTime = 2000;
+    this.contextMenu = null;
+    this.commonActions = {};
+
+    this.searchMarker = null;
+    this.resultsFeatures = [];
+    this.resultsLayer = null;
+    this.resultsLayers = [];
+
+    this.selfelement = null;
+    this.parts = {};
+
+    var template_search = `
+        <div data-window="search-panel-bg" class="bg-main-halo-02" data-isopen="false"></div>
+        <div data-window="search-panel" data-state="ready" data-isopen="false">
+            <div class="header bg-main-halo-02" data-key="content">
+                <div class="search-field-container">
+                    <div class="inp-wrap">
+                        <input type="search" class="search-field  gr-lens" autocomplete="off" autofocus />
+                        <span class="gr-close-x-r clear-query header-button" data-action="clear-query"></span>
+                        <div class="input-label">{{search_enter_search_text}}</div>
+                    </div>
+                    <div class="btn-find header-button" data-action="find">{{search}}</div>
+                </div>
+
+                <div class="header-button close-ico gr-close-x-r" data-action="close-window" title="{{close}}"></div>
+                <div class="header-button gr-context-v" data-action="context-menu" title="{{context_menu}}" style="display:none"></div>
+                <div class="header-label-left font-default-inverted">{{search}}</div>
+
+                <div class="search-counter"></div>
+                <div class="search-wait"></div>
+            </div>
+
+            <div class="window-context-menu font-solid bg-main-halo-02" style="display:none" data-state="disabled">
+                <div class="context-menu-item icon-clock" data-action="search-history">{{search_history}}</div>
+                <div class="context-menu-separator menu-separator"></div>
+                <div class="context-menu-item icon-layers-blank" data-action="clear-history">{{clear_history}}</div>
+                <div class="context-menu-separator menu-separator"></div>
+                <div class="context-menu-item icon-layers-market" data-action="open-store">{{search_find_via_api}}</div>
+            </div>
+   
+            <div class="search-results">
+                <div class="scroll-container min-blue-scroll"></div>
+            </div>
+            <div class="outer-close-btn" data-action="close-window" title="{{close}}"></div>
+        </div>
+    `;
+
+    var createTopButton = function() {
+        localThis.topPanelButton = window.ToolPanelModule.getNewPanelButton({
+            "title": gltxt("search"),
+            "class": "SearchMap gr-lens",
+            "onClick": function () {
+                localThis.show();
+                localThis.topPanelButton.on();
+            },
+            "order": 1,
+            "type": "small",
+            "float": "center"
+        });
+        localThis.topPanelButton.addToTopPanel();
+
+        if (window.detectMobile() == "mobile") {
+            localThis.topPanelButton = window.ToolPanelModule.getNewPanelButton({
+                "title": gltxt("search"),
+                "class": "rightRibbonButton gr-lens",
+                "onClick": function () {
+                    localThis.show();
+                    localThis.topPanelButton.on();
+                },
+                mobile:true,
+                "order": 1,
+                "type": "small",
+                "float": "rightPanelCenter",
+                "mapContainer": "mapPanel"
+            });
+            localThis.topPanelButton.addToTopPanel();
+            localThis.topPanelButton.$elemButton.attr("data-help", "search-btn");
+        }
+    };
+
+    var bindEvents = function () {
+
+        /*клик по любой кнопке в шапке*/
+        localThis.parts.header.on("click", ".header-button",
+                function () {
+                    var actionName = $(this).attr("data-action");
+                    if (localThis.commonActions.hasOwnProperty(actionName))
+                        localThis.commonActions[actionName]($(this));
+            });
+
+        /*нажатие кнопки Enter в поисковом инпуте*/
+        localThis.parts.searchfield.keyup(function (e) {
+            if (localThis.selfelement.attr("data-state") === "pending") {
+                return;
+            }
+            var code = e.keyCode || e.which;
+            if (code === 13) {
+                localThis.text = trim11(localThis.parts.searchfield.val());
+
+                var doOverride = false;
+                var overrideMethod = null;
+
+                overrides.forEach(function (over) {
+                    if (doOverride === false) {
+                        var re = new RegExp(over.regex);
+                        if (re.test(localThis.text)) {
+                            doOverride = true;
+                            overrideMethod = over.method;
+                        }
+                    }
+                });
+
+                if (doOverride && typeof overrideMethod === "function") {
+                    localThis.clearResultList();
+
+                    overrideMethod(localThis.text);
+                }
+                else {
+                    localThis.search(localThis.text);
+                }
+            }
+        });
+
+        /*клик по одному элементу в результатах поиска*/
+        localThis.parts.searchresults.on("click", ".scroll-container > .search-result-item", function () {
+            var id = parseInt($(this).attr("data-id"));
+            localThis.zoomToResultItemById(id);
+            localThis.parts.searchresults.find(".search-result-item").attr("data-active", "false");
+            $(this).attr("data-active", "true");
+
+            /*Для мобайла */
+            if (window.detectMobile() == "mobile") {
+                localThis.hide();
+            }
+        });
+
+        localThis.selfelement.on("click", ".header",
+            function (e) {
+                if (e.target.className.indexOf("header-button") === -1) {
+                    localThis.hideContextMenu();
+                }
+            });
+
+        localThis.contextMenu.on("click", "div.context-menu-item",
+                function () {
+                    var actionName = $(this).attr("data-action");
+                    if (localThis.commonActions.hasOwnProperty(actionName))
+                        localThis.commonActions[actionName]($(this));
+                    localThis.hideContextMenu();
+                });
+
+        localThis.hideContextMenu = function () {
+            localThis.contextMenu.attr("data-state", "closed");
+            setTimeout(function () {
+                localThis.contextMenu.css({ display: "none" });
+            }, 200);
+        };
+
+        localThis.showContextMenu = function () {
+            localThis.contextMenu.css({ display: "block" });
+            localThis.contextMenu.attr("data-state", "opened");
+        };
+
+        localThis.commonActions["context-menu"] = function () {
+            if (localThis.contextMenu.attr("data-state") === "closed") {
+                localThis.showContextMenu();
+            } else {
+                localThis.hideContextMenu();
+            }
+        };
+
+        localThis.commonActions["close-window"] = function () {
+            localThis.hide();
+            localThis.hideContextMenu();
+            tryRemoveGeometry(localThis.searchMarker);
+            localThis.topPanelButton.off();
+        };
+
+        localThis.commonActions["clear-query"] = function () {
+            localThis.parts.searchfield.val("");
+            localThis.clearResultList();
+        };
+
+        localThis.commonActions["find"] = function () {
+            localThis.parts.searchfield.trigger(jQuery.Event('keyup', {
+                keyCode: 13
+            }));
+        };
+    };
+
+    var createSearchWindow = function() {
+        var txt = localizeHtml(template_search, gl.text);
+        var tmp = $("<div/>").append($(txt));
+        localThis.selfelement = tmp.children("[data-window=\"search-panel\"]");
+        localThis.parts.bg = tmp.children("[data-window=\"search-panel-bg\"]");
+        $("body").append(localThis.parts.bg);
+        $("body").append(localThis.selfelement);
+
+        localThis.parts.header = localThis.selfelement.find(".header");
+        localThis.parts.searchfieldcontainer = localThis.selfelement.find(".search-field-container");
+        localThis.parts.searchfield = localThis.selfelement.find(".search-field");
+
+        localThis.parts.searchcounter = localThis.selfelement.find(".search-counter");
+        localThis.parts.searchwait = localThis.selfelement.find(".search-wait");
+
+        localThis.parts.searchresults = localThis.selfelement.find(".search-results");
+        localThis.parts.scrollcontainer = localThis.selfelement.find(".scroll-container");
+
+        localThis.parts.outerclosebtn = localThis.selfelement.find(".outer-close-btn");
+
+        localThis.parts.outerclosebtn.on("click", function () {
+            localThis.hide();
+            localThis.hideContextMenu();
+            tryRemoveGeometry(localThis.searchMarker);
+            localThis.topPanelButton.off();
+        });
+
+        localThis.contextMenu = localThis.selfelement.find(".window-context-menu");
+        localThis.contextMenu.css({ display: "none" });
+
+        bindEvents();
+    };
+
+    var startSearchWaiter = function() {
+        localThis.selfelement.attr({"data-state":"pending"});
+    };
+
+    this.startSearchWaiterPub = function () {
+        startSearchWaiter();
+    };
+
+    var stopSearchWaiter = function () {
+        localThis.selfelement.attr({ "data-state": "ready" });
+    };
+
+    this.stopSearchWaiterPub = function () {
+        stopSearchWaiter();
+    };
+
+    
+    var init = function() {
+        appendHeadStyle(loadCssUrl);
+        appendHeadStyle(loadCssUrlsecondary);
+        createTopButton();
+        createSearchWindow();
+    };
+
+    this.show = function () {
+        /*открытие окна с поиском*/
+        if (localThis.visible) {
+            return;
+        }
+
+        window.window.right_z += 1;
+        localThis.parts.bg.css("z-index", window.window.right_z);
+        localThis.selfelement.css("z-index", window.window.right_z);
+        localThis.parts.bg.transition({ "right": "20px", easing: "cubic-bezier(0.915, 0.825, 0.345, 1.075)", duration: 200 });
+        localThis.parts.bg.attr("data-isopen", "true");
+
+        localThis.selfelement.transition({ "right": "20px", easing: "cubic-bezier(0.915, 0.825, 0.345, 1.075)", duration: 200 }, function () {
+            /*Двигаем полоску на ширину окна*/
+            onRightPanelExpanded(localThis.selfelement);
+        });
+        localThis.selfelement.attr("data-isopen", "true");
+
+        localThis.parts.searchfield.transition({ "right": "40px", easing: "cubic-bezier(0.915, 0.825, 0.345, 1.075)", duration: 300 });
+        localThis.parts.searchfield.focus();
+        localThis.visible = true;       
+    };
+
+    this.hide = function () {
+        /*закрытие окна с поиском*/
+        localThis.parts.bg.transition({ "right": "-600px", easing: "snap", duration: 200 });
+        localThis.selfelement.transition({ "right": "-600px", easing: "snap", duration: 200 });
+        localThis.parts.searchfield.transition({ "right": "-400px", easing: "snap", duration: 200 });
+        localThis.parts.bg.attr("data-isopen", "false");
+        localThis.selfelement.attr("data-isopen", "false");
+        onRightPanelCollapsed();
+        localThis.visible = false;
+    };
+
+    this.searchResultItem = function (o) {
+        /*метод для формирования одной строчки в списке результатов*/
+        if (typeof o !== "object") {
+            return "";
+        }
+        var geo = o.Point;
+        var attributes = {
+            "data-id": o.Id,
+            "data-gis-type": geo.type,
+            "data-active":"false"
+        };
+        var elembody = $("<div/>", attributes)
+            .addClass("search-result-item")
+            .css({ "margin-top": "-40px", "opacity": 0.3 });
+
+        var pic = $("<div/>").addClass("pic");
+        var content = $("<div/>").addClass("content");
+        var title = $("<div/>").addClass("title").html(o.Type);
+        var text = $("<div/>").addClass("text").html(o.Name);
+
+        content.append(title);
+        content.append(text);
+        elembody.append(pic);
+        elembody.append(content);
+
+        return elembody;
+    };
+
+    this.ClearResultLayers = function () {
+        localThis.resultsLayers.forEach(function (layer) {
+            tryRemoveGeometry(layer);
+        });
+        localThis.resultsLayers = [];
+    };
+
+    this.clearResultList = function () {
+        /*метод для очистки списка с результатами*/
+        localThis.parts.searchresults.children(".scroll-container").children().remove();
+        localThis.parts.searchcounter.remove();
+        localThis.searchResult = [];
+        localThis.searchResult.length = 0;
+
+        tryRemoveGeometry(localThis.searchMarker);
+        tryRemoveGeometry(localThis.resultsLayer);
+        localThis.ClearResultLayers();
+        localThis.resultsFeatures = [];
+        localThis.resultsFeatures.length = 0;
+    };
+
+    this.fillResultList = function () {
+        /*метод для заполнения списка с результатами*/
+        localThis.parts.searchresults.children(".scroll-container").children().remove();
+        if (localThis.searchResult.length <= 0) {
+            localThis.parts.searchresults.children(".scroll-container").append(
+                $("<span/>", { "class": "notResult" }).html(gltxt("search_nothing_found"))
+            );           
+            return;
+        }
+
+        var stepper = 100;
+        localThis.searchResult.forEach(function (o) {
+            stepper += 50;
+            var el = localThis.searchResultItem(o);
+            if (el !== null) {
+                localThis.parts.searchresults.children(".scroll-container").append(el);
+                el.transit({ "margin-top": "0px", opacity: 1.0, duration: stepper });
+
+                localThis.resultsFeatures.push(o.Point);
+            }
+        });
+        
+        localThis.resultsLayer = L.geoJson(localThis.resultsFeatures, {
+            pointToLayer: function (feature, latlng) {
+                return L.marker([latlng.lat, latlng.lng], window.MapElementsStyle.pinMarker);
+            },
+            pane: "specialFX",
+            clickable: false,
+            interactive: false
+        }).addTo(window.MAP);
+    };
+
+    this.getResultItemById = function (id) {
+        /*поиск элемента в результатах по айдишнику*/
+        /*возвращает объект*/
+        var itm = null;
+        localThis.searchResult.forEach(function (o) {
+            if (o.Id === id) {
+                itm = o;
+            }
+        });
+        if (itm === null) {
+            console.info(gl.text.search_nothing_found_with_this_id);
+        }
+        return itm;
+    };
+
+    this.zoomToResultItemById = function (id) {
+        /*приближение карты к элементу в результатах по айдишнику*/
+        var itm = null;
+        localThis.searchResult.forEach(function (o) {
+            if (o.Id === id) {
+                itm = o;
+            }
+        });
+
+        tryRemoveGeometry(localThis.searchMarker);
+
+        if (itm == null || itm.Point == null) {
+            blinkmsg(gltxt("search_nothing_found_with_this_id"));
+        }
+        else
+        {
+            var geo = itm.Point;
+
+            switch (geo.type) {
+                case "Point":
+                    /*todo: приблизить к точке очистить слой с маркерами поиска (метод должен быть в другом классе)*/
+                    var xlon = itm.Point.coordinates[0];
+                    var ylat = itm.Point.coordinates[1];
+
+                    localThis.searchMarker = L.marker([ylat, xlon], window.MapElementsStyle.pinMarker);
+                    localThis.searchMarker.addTo(window.MAP);
+
+                    window.MAP.setView([ylat, xlon], 17);
+                    break;
+                case "Polygon":
+                    /*todo: приблизить к полигону*/
+                    break;
+                case "LineString":
+                    /*todo: приблизить к линии*/
+                    break;
+                default:
+                    break;
+            };
+        }
+    };
+
+    this.search = function(searchtext) {
+        /*метод для поиска, который можно вызывать хоть изнутри, хоть снаружи*/
+        localThis.text = searchtext?.trim() || "";
+        localThis.parts.searchfield.val(localThis.text);
+        if (!localThis.visible) {
+            localThis.show();
+        }
+
+        if (localThis.text.length < 2) {
+            blinkmsg(gltxt("search_text_too_short"));
+            return;
+        }
+
+        var extt = window.MAP.getBounds();
+        var exttCenter = extt.getCenter();
+
+        localThis.clearResultList();
+
+        startSearchWaiter();
+        localThis.startSearchTime = new Date();
+
+        var _city /*= G.DynamicFlat.getValue(GiEvents.TerraInfo).Name;
+        _city*/ = "";
+
+        var mypost = DoWebApiAction("/geocoder/address2point", {
+            address: searchtext,
+            city: _city,
+            extent: "" + extt._southWest.lng + "," + extt._southWest.lat + "," + extt._northEast.lng + "," + extt._northEast.lat,
+            point: "" + exttCenter.lng + "," + exttCenter.lat,
+            zoom: 13
+        });
+
+        mypost.done(function (e) {
+            if (e.success) {
+                localThis.searchResult = e.results;
+                for (var i = 0; i < localThis.searchResult.length; i++) {
+                    var o = localThis.searchResult[i];
+                    o.Id = i + 1;
+                }
+            } else {
+                blinkmsg(e.message.replace("{0}", e.details));
+            }
+
+            var endSearchTime = new Date();
+            var datedifference = endSearchTime.getTime() - localThis.startSearchTime.getTime();
+
+            if (datedifference < localThis.minSearchPulseTime) {
+                setTimeout(function () {
+                    stopSearchWaiter();
+                    localThis.fillResultList();
+                }, localThis.minSearchPulseTime);
+            } else {
+                stopSearchWaiter();
+                localThis.fillResultList();
+            }
+
+        });
+
+        mypost.fail(function (a,b,c) {
+            console.error(a,b,c);
+            stopSearchWaiter();
+            localThis.fillResultList();
+        });
+
+        mypost.always(function() {
+            /*то. что всегда должно выполняться после поиска
+            например отвисание кнопок/панелей/отправка сообщений/логов и пр.*/
+            if (localThis.searchResult.length === 0) {
+                localThis.parts.searchcounter.html(gl.text.search_nothing_found);
+            } else {
+                localThis.parts.searchcounter.html(gl.text.search_found_n_results + ": " + localThis.searchResult.length);
+            }
+            setTimeout(function () {
+                if (localThis.parts.searchresults.children(".scroll-container").children(".search-result-item:first-child").css("margin-top") === "-40px") {
+                    localThis.parts.searchresults.children(".scroll-container").children(".search-result-item").css({ "margin-top": "0px", opacity: 1.0 });
+                }
+            }, 2000);
+        });
+
+    };
+
+    this.addOverride = function (regex, method) {
+        overrides.push({
+            regex: regex,
+            method: method
+        });
+    };
+
+    var showCoorditanes = function (searchtext) {
+        
+        var groups = searchtext.match(/(\-?\d+(\.\d+)?),\s*(\-?\d+(\.\d+)?)/);
+        var c1 = parseFloat(groups[1]);
+        var c2 = parseFloat(groups[3]);
+
+        if (isNaN(c1) || Math.abs(c1) > 180) return;
+        if (isNaN(c2) || Math.abs(c2) > 180) return;
+
+        tryRemoveGeometry(localThis.searchMarker);
+        localThis.searchMarker = L.marker([c1, c2], window.MapElementsStyle.pinMarker);
+        localThis.searchMarker.addTo(window.MAP);
+        window.MAP.setView([c1, c2], 17);
+
+    };
+
+    localThis.addOverride("(\\-?\\d+(\\.\\d+)?),\\s*(\\-?\\d+(\\.\\d+)?)", showCoorditanes);
+
+    init();
+};
+
+$(document).ready(function() {
+    window.searchMap = new SearchMapAdv();
+});

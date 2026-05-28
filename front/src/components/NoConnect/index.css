@@ -1,0 +1,31 @@
+.no__connect {
+    gap: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    height: 100vh;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    position: relative;
+    color: #fff;
+    text-align: center;
+
+    &&::before {
+        background: #00000099;
+        position: absolute;
+        content: "";
+        right: 0;
+        top: 0;
+        height: 100%;
+        width: 100%;
+    }
+
+    && .title {
+        font-size: 24px;
+    }
+
+    && .title, .descr {
+        z-index: 1;
+    }
+}

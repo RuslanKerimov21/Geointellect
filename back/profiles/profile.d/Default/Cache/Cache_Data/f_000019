@@ -1,0 +1,2961 @@
+function gButton(options) {
+    if (!options) return null;
+
+    this.id = generateSTRUID();
+
+    options.visible = options.visible || true;
+    options.enabled = options.enabled || true;
+    options.text = options.text || "";
+    options.className = options.className || "default";
+    options.iconClass = options.iconClass || "";
+
+    let icon = '';
+    if (options.iconClass != "") {
+        icon = `<div class="icon gr-pic ${options.iconClass}"></div>`;
+    }
+
+    let text = '';
+    let notext = 'data-notext=true';
+    if (options.text != "") {
+        notext = '';
+        text = `<div class="text">${options.text}</div>`;
+    }
+
+    const button = HtmlElementFromText(`
+        <div id="${this.id}" class="gbutton" ${notext}>
+            ${icon}
+            ${text}
+        </div>`);
+
+    button.setAttribute("data-visible", options.visible);
+
+    button.classList.add(options.className);
+
+    button.addEventListener("click", function (e) {
+        if (typeof options.onClick == "function") {
+            options.onClick(e);
+        }
+        else {
+            console.warn("gButton: onClick is not a function");
+        }
+    });
+
+    this.getElement = function () {
+        return button;
+    };
+
+    this.clone = function () {
+        const clone = new gButton(options);
+        return clone;
+    };
+};
+function gCheckbox(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.name = options.name;
+    this.value = options.value || "unchecked"; /*unchecked, checked, partially, disabled*/
+    this.checkedClass = options.checkedClass || "gr-check-square-solid";
+    this.uncheckedClass = options.uncheckedClass || "gr-rsquare";
+    this.partialClass = options.partialClass || "gr-check-square-partial-2";
+    this.disabledClass = options.disabledClass || "gr-rsquare-solid";
+    this.size = options.size || "24px";
+    this.disabled = options.disabled || false;
+    this.readOnly = options.readOnly || false;
+    this.partialStateEnabled = options.partialStateEnabled || false;
+
+    this._getStateClass = function () {
+        switch (this.value) {
+            case 'checked': return this.checkedClass;
+            case 'partially': return this.partialClass;
+            case 'disabled': return this.disabledClass;
+            default: return this.uncheckedClass;
+        }
+    };
+
+    const element = HtmlElementFromText(`
+<div id="${id}" class="g-checkbox {{dstate}} {{ddisabled}} {{dreadonly}}" 
+     style="width: {{dsize}}; height: {{dsize}};"
+     {{dreadonlyattr}}>
+    <div class="checkbox-visual"></div>
+</div>`, [
+        { key: "dstate", value: this._getStateClass() },
+        { key: "ddisabled", value: this.disabled ? "disabled" : "" },
+        { key: "dreadonly", value: this.readOnly ? "readonly" : "" },
+        { key: "dreadonlyattr", value: this.readOnly ? "data-readonly='true'" : "" },
+        { key: "dsize", value: this.size }
+    ]);
+
+    const visualElement = element.querySelector('.checkbox-visual');
+
+    this._updateVisual = function () {
+        if (visualElement) {
+            visualElement.className = 'checkbox-visual';
+            visualElement.classList.add(this._getStateClass());
+        }
+
+        element.className = `g-checkbox ${this._getStateClass()} ${this.disabled ? 'disabled' : ''} ${this.readOnly ? 'readonly' : ''}`;
+
+        if (this.readOnly) {
+            element.setAttribute('data-readonly', 'true');
+        } else {
+            element.removeAttribute('data-readonly');
+        }
+    };
+
+    this._updateVisual();
+
+    this._getBooleanValue = function () {
+        return this.value === 'checked';
+    };
+
+    this._toggleState = function () {
+        if (this.disabled || this.readOnly) return;
+
+        const states = this.partialStateEnabled ?
+            ['unchecked', 'checked', 'partially'] : ['unchecked', 'checked'];
+
+        const currentIndex = states.indexOf(this.value);
+
+        if (currentIndex !== -1) {
+            const nextIndex = (currentIndex + 1) % states.length;
+            this.value = states[nextIndex];
+            this._updateVisual();
+        }
+    };
+
+    if (!this.disabled && !this.readOnly) {
+        element.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this._toggleState();
+
+            if (typeof options.onChange === 'function') {
+                options.onChange(this.value, this._getBooleanValue());
+            }
+        });
+
+        element.addEventListener('keydown', (e) => {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                this._toggleState();
+
+                if (typeof options.onChange === 'function') {
+                    options.onChange(this.value, this._getBooleanValue());
+                }
+            }
+        });
+
+        element.setAttribute('tabindex', '0');
+    } else if (this.readOnly) {
+        element.removeAttribute('tabindex');
+    }
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.getValue = function () {
+        return this.value;
+    };
+
+    this.getBooleanValue = function () {
+        return this._getBooleanValue();
+    };
+
+    this.setValue = function (newValue) {
+        if (['unchecked', 'checked', 'partially', 'disabled'].includes(newValue)) {
+            this.value = newValue;
+            this._updateVisual();
+        }
+    };
+
+    this.setDisabled = function (isDisabled) {
+        this.disabled = isDisabled;
+
+        if (isDisabled) {
+            element.classList.add('disabled');
+            element.removeAttribute('tabindex');
+        } else if (!this.readOnly) {
+            element.classList.remove('disabled');
+            element.setAttribute('tabindex', '0');
+        }
+
+        this._updateVisual();
+    };
+
+    this.setReadOnly = function (isReadOnly) {
+        this.readOnly = isReadOnly;
+
+        if (isReadOnly) {
+            element.classList.add('readonly');
+            element.removeAttribute('tabindex');
+        } else if (!this.disabled) {
+            element.classList.remove('readonly');
+            element.setAttribute('tabindex', '0');
+        }
+
+        this._updateVisual();
+    };
+
+    this.enablePartialState = function (enable) {
+        this.partialStateEnabled = enable;
+
+        if (!enable && this.value === 'partially') {
+            this.setValue('unchecked');
+        }
+    };
+
+    this.setCustomClasses = function (classes) {
+        if (classes.checked) this.checkedClass = classes.checked;
+        if (classes.unchecked) this.uncheckedClass = classes.unchecked;
+        if (classes.partial) this.partialClass = classes.partial;
+        if (classes.disabled) this.disabledClass = classes.disabled;
+
+        this._updateVisual();
+    };
+
+    return this;
+};
+function gFieldFilterItem(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+
+    let localThis = this;
+
+    let props = options.properties || [];
+
+    this.name = options.name;/*objaddress*/
+    this.condition = options.condition;/*gte*/
+    this.value = options.value;/*Mars st., 34-678*/
+    this.next = options.next ?? "AND";
+
+    let valueType = "default";
+    let valueOptions = [];
+    let onRemove = options.onRemove || function () { };
+
+    if (options.valueType) {
+        valueType = options.valueType;
+    }
+
+    if (options.valueOptions) {
+        valueOptions = options.valueOptions;
+    }
+
+    let props_options = "";
+    if (props.length > 0) {
+        props_options = props.map(function(prop) {
+            return `<option value="${prop.name}">${prop.alias ?? prop.name}</option>`;
+        }).join("");
+    }
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="gfield-filter-item">
+    <select class="FieldName">
+        ${props_options}
+    </select>
+    <select class="Condition">
+        <option value="gte">{{layer_filter_condition_gte}}</option>
+        <option value="lte">{{layer_filter_condition_lte}}</option>
+        <option value="eq">{{layer_filter_condition_eq}}</option>
+        <option value="like">{{layer_filter_condition_contains}}</option>
+        <option value="in">{{layer_filter_condition_in_list}}</option>
+    </select>
+    <input type="text" class="Value"/>
+    <div class="remove"><div class="gr-pic gr-trash"></div></div>
+</div>`));
+
+    element.querySelector(".FieldName").value = options.name;
+    element.querySelector(".Condition").value = options.condition;
+    element.querySelector(".Value").value = options.value;
+
+    element.querySelector(".FieldName").addEventListener("change", function (e) {
+        options.name = e.target.value;
+        localThis.name = e.target.value;
+    });
+
+    element.querySelector(".Condition").addEventListener("change", function (e) {
+        options.condition = e.target.value;
+        localThis.condition = e.target.value;
+    });
+
+    const _changeValueHandler = (e) => {
+        options.value = e.target.value;
+        localThis.value = e.target.value;
+    };
+
+    element.querySelector(".Value").addEventListener("change", _changeValueHandler);
+    element.querySelector(".Value").addEventListener("keyup", _changeValueHandler);
+    element.querySelector(".Value").addEventListener("paste", _changeValueHandler);
+    element.querySelector(".Value").addEventListener("input", _changeValueHandler);
+
+    element.querySelector(".remove").addEventListener("click", function (e) {
+        if (typeof onRemove == "function") {
+            onRemove(id, e);
+        }
+    });
+
+    this.asFilter = function () {
+        return {
+            FieldName: options.name,
+            Condition: options.condition,
+            Value: options.value,
+            Next: options.next ?? "AND"
+        };
+    };
+
+    this.getElement = function () {
+        return element;
+    };
+};
+function gFieldFilterItemSelect(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+
+    let localThis = this;
+
+    let props = options.properties || [];
+
+    this.name = options.name;/*objaddress*/
+    this.condition = options.condition;/*gte*/
+    this.value = options.value;/*Mars st., 34-678*/
+    this.next = options.next ?? "AND";
+
+    let valueType = "default";
+    let valueOptions = [];
+    let onRemove = options.onRemove || function () { };
+
+    if (options.valueType) {
+        valueType = options.valueType;
+    }
+
+    if (options.valueOptions) {
+        valueOptions = options.valueOptions;
+    }
+
+    let props_options = "";
+    if (props.length > 0) {
+        props_options = props.map(function(prop) {
+            return `<option value="${prop.name}">${prop.alias ?? prop.name}</option>`;
+        }).join("");
+    }
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="gfield-filter-item">
+    <select class="FieldName">
+        ${props_options}
+    </select>
+    <select class="Condition">
+        <option value="gte">{{layer_filter_condition_gte}}</option>
+        <option value="lte">{{layer_filter_condition_lte}}</option>
+        <option value="eq">{{layer_filter_condition_eq}}</option>
+        <option value="like">{{layer_filter_condition_contains}}</option>
+        <option value="in">{{layer_filter_condition_in_list}}</option>
+    </select>
+    <select class="Value">
+        <option value="1" selected>Коробицыно</option>
+        <option value="2">Другое значение 1</option>
+        <option value="3">Другое значение 2</option>
+        <option value="4">Другое значение 3</option>
+        <option value="5">Другое значение 4</option>
+    </select>
+    <div class="remove"><div class="gr-pic gr-trash"></div></div>
+</div>`));
+
+    element.querySelector(".FieldName").value = options.name;
+    element.querySelector(".Condition").value = options.condition;
+    element.querySelector(".Value").value = "1"; // FIXME
+
+    element.querySelector(".FieldName").addEventListener("change", function (e) {
+        options.name = e.target.value;
+        localThis.name = e.target.value;
+    });
+
+    element.querySelector(".Condition").addEventListener("change", function (e) {
+        options.condition = e.target.value;
+        localThis.condition = e.target.value;
+    });
+
+    const _changeValueHandler = (e) => {
+        options.value = e.target.value;
+        localThis.value = e.target.value;
+    };
+
+    element.querySelector(".Value").addEventListener("change", _changeValueHandler);
+    // element.querySelector(".Value").addEventListener("keyup", _changeValueHandler);
+    // element.querySelector(".Value").addEventListener("paste", _changeValueHandler);
+    // element.querySelector(".Value").addEventListener("input", _changeValueHandler);
+
+    element.querySelector(".remove").addEventListener("click", function (e) {
+        if (typeof onRemove == "function") {
+            onRemove(id, e);
+        }
+    });
+
+    this.asFilter = function () {
+        return {
+            FieldName: options.name,
+            Condition: options.condition,
+            Value: options.value,
+            Next: options.next ?? "AND"
+        };
+    };
+
+    this.getElement = function () {
+        return element;
+    };
+};
+function gFieldInput(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+
+    let localThis = this;
+
+    this.name = options.name;
+    this.title = options.title;
+    this.type = options.type ?? "text";
+    this.min = options.min ?? 0;
+    this.max = options.max ?? 0;
+
+    this.value = options.value;
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="gfield-input">
+    <span class="Title">{{dtitle}}</span>
+    <input type="{{dtype}}" data-name="{{dname}}" class="Value"/>
+</div>`), [
+        { key: "dname", value: this.name },
+        { key: "dtitle", value: this.title },
+        { key: "dtype", value: this.type },
+    ]);
+
+    if ((this.title ?? "") == "") {
+        element.querySelector(".Title").remove();
+    }
+
+    function setValue(e) {
+        options.value = e.target.value;
+        localThis.value = e.target.value;
+    };
+
+    element.querySelector(".Value").value = options.value;
+
+    element.querySelector(".Value").addEventListener("change", setValue);
+    element.querySelector(".Value").addEventListener("keyup", setValue);
+    element.querySelector(".Value").addEventListener("paste", setValue);
+    element.querySelector(".Value").addEventListener("input", setValue);
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.getValue = function () {
+        return localThis.value;
+    };
+};
+function gFieldSelect(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.name = options.name;
+    this.title = options.title;
+    this.options = options.options || []; // Список объектов типа {value: "1", text: "First"}
+    this.value = options.value || "";
+    this.placeholder = options.placeholder || gltxt("select_option") || "Select...";
+    this.required = options.required || false;
+
+    let optionsHtml = "";
+    if (this.placeholder) {
+        optionsHtml += `<option value="" ${!this.value ? 'selected' : ''} disabled>${this.placeholder}</option>`;
+    }
+
+    this.options.forEach(option => {
+        const selected = option.value === this.value ? 'selected' : '';
+        optionsHtml += `<option value="${option.value}" ${selected}>${option.text}</option>`;
+    });
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="gfield-select">
+    <span class="Title">{{dtitle}}</span>
+    <select data-name="{{dname}}" class="gr-down-l Value" {{drequired}}>
+        ${optionsHtml}
+    </select>
+</div>`), [
+        { key: "dname", value: this.name },
+        { key: "dtitle", value: this.title },
+        { key: "drequired", value: this.required ? "required" : "" }
+    ]);
+
+    if ((this.title ?? "") == "") {
+        element.querySelector(".Title").remove();
+    }
+
+    const selectElement = element.querySelector(".Value");
+
+    function setValue(e) {
+        localThis.value = e.target.value;
+        if (typeof options.onChange === "function") {
+            options.onChange(localThis.value);
+        }
+    }
+
+    selectElement.value = this.value;
+
+    selectElement.addEventListener("change", setValue);
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.getValue = function () {
+        return localThis.value;
+    };
+
+    this.setValue = function (value) {
+        localThis.value = value;
+        selectElement.value = value;
+    };
+
+    this.setOptions = function (newOptions) {
+        this.options = newOptions;
+        selectElement.innerHTML = "";
+
+        if (this.placeholder) {
+            const placeholderOption = document.createElement("option");
+            placeholderOption.value = "";
+            placeholderOption.textContent = this.placeholder;
+            placeholderOption.disabled = true;
+            placeholderOption.selected = !this.value;
+            selectElement.appendChild(placeholderOption);
+        }
+
+        newOptions.forEach(option => {
+            const optionElement = document.createElement("option");
+            optionElement.value = option.value;
+            optionElement.textContent = option.text;
+            optionElement.selected = option.value === this.value;
+            selectElement.appendChild(optionElement);
+        });
+    };
+
+    this.clear = function () {
+        localThis.value = "";
+        selectElement.value = "";
+        if (this.placeholder) {
+            selectElement.querySelector('option[value=""]').selected = true;
+        }
+    };
+
+    return this;
+};
+function gFieldFileInput(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.name = options.name;
+    this.title = options.title;
+    this.accept = options.accept || "*/*"; // например .xlsx, .xls
+    this.multiple = false; // потом может сделаем чтобы много файлов можно было
+    this.value = options.value || null; // будет содержать целиком File-объект
+
+    this._getFileNameDisplay = function () {
+        if (!this.value) {
+            return options.noFileText || gltxt("no_file_selected") || "No file selected";
+        }
+
+        if (this.multiple && this.value.length > 0) {
+            return this.value.length + " " +
+                (options.filesSelectedText || gltxt("files_selected") || "files selected");
+        }
+
+        if (!this.multiple && this.value) {
+            return this.value.name;
+        }
+
+        return options.noFileText || gltxt("no_file_selected") || "No file selected";
+    };
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="gfield-file-input">
+    <span class="Title">{{dtitle}}</span>
+    <div class="file-input-container">
+        <input type="file" data-name="{{dname}}" class="file-input-hidden" 
+               accept="{{daccept}}" {{dmultiple}}/>
+        <button type="button" class="browse-btn">{{dbrowsetext}}</button>
+        <div class="file-name">{{dfilename}}</div>
+    </div>
+</div>`), [
+        { key: "dname", value: this.name },
+        { key: "dtitle", value: this.title },
+        { key: "daccept", value: this.accept },
+        { key: "dmultiple", value: this.multiple ? "multiple" : "" },
+        { key: "dbrowsetext", value: options.browseText || gltxt("browse") || "Browse" },
+        { key: "dfilename", value: this._getFileNameDisplay() }
+    ]);
+
+    if ((this.title ?? "") == "") {
+        element.querySelector(".Title").remove();
+    }
+
+    const fileInput = element.querySelector(".file-input-hidden");
+    const browseBtn = element.querySelector(".browse-btn");
+    const fileName = element.querySelector(".file-name");
+
+    browseBtn.addEventListener("click", function () {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener("change", function (e) {
+        if (this.multiple) {
+            localThis.value = e.target.files;
+        } else {
+            localThis.value = e.target.files[0];
+        }
+        fileName.textContent = localThis._getFileNameDisplay();
+
+        if (typeof options.onChange === "function") {
+            options.onChange(localThis.value);
+        }
+    });
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.getValue = function () {
+        return localThis.value;
+    };
+
+    this.setValue = function (file) {
+        localThis.value = file;
+        fileName.textContent = this._getFileNameDisplay();
+        // Нельзя программно сэтить file из-за безопасности
+    };
+
+    this.clear = function () {
+        fileInput.value = "";
+        localThis.value = null;
+        fileName.textContent = this._getFileNameDisplay();
+    };
+
+    this.setAccept = function (acceptTypes) {
+        this.accept = acceptTypes;
+        fileInput.accept = acceptTypes;
+    };
+
+    return this;
+};
+function gTable(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+
+    this.name = options.name;
+    this.title = options.title;
+    this.data = options.data || [];
+    this.columns = options.columns || [];
+    this.maxHeight = options.maxHeight || "300px";
+    this.showHeader = options.showHeader !== false;
+    this.compact = options.compact || false;
+
+    if (this.columns.length === 0 && this.data.length > 0) {
+        this.columns = Object.keys(this.data[0]).map(key => ({
+            key: key,
+            title: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+            width: options.autoWidth ? "auto" : "150px"
+        }));
+    }
+
+    this._formatValue = function (value) {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+    };
+
+    this._generateRowHtml = function (row) {
+        return this.columns.map(col => {
+            const value = row[col.key] ?? '';
+            return `<td data-key="${col.key}">${this._formatValue(value)}</td>`;
+        }).join('');
+    };
+
+    this._generateBodyHtml = function () {
+        if (this.data.length === 0) {
+            return `<tr><td colspan="${this.columns.length}" class="no-data">${gltxt("no_data") || "No data available"}</td></tr>`;
+        }
+
+        return this.data.map((row, index) => {
+            const rowClass = index % 2 === 0 ? 'even' : 'odd';
+            return `<tr class="row-${rowClass}">${this._generateRowHtml(row)}</tr>`;
+        }).join('');
+    };
+
+    this._generateHeaderHtml = function () {
+        if (!this.showHeader) return '';
+        return this.columns.map(col =>
+            `<th data-key="${col.key}" ${col.width ? `style="width: ${col.width}"` : ''}>${col.title}</th>`
+        ).join('');
+    };
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="g-table">
+    {{dtitle}}
+    <div class="table-container">
+        <table class="table-content">
+            <thead class="table-header">
+                <tr>{{headerContent}}</tr>
+            </thead>
+            <tbody class="table-body">
+                {{bodyContent}}
+            </tbody>
+        </table>
+    </div>
+</div>`), [
+        {
+            key: "dtitle",
+            value: this.title ? `<span class="Title">${this.title}</span>` : ""
+        },
+        {
+            key: "headerContent",
+            value: this._generateHeaderHtml()
+        },
+        {
+            key: "bodyContent",
+            value: this._generateBodyHtml()
+        }
+    ]);
+
+    const tableContainer = element.querySelector('.table-container');
+    if (tableContainer) {
+        tableContainer.style.maxHeight = this.maxHeight;
+    }
+
+    if (this.compact) {
+        element.classList.add('compact');
+    }
+
+    this._applyColumnWidths = function () {
+        const headers = element.querySelectorAll('th');
+        const cells = element.querySelectorAll('td');
+
+        this.columns.forEach((col, index) => {
+            if (col.width && headers[index]) {
+                headers[index].style.width = col.width;
+                headers[index].style.minWidth = col.width;
+
+                cells.forEach((cell, cellIndex) => {
+                    if (cellIndex % this.columns.length === index) {
+                        cell.style.width = col.width;
+                        cell.style.minWidth = col.width;
+                    }
+                });
+            }
+        });
+    };
+
+    if (this.columns.some(col => col.width)) {
+        this._applyColumnWidths();
+    }
+
+    this._refreshTable = function () {
+        const thead = element.querySelector('.table-header');
+        const tbody = element.querySelector('.table-body');
+
+        if (thead) {
+            thead.innerHTML = `<tr>${this._generateHeaderHtml()}</tr>`;
+        }
+
+        if (tbody) {
+            tbody.innerHTML = this._generateBodyHtml();
+        }
+
+        if (this.columns.some(col => col.width)) {
+            setTimeout(() => this._applyColumnWidths(), 0);
+        }
+    };
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.getValue = function () {
+        return this.data;
+    };
+
+    this.setData = function (newData) {
+        this.data = newData;
+        this._refreshTable();
+    };
+
+    this.setColumns = function (newColumns) {
+        this.columns = newColumns;
+        this._refreshTable();
+    };
+
+    this.addRow = function (rowData) {
+        this.data.push(rowData);
+        this._refreshTable();
+    };
+
+    this.removeRow = function (index) {
+        this.data.splice(index, 1);
+        this._refreshTable();
+    };
+
+    this.clear = function () {
+        this.data = [];
+        this._refreshTable();
+    };
+
+    return this;
+}
+function gParamsTable(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.name = options.name;
+    this.title = options.title;
+    this.params = options.params || [];
+    this.selectedKeys = options.selectedKeys || [];
+    this.maxHeight = options.maxHeight || "300px";
+    this.compact = options.compact || false;
+    this.checkboxInstances = {};
+
+    this._generateRowHtml = function (param, index) {
+        return `
+            <tr class="row-${index % 2 === 0 ? 'even' : 'odd'}" data-key="${param.key}">
+                <td class="checkbox-cell" id="checkbox-${param.key.replace(/[^a-zA-Z0-9]/g, '-')}"></td>
+                <td class="key-cell">${param.key}</td>
+                <td class="title-cell">${param.title}</td>
+            </tr>`;
+    };
+
+    this._generateBodyHtml = function () {
+        if (this.params.length === 0) {
+            return `<tr><td colspan="3" class="no-data">${gltxt("no_params") || "No parameters available"}</td></tr>`;
+        }
+
+        return this.params.map((param, index) => this._generateRowHtml(param, index)).join('');
+    };
+
+    this._generateHeaderHtml = function () {
+        return `
+            <th class="checkbox-header" style="width: 50px;"></th>
+            <th class="key-header" style="width: 150px;">${gltxt("key") || "Key"}</th>
+            <th class="title-header">${gltxt("title") || "Title"}</th>`;
+    };
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="g-params-table">
+    {{dtitle}}
+    <div class="table-container">
+        <table class="table-content">
+            <thead class="table-header">
+                <tr>{{headerContent}}</tr>
+            </thead>
+            <tbody class="table-body">
+                {{bodyContent}}
+            </tbody>
+        </table>
+    </div>
+</div>`), [
+        {
+            key: "dtitle",
+            value: this.title ? `<span class="Title">${this.title}</span>` : ""
+        },
+        {
+            key: "headerContent",
+            value: this._generateHeaderHtml()
+        },
+        {
+            key: "bodyContent",
+            value: this._generateBodyHtml()
+        }
+    ]);
+
+    const tableContainer = element.querySelector('.table-container');
+    if (tableContainer) {
+        tableContainer.style.maxHeight = this.maxHeight;
+    }
+
+    if (this.compact) {
+        element.classList.add('compact');
+    }
+
+    setTimeout(() => this._createCheckboxes(), 0);
+
+    this._createCheckboxes = function () {
+        this.params.forEach(param => {
+            const isChecked = this.selectedKeys.includes(param.key);
+            const checkboxCell = element.querySelector(`#checkbox-${param.key.replace(/[^a-zA-Z0-9]/g, '-')}`);
+
+            if (checkboxCell) {
+                const checkbox = new gCheckbox({
+                    value: isChecked ? "checked" : "unchecked",
+                    size: "20px",
+                    checkedClass: options.checkedClass || "gr-check-square-solid",
+                    uncheckedClass: options.uncheckedClass || "gr-rsquare",
+                    onChange: (state, booleanValue) => {
+                        this._handleCheckboxChange(param.key, booleanValue);
+                    }
+                });
+
+                this.checkboxInstances[param.key] = checkbox;
+                checkboxCell.appendChild(checkbox.getElement());
+            }
+        });
+    };
+
+    this._handleCheckboxChange = function (key, isChecked) {
+        if (isChecked) {
+            if (!this.selectedKeys.includes(key)) {
+                this.selectedKeys.push(key);
+            }
+        } else {
+            this.selectedKeys = this.selectedKeys.filter(k => k !== key);
+        }
+
+        if (typeof options.onSelectionChange === 'function') {
+            options.onSelectionChange(this.selectedKeys);
+        }
+    };
+
+    this._updateCheckboxes = function () {
+        this.params.forEach(param => {
+            const checkbox = this.checkboxInstances[param.key];
+            if (checkbox) {
+                const isChecked = this.selectedKeys.includes(param.key);
+                checkbox.setValue(isChecked ? "checked" : "unchecked");
+            }
+        });
+    };
+
+    this._cleanupCheckboxes = function () {
+        Object.values(this.checkboxInstances).forEach(checkbox => {
+            const element = checkbox.getElement();
+            if (element && element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
+        });
+        this.checkboxInstances = {};
+    };
+
+    this._refreshTable = function () {
+        const tbody = element.querySelector('.table-body');
+        if (tbody) {
+            tbody.innerHTML = this._generateBodyHtml();
+            setTimeout(() => this._createCheckboxes(), 0);
+        }
+    };
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.getValue = function () {
+        return this.selectedKeys;
+    };
+
+    this.setSelectedKeys = function (keys) {
+        this.selectedKeys = keys;
+        this._updateCheckboxes();
+
+        if (typeof options.onSelectionChange === 'function') {
+            options.onSelectionChange(this.selectedKeys);
+        }
+    };
+
+    this.selectAll = function () {
+        this.selectedKeys = this.params.map(param => param.key);
+        this._updateCheckboxes();
+
+        if (typeof options.onSelectionChange === 'function') {
+            options.onSelectionChange(this.selectedKeys);
+        }
+    };
+
+    this.deselectAll = function () {
+        this.selectedKeys = [];
+        this._updateCheckboxes();
+
+        if (typeof options.onSelectionChange === 'function') {
+            options.onSelectionChange(this.selectedKeys);
+        }
+    };
+
+    this.setParams = function (newParams) {
+        this._cleanupCheckboxes();
+        this.params = newParams;
+        this.selectedKeys = this.selectedKeys.filter(key =>
+            newParams.some(param => param.key === key)
+        );
+        this._refreshTable();
+    };
+
+    this.destroy = function () {
+        this._cleanupCheckboxes();
+        if (element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    };
+
+    return this;
+};
+function gCreateProps(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.rows = options.initialData || [{ key: "", title: "", type: "string" }];
+    this.columnInstances = [];
+    this.onChange = options.onChange || function () { };
+
+    const element = HtmlElementFromText(`
+<div class="g-create-props">
+    <div class="columns-container" style="max-height: 500px; overflow-y: auto;">
+        <!-- columns -->
+    </div>
+    <div class="buttons-container">
+        <div class="add-btn-container"></div>
+        <div class="clear-btn-container"></div>
+    </div>
+</div>`);
+
+    const columnsContainer = element.querySelector('.columns-container');
+    const addBtnContainer = element.querySelector('.add-btn-container');
+    const clearBtnContainer = element.querySelector('.clear-btn-container');
+
+    this._createButtons = function () {
+        addBtnContainer.innerHTML = "";
+
+        const addButton = new gButton({
+            iconClass: "gr-plus",
+            className: "success",
+            onClick: function () {
+                localThis.rows.push({ key: "", title: "", type: "string" });
+                localThis._refreshColumns();
+                localThis._triggerChange();
+            }
+        });
+        addBtnContainer.appendChild(addButton.getElement());
+
+        /**/
+
+        clearBtnContainer.innerHTML = "";
+
+        const clearButton = new gButton({
+            iconClass: "gr-recycle-b",
+            text: gltxt("clear"),
+            className: "default",
+            onClick: function () {
+                localThis.rows = [];
+                localThis.rows.length = 0;
+
+                localThis._refreshColumns();
+                localThis._triggerChange();
+            }
+        });
+        clearBtnContainer.appendChild(clearButton.getElement());
+    };
+
+    this._createColumns = () => {
+        columnsContainer.innerHTML = "";
+        this.columnInstances = [];
+
+        this.rows.forEach((rowData, index) => {
+            const column = new gSchemaColumn({
+                title: rowData.title,
+                type: rowData.type,
+                onChange: function (data) {
+                    localThis.rows[index] = {
+                        key: ToUrlSlug(data.title),
+                        title: data.title,
+                        type: data.type
+                    };
+                    localThis._triggerChange();
+                },
+                onRemove: function () {
+                    localThis.rows.splice(index, 1);
+                    localThis._refreshColumns();
+                    localThis._triggerChange();
+                }
+            });
+
+            columnsContainer.appendChild(column.getElement());
+            this.columnInstances.push(column);
+        });
+    };
+
+    this._refreshColumns = () => {
+        console.log("rows", this.rows);
+        this._createColumns();
+        this._createButtons();
+    };
+
+    this._triggerChange = () => {
+        this.onChange(this.getValue());
+    };
+
+    this.checkValue = function () {
+        // Проверка: что вообще что-тл есть в принципе
+        const hasProperties = this.rows.length > 0;
+
+        // Проверка: нет пустых title
+        const emptyTitles = this.rows
+            .map((row, index) => ({ title: row.title, index }))
+            .filter(item => item.title.trim() === "")
+            .map(item => gltxt_f("empty_title_at_row_n", item.index + 1));
+
+        // Проверка: duplicate keys
+        const keyEntries = this.rows
+            .map((row, index) => ({ key: row.key, index }))
+            .filter(item => item.key.trim() !== "");
+
+        const keyMap = {};
+        keyEntries.forEach(item => {
+            if (!keyMap[item.key]) {
+                keyMap[item.key] = [];
+            }
+            keyMap[item.key].push(item.index + 1);
+        });
+
+        const keyErrors = Object.entries(keyMap)
+            .filter(([key, indexes]) => indexes.length > 1)
+            .map(([key, indexes]) => gltxt_f("duplicate_key_n_in_rows", key) + ` ${indexes.join(', ') }`);
+
+        // Проверка: duplicate titles
+        const titleEntries = this.rows
+            .map((row, index) => ({ title: row.title, index }))
+            .filter(item => item.title.trim() !== "");
+
+        const titleMap = {};
+        titleEntries.forEach(item => {
+            if (!titleMap[item.title]) {
+                titleMap[item.title] = [];
+            }
+            titleMap[item.title].push(item.index + 1);
+        });
+
+        const titleErrors = Object.entries(titleMap)
+            .filter(([title, indexes]) => indexes.length > 1)
+            .map(([title, indexes]) => gltxt_f("duplicate_title_n_in_rows", title) + ` ${indexes.join(', ')}`);
+
+        // все ошибки
+        const allErrors = [
+            ...(!hasProperties ? [gltxt("must_have_at_least_one_item")] : []),
+            ...emptyTitles,
+            ...keyErrors,
+            ...titleErrors
+        ];
+
+        return {
+            isValid: allErrors.length === 0,
+            hasProperties: hasProperties,
+            hasEmptyTitles: emptyTitles.length > 0,
+            hasDuplicateKeys: keyErrors.length > 0,
+            hasDuplicateTitles: titleErrors.length > 0,
+            errors: allErrors,
+            emptyTitles: emptyTitles,
+            duplicateKeys: keyErrors,
+            duplicateTitles: titleErrors
+        };
+    };
+
+    setTimeout(() => {
+        this._refreshColumns();
+    }, 0);
+
+    this.getElement = () => {
+        return element;
+    };
+
+    this.getValue = () => {
+        return this.rows.filter(row => row.title.trim() !== "").map(row => ({
+            key: row.key.trim(),
+            title: row.title.trim(),
+            type: row.type
+        }));
+    };
+
+    this.setValue = (newRows) => {
+        this.rows = newRows || [{ key: "", title: "", type: "string" }];
+        this._refreshColumns();
+        this._triggerChange();
+    };
+
+    this.addRow = (rowData) => {
+        this.rows.push(rowData || { key: "", title: "", type: "string" });
+        this._refreshColumns();
+        this._triggerChange();
+    };
+
+    this.clear = () => {
+        this.rows = [{ key: "", title: "", type: "string" }];
+        this._refreshColumns();
+        this._triggerChange();
+    };
+
+    this.destroy = () => {
+        this.columnInstances.forEach(column => {
+            const columnElement = column.getElement();
+            if (columnElement && columnElement.parentNode) {
+                columnElement.parentNode.removeChild(columnElement);
+            }
+        });
+        this.columnInstances = [];
+
+        if (element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    };
+
+    return this;
+};
+function gSchemaColumn(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.key = options.key || null;
+    this.title = options.title || "";
+    this.type = options.type || "string";
+    this.onChange = options.onChange || function () { };
+    this.onRemove = options.onRemove || function () { };
+
+    const element = HtmlElementFromText(`
+<div class="gschema-column">
+    <input type="text" class="column-title" value="${this.title}" placeholder="${gltxt("layer_new_enter_property_name")}">
+    <select class="column-type">
+        <option value="string" ${this.type === 'string' ? 'selected' : ''}>${gltxt("format_text")}</option>
+        <option value="int" ${this.type === 'int' ? 'selected' : ''}>${gltxt("format_integer")}</option>
+        <option value="double" ${this.type === 'double' ? 'selected' : ''}>${gltxt("format_double")}</option>
+    </select>
+    <div class="remove-btn">
+        <div class="gr-pic gr-trash"></div>
+    </div>
+</div>`);
+
+    const titleInput = element.querySelector(".column-title");
+    const typeSelect = element.querySelector(".column-type");
+    const removeBtn = element.querySelector(".remove-btn");
+
+    const triggerChange = function () {
+        localThis.title = titleInput.value;
+        localThis.type = typeSelect.value;
+        localThis.onChange({
+            title: localThis.title,
+            type: localThis.type
+        });
+    };
+
+    titleInput.addEventListener("input", function (e) {
+        triggerChange();
+    });
+
+    titleInput.addEventListener("change", function (e) {
+        triggerChange();
+    });
+
+    titleInput.addEventListener("keyup", function (e) {
+        triggerChange();
+    });
+
+    titleInput.addEventListener("paste", function (e) {
+        triggerChange();
+    });
+
+    typeSelect.addEventListener("change", function (e) {
+        triggerChange();
+    });
+
+    removeBtn.addEventListener("click", function (e) {
+        localThis.onRemove(localThis.id);
+    });
+
+    this.getValue = function () {
+        return {
+            key: ToUrlSlug(this.title),
+            title: this.title,
+            type: this.type
+        };
+    };
+
+    this.setValue = function (newValue) {
+        this.title = newValue.title || "";
+        this.type = newValue.type || "string";
+
+        titleInput.value = this.title;
+        typeSelect.value = this.type;
+
+        triggerChange();
+    };
+
+    this.getElement = function () {
+        return element;
+    };
+
+    return this;
+};
+function gIconsLibrary(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.name = options.name;
+    this.title = options.title;
+    this.icons = options.icons || [];
+    this.baseUrl = options.baseUrl || getNextImagesHost() + "/icon";
+    this.value = options.value || null;
+    this.size = options.size || 24;
+    this.columns = options.columns || 6;
+    this.maxHeight = options.maxHeight || "400px";
+
+    this._generateIconsHtml = function (icons) {
+        if (icons.length === 0) {
+            return `<div class="no-icons">${gltxt("no_icons_found") || "No icons found"}</div>`;
+        }
+
+        return icons.map(icon => {
+            const isSelected = this.value === icon;
+            return `
+                <div class="icon-item ${isSelected ? 'selected' : ''}" 
+                     data-icon="${icon}" title="${icon}">
+                    <img src="${this.baseUrl}${icon}" 
+                         width="${this.size}" 
+                         height="${this.size}" 
+                         alt="${icon}" 
+                         loading="lazy" />
+                </div>`;
+        }).join('');
+    };
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="g-icons-library">
+    {{dtitle}}
+    <div class="search-container">
+        <input type="text" class="search-input" placeholder="{{dsearchplaceholder}}" />
+    </div>
+    <div class="icons-container">
+        {{diconscontent}}
+    </div>
+</div>`), [
+        {
+            key: "dtitle",
+            value: this.title ? `<span class="Title">${this.title}</span>` : ""
+        },
+        {
+            key: "dsearchplaceholder",
+            value: options.searchPlaceholder || gltxt("search_icons") || "Search icons..."
+        },
+        {
+            key: "diconscontent",
+            value: this._generateIconsHtml(this.icons)
+        }
+    ]);
+
+    const searchInput = element.querySelector('.search-input');
+    const iconsContainer = element.querySelector('.icons-container');
+
+    if (iconsContainer) {
+        iconsContainer.style.maxHeight = this.maxHeight;
+    }
+
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filteredIcons = this.icons.filter(icon =>
+            icon.toLowerCase().includes(searchTerm)
+        );
+        this._updateIconsDisplay(filteredIcons);
+    });
+
+    iconsContainer.addEventListener('click', (e) => {
+        const iconElement = e.target.closest('.icon-item');
+        if (iconElement) {
+            const iconName = iconElement.dataset.icon;
+            this._selectIcon(iconName);
+
+            if (typeof options.onIconSelect === 'function') {
+                options.onIconSelect(iconName);
+            }
+        }
+    });
+
+    this._updateIconsDisplay = function (icons) {
+        iconsContainer.innerHTML = this._generateIconsHtml(icons);
+    };
+
+    this._selectIcon = function (iconName) {
+        const currentSelected = element.querySelector('.icon-item.selected');
+        if (currentSelected) {
+            currentSelected.classList.remove('selected');
+        }
+
+        if (iconName) {
+            const newSelected = element.querySelector(`.icon-item[data-icon="${iconName}"]`);
+            if (newSelected) {
+                newSelected.classList.add('selected');
+                this.value = iconName;
+            }
+        } else {
+            this.value = null;
+        }
+    };
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.getValue = function () {
+        return this.value;
+    };
+
+    this.setValue = function (iconName) {
+        this._selectIcon(iconName);
+    };
+
+    this.setIcons = function (newIcons) {
+        this.icons = newIcons;
+        this._updateIconsDisplay(newIcons);
+    };
+
+    this.clearSelection = function () {
+        this._selectIcon(null);
+    };
+
+    if (this.value) {
+        setTimeout(() => this._selectIcon(this.value), 0);
+    }
+
+    return this;
+};
+function gUsersRights(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.readOnly = options.readOnly || false;
+    this.name = options.name;
+    this.title = options.title;
+    this.owner = options.owner || "unknown";
+    this.users = options.users || [];
+    this.editors = options.editors || [];
+    this.viewers = options.viewers || [];
+    this.maxHeight = options.maxHeight || "400px";
+    this.checkboxInstances = {};
+
+    this._generateBodyHtml = function () {
+        if (this.users.length === 0) {
+            return `<tr><td colspan="3" class="no-data">${gltxt("no_users") || "No users available"}</td></tr>`;
+        }
+
+        return this.users.map(email => {
+            const isOwner = this.owner == email;
+            const isEditor = this.editors.includes(email);
+            const isViewer = this.viewers.includes(email);
+
+            if (isOwner) {
+                return `
+                <tr class="user-row" data-email="${email}">
+                    <td class="email-cell gr-profile">${email}</td>
+                    <td class="editor-cell" id="editor-${email.replace(/[@.]/g, '-')}"></td>
+                    <td class="viewer-cell" id="viewer-${email.replace(/[@.]/g, '-')}"></td>
+                </tr>`;
+            }
+            else {
+
+                return `
+                <tr class="user-row" data-email="${email}">
+                    <td class="email-cell">${email}</td>
+                    <td class="editor-cell" id="editor-${email.replace(/[@.]/g, '-')}"></td>
+                    <td class="viewer-cell" id="viewer-${email.replace(/[@.]/g, '-')}"></td>
+                </tr>`;
+            }
+
+            
+        }).join('');
+    };
+
+    const element = HtmlElementFromText(localizeHtml(`
+<div id="${id}" class="g-users-rights">
+    {{dtitle}}
+    <div class="table-container">
+        <table class="table-content">
+            <thead class="table-header">
+                <tr>
+                    <th class="email-header">&nbsp;</th>
+                    <th class="editor-header" style="width: 60px;">
+                        <span class="table-header-icon gr-pencil" title="${gltxt("access_write")}"></span>
+                    </th>
+                    <th class="viewer-header" style="width: 60px;">
+                        <span class="table-header-icon gr-eye-open" title="${gltxt("access_read")}"></span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="table-body">
+                {{dbodyContent}}
+            </tbody>
+        </table>
+    </div>
+</div>`), [
+        {
+            key: "dtitle",
+            value: this.title ? `<span class="Title">${this.title}</span>` : ""
+        },
+        {
+            key: "dbodyContent",
+            value: this._generateBodyHtml()
+        }
+    ]);
+
+    const tableContainer = element.querySelector('.table-container');
+    if (tableContainer) {
+        tableContainer.style.maxHeight = this.maxHeight;
+    }
+
+    setTimeout(() => this._createCheckboxes(), 0);
+
+    this._createCheckboxes = function () {
+        this.users.forEach(email => {
+            const isOwner = this.owner == email;
+            const isEditor = this.editors.includes(email);
+            const isViewer = this.viewers.includes(email);
+
+            const editorCell = element.querySelector(`#editor-${email.replace(/[@.]/g, '-')}`);
+            if (editorCell) {
+                const editorCheckbox = new gCheckbox({
+                    value: isOwner || isEditor ? "checked" : "unchecked",
+                    readOnly: isOwner || this.readOnly,
+                    size: "20px",
+                    onChange: (state, booleanValue) => {
+                        this._handleRightChange(email, 'editor', booleanValue);
+                    }
+                });
+                this.checkboxInstances[`editor-${email}`] = editorCheckbox;
+                editorCell.appendChild(editorCheckbox.getElement());
+            }
+
+            const viewerCell = element.querySelector(`#viewer-${email.replace(/[@.]/g, '-')}`);
+            if (viewerCell) {
+                const viewerCheckbox = new gCheckbox({
+                    value: isOwner || isViewer ? "checked" : "unchecked",
+                    readOnly: isOwner || this.readOnly,
+                    size: "20px",
+                    onChange: (state, booleanValue) => {
+                        this._handleRightChange(email, 'viewer', booleanValue);
+                    }
+                });
+                this.checkboxInstances[`viewer-${email}`] = viewerCheckbox;
+                viewerCell.appendChild(viewerCheckbox.getElement());
+            }
+        });
+    };
+
+    this._handleRightChange = function (email, rightType, isChecked) {
+        if (rightType === 'editor') {
+            if (isChecked) {
+                if (!this.editors.includes(email)) {
+                    this.editors.push(email);
+                }
+                if (!this.viewers.includes(email)) {
+                    this.viewers.push(email);
+                    
+                    const viewerCheckbox = this.checkboxInstances[`viewer-${email}`];
+                    if (viewerCheckbox) {
+                        viewerCheckbox.setValue("checked");
+                    }
+                }
+            } else {
+                this.editors = this.editors.filter(e => e !== email);
+            }
+        } else if (rightType === 'viewer') {
+            if (isChecked) {
+                if (!this.viewers.includes(email)) {
+                    this.viewers.push(email);
+                }
+            } else {
+                this.viewers = this.viewers.filter(e => e !== email);
+                this.editors = this.editors.filter(e => e !== email);
+                
+                const editorCheckbox = this.checkboxInstances[`editor-${email}`];
+                if (editorCheckbox) {
+                    editorCheckbox.setValue("unchecked");
+                }
+            }
+        }
+
+        if (typeof options.onRightsChange === 'function') {
+            options.onRightsChange({
+                editors: this.editors,
+                viewers: this.viewers
+            });
+        }
+    };
+
+    this._updateCheckboxes = function (email) {
+        const isEditor = this.editors.includes(email);
+        const isViewer = this.viewers.includes(email);
+
+        const editorCheckbox = this.checkboxInstances[`editor-${email}`];
+        const viewerCheckbox = this.checkboxInstances[`viewer-${email}`];
+
+        if (editorCheckbox) {
+            editorCheckbox.setValue(isEditor ? "checked" : "unchecked");
+        }
+        if (viewerCheckbox) {
+            viewerCheckbox.setValue(isViewer ? "checked" : "unchecked");
+        }
+    };
+
+    this._refreshTable = function () {
+        const tbody = element.querySelector('.table-body');
+        if (tbody) {
+            tbody.innerHTML = this._generateBodyHtml();
+            setTimeout(() => this._createCheckboxes(), 0);
+        }
+    };
+
+    this._cleanupCheckboxes = function () {
+        Object.values(this.checkboxInstances).forEach(checkbox => {
+            const element = checkbox.getElement();
+            if (element && element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
+        });
+        this.checkboxInstances = {};
+    };
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.getValue = function () {
+        return {
+            editors: [...this.editors],
+            viewers: [...this.viewers]
+        };
+    };
+
+    this.setUsers = function (newUsers) {
+        this._cleanupCheckboxes();
+        this.users = newUsers;
+        this.editors = this.editors.filter(email => newUsers.includes(email));
+        this.viewers = this.viewers.filter(email => newUsers.includes(email));
+        this._refreshTable();
+    };
+
+    this.setRights = function (editors, viewers) {
+        this.editors = editors || [];
+        this.viewers = viewers || [];
+
+        this.users.forEach(email => {
+            this._updateCheckboxes(email);
+        });
+    };
+
+    this.addUser = function (email) {
+        if (!this.users.includes(email)) {
+            this.users.push(email);
+            this._refreshTable();
+        }
+    };
+
+    this.removeUser = function (email) {
+        this.users = this.users.filter(e => e !== email);
+        this.editors = this.editors.filter(e => e !== email);
+        this.viewers = this.viewers.filter(e => e !== email);
+
+        delete this.checkboxInstances[`editor-${email}`];
+        delete this.checkboxInstances[`viewer-${email}`];
+
+        this._refreshTable();
+    };
+
+    this.destroy = function () {
+        this._cleanupCheckboxes();
+        if (element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    };
+
+    return this;
+};
+/**
+ * colorPick: ultra-light vanilla-JS color picker with palette, recent colors, and optional custom input.
+ */
+(function () {
+    // Default configuration
+    var defaults = {
+        initialColor: '#3498DB',
+        paletteLabel: 'Default palette:',
+        allowRecent: true,
+        recentMax: 5,
+        allowCustomColor: false,
+        palette: [
+            '#1ABC9C', '#16A085', '#2ECC71', '#27AE60', '#3498DB', '#2980B9',
+            '#9B59B6', '#8E44AD', '#34495E', '#2C3E50', '#F1C40F', '#F39C12',
+            '#E67E22', '#D35400', '#E74C3C', '#C0392B', '#ECF0F1', '#BDC3C7',
+            '#95A5A6', '#7F8C8D'
+        ],
+        onColorSelected: function () {
+            /** apply selected color */
+            this.element.style.backgroundColor = this.color;
+            this.element.style.color = this.color;
+        }
+    };
+
+    // Merge user options onto defaults
+    function mergeOptions(opts) {
+        var o = {};
+        for (var k in defaults) o[k] = defaults[k];
+        if (opts) for (var k2 in opts) if (opts[k2] != null) o[k2] = opts[k2];
+        return o;
+    }
+
+    // Uppercase + dedupe
+    function unique(arr) {
+        var res = [];
+        for (var i = 0; i < arr.length; i++) {
+            var v = String(arr[i]).toUpperCase();
+            if (res.indexOf(v) === -1) res.push(v);
+        }
+        return res;
+    }
+
+    // Load recent colors (up to max)
+    function parseRecents(max) {
+        try {
+            var a = JSON.parse(localStorage.getItem('colorPickRecent'));
+            return Array.isArray(a) ? a.slice(0, max) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // Save recent colors
+    function saveRecents(arr, max) {
+        localStorage.setItem('colorPickRecent', JSON.stringify(arr.slice(0, max)));
+    }
+
+    // Picker constructor
+    function ColorPick(el, opts) {
+        this.element = el;
+        this.options = mergeOptions(opts);
+        this.color = (el.dataset.initialcolor || this.options.initialColor).toUpperCase();
+        this.palette = unique(this.options.palette);
+        if (this.options.allowRecent) {
+            this.recents = parseRecents(this.options.recentMax);
+        }
+        this.applyColor();
+
+        var self = this;
+        // show on click of host element
+        el.addEventListener('click', function (e) {
+            if (e.target !== self.element) return;
+            e.preventDefault();
+            var r = self.element.getBoundingClientRect();
+            self.show(r.left + e.offsetX - 10, r.top + e.offsetY);
+        });
+
+        // hide on outside click
+        document.addEventListener('click', function (e) {
+            if (!self.wrapper || self.element.contains(e.target)) return;
+            self.hide();
+        });
+    }
+
+    ColorPick.prototype.applyColor = function () {
+        this.element.style.backgroundColor = this.color;
+        this.element.style.color = this.color;
+    };
+
+    ColorPick.prototype.show = function (left, top) {
+        if (this.wrapper) return;
+        var o = this.options;
+        var frag = document.createDocumentFragment();
+
+        // wrapper
+        var w = document.createElement('div');
+        w.className = 'colorPickWrapper';
+        w.style.cssText =
+            'position:absolute;padding:5px;background:#FFF;border:1px solid #CCC;z-index:99999';
+        w.style.left = left + 'px';
+        w.style.top = top + 'px';
+
+        // palette label
+        var lbl = document.createElement('span');
+        lbl.textContent = o.paletteLabel;
+        frag.appendChild(lbl);
+
+        // palette buttons
+        for (var i = 0; i < this.palette.length; i++) {
+            var hex = this.palette[i];
+            var btn = document.createElement('div');
+            btn.className = 'colorPickButton';
+            btn.dataset.hexValue = hex;
+            btn.style.cssText = 'display:inline-block;margin:2px;width:20px;height:20px;cursor:pointer;background:' + hex;
+            frag.appendChild(btn);
+        }
+
+        // custom color input
+        if (o.allowCustomColor) {
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'customColorHash';
+            inp.value = this.color;
+            inp.style.margin = '5px 0 0';
+            frag.appendChild(inp);
+
+            var self = this;
+            inp.addEventListener('keyup', function () {
+                var v = inp.value.trim();
+                if (v.charAt(0) !== '#') v = '#' + v;
+                if (/^#([0-9A-F]{3}|[0-9A-F]{6})$/i.test(v)) {
+                    inp.classList.remove('error');
+                    self.color = v.toUpperCase();
+                    self.applyColor();
+                    if (o.allowRecent) {
+                        if (self.recents.indexOf(self.color) === -1) {
+                            self.recents.unshift(self.color);
+                            saveRecents(self.recents, o.recentMax);
+                        }
+                    }
+                } else {
+                    inp.classList.add('error');
+                }
+            });
+        }
+
+        // recent palette
+        if (o.allowRecent) {
+            var rec = this.recents || [];
+            var span = document.createElement('span');
+            span.textContent = 'Recent:';
+            span.style.margin = '0 0 0 10px';
+            frag.appendChild(span);
+
+            for (var j = 0; j < rec.length; j++) {
+                var hexR = rec[j];
+                var btnR = document.createElement('div');
+                btnR.className = 'colorPickButton';
+                btnR.dataset.hexValue = hexR;
+                btnR.style.cssText = 'display:inline-block;margin:2px;width:20px;height:20px;cursor:pointer;background:' + hexR;
+                frag.appendChild(btnR);
+            }
+        }
+
+        w.appendChild(frag);
+        document.body.appendChild(w);
+        this.wrapper = w;
+
+        var self = this;
+        w.addEventListener('click', function (e) {
+            var hex = e.target.dataset.hexValue;
+            if (!hex) return;
+            self.color = hex;
+            self.applyColor();
+            if (o.allowRecent) {
+                if (self.recents.indexOf(hex) === -1) {
+                    self.recents.unshift(hex);
+                    saveRecents(self.recents, o.recentMax);
+                }
+            }
+            self.hide();
+        });
+    };
+
+    ColorPick.prototype.hide = function () {
+        if (this.wrapper) {
+            this.wrapper.remove();
+            this.wrapper = null;
+        }
+    };
+
+    // Public initializer
+    window.colorPick = function (selector, config) {
+        var elements = typeof selector === 'string'
+            ? document.querySelectorAll(selector)
+            : (selector instanceof NodeList ? selector : [selector]);
+        for (var k = 0; k < elements.length; k++) {
+            new ColorPick(elements[k], config);
+        }
+    };
+})();
+
+function ContextMenu(items, options, from) {
+
+    this.items = [];
+    this.options = {};
+    this.MenuDiv;
+    this._targetEvent = null;
+    this._hasButton = false;
+    this._visible;
+    this._from = "";
+
+    const Dialog = `
+        <div class="gi-context-menu" data-visible="false" animate="false" style="height: auto;" oncontextmenu="return false;">    
+            <div class="container">
+                <div class="header">
+                </div>
+                <div class="items-list">                
+                </div>
+            </div>
+        </div>
+    `;
+
+    const Button = `
+        <div class="item">
+            <div class="icon ico ico-small"></div>
+            <div class="text">{{text}}</div>
+        </div>`;
+
+    const Separator = `<div class="separator"><div class="line"></div></div>`;
+
+    this.unbind = () => {
+
+    }
+
+    this.clearItems = () => {
+        this.items = [];
+        const list_div = this.MenuDiv.querySelector(".items-list");
+        list_div.innerHTML = "";
+    }
+
+    this.itemsCount = () => {
+        return this.items.length;
+    };
+
+    this.addItem = (item) => {
+        this.items.push(item);
+    };
+
+    this.showAt = (top, left) => {
+        const all = document.querySelectorAll(".gi-context-menu");
+        all.forEach(x => x.remove());
+        this.createMenu(null, top, left);
+    }
+
+
+    this._onMouseUp = (e) => {
+        if (e.button !== this.options.which_btn) return;
+        if (this._visible && this.options.singleInstance === true) return;
+        if (this.items.length == 0) return;
+        this.createMenu(e);
+    }
+
+    this.createMenu = (e, top, left) => {
+
+        this.MenuDiv = HtmlElementFromText(Dialog);
+
+        const container = this.MenuDiv.querySelector(".container");
+        container.style.maxWidth = this.options.width_px + "px";
+
+        const list_div = this.MenuDiv.querySelector(".items-list");
+
+        let group_numbers = this.items.map(x => x.group).filter(x => x !== undefined);
+        group_numbers = group_numbers.sort((a, b) => a - b).filter((x, i, a) => a.indexOf(x) === i);
+
+        group_numbers.forEach((group_number, index) => {
+
+            if (index !== 0) {
+                const sprHtml = HtmlElementFromText(Separator);
+                list_div.appendChild(sprHtml);
+            }
+
+            const items = this.items.filter(x => x.group === group_number);
+
+            items.forEach(item => {
+                switch (item.type) {
+                    case "button":
+                        const itemHtml = HtmlElementFromText(Button);
+                        itemHtml.querySelector(".text").innerHTML = item.text;
+                        item.icon_classes?.forEach(x => itemHtml.querySelector(".icon").classList.add(x));
+                        item.item_classes?.forEach(x => itemHtml.classList.add(x));
+                        itemHtml.addEventListener("click", (e) => {
+                            item.onClick(item.id);
+                            this.closeMenuFast();
+                        });
+                        list_div.appendChild(itemHtml);
+                        break;
+                    case "checkbox":
+                        break;
+                    default:
+                        break;
+                }
+            });
+        });
+
+        const _size = ElSize.fromElement(this.MenuDiv);
+
+        const menuHeight = _size.height;
+        const menuWidth = (_size.width > 0) ? _size.width : this.options.width_px;
+
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        let _tar_pos = null;
+        if (e?.target) {
+            _tar_pos = e.target.getBoundingClientRect();
+        }
+        else if (top && left) {
+            _tar_pos = new DOMRect(left, top, 0, 0);
+        }
+
+        this.MenuDiv.style.left = ((_tar_pos.left + (_tar_pos.width / 2)) - menuWidth / 2) + "px";
+        this.MenuDiv.style.top = ((_tar_pos.top + (_tar_pos.height / 2)) - menuHeight / 2) + "px";
+
+        this.MenuDiv.style.maxWidth = this.options.width_px + "px";
+
+        document.body.appendChild(this.MenuDiv);
+
+        //tut
+
+        let startLeft;
+        let startTop;
+        if (this._hasButton) {
+            startLeft = this.options.attachTo.getBoundingClientRect().left;
+            startTop = this.options.attachTo.getBoundingClientRect().top;
+            const btn_size = ElSize.fromElement(this.options.attachTo);
+            startLeft = startLeft + Math.ceil(btn_size.width / 2);
+            startTop = startTop + Math.ceil(btn_size.height);
+        }
+        else {
+            if (e) {
+                startLeft = e.clientX;
+                startTop = e.clientY;
+            }
+            else if (top && left) {
+                startLeft = left;
+                startTop = top;
+            }
+
+        }
+
+        startLeft = startLeft - Math.ceil(menuWidth / 2);
+
+        this.MenuDiv.style.left = startLeft + "px";
+        this.MenuDiv.style.top = startTop + "px";
+
+        if (startLeft + menuWidth > windowWidth) {
+            this.MenuDiv.style.left = (windowWidth - menuWidth - 10) + "px";
+        }
+        else if (startLeft < 0) {
+            this.MenuDiv.style.left = "0px";
+        }
+
+        if (startTop + menuHeight > windowHeight) {
+            this.MenuDiv.style.top = (startTop - menuHeight) + "px";
+        }
+        else if (startTop < 0) {
+            this.MenuDiv.style.top = "0px";
+        }
+
+        this.MenuDiv.setAttribute("animate", "true");
+
+        this.MenuDiv.setAttribute("data-visible", "true");
+
+        this._visible = true;
+
+        if (this.options.onOpen) {
+            this.options.onOpen();
+        }
+
+        setTimeout(() => {
+            window.addEventListener("mousedown", this._outsideClick);
+            window.addEventListener("resize", this._windowResize);
+        }, 200);
+    }
+
+    this.closeMenu = () => {
+        this.closeMenuFast();
+    }
+
+    this.closeMenuFast = () => {
+        if (this.MenuDiv) {
+            window.removeEventListener("mousedown", this._outsideClick);
+            window.removeEventListener("resize", this._windowResize);
+
+            this.MenuDiv.remove();
+            if (this.options.onClose) {
+                this.options.onClose();
+            }
+        }
+
+        this._visible = false;
+    }
+
+    this._outsideClick = (e) => {
+        if (this.MenuDiv.contains(e.target)) {
+            return;
+        }
+        this.closeMenuFast();
+    }
+
+    this._windowResize = () => {
+        this.closeMenuFast();
+    }
+
+    const init = (items, options, from) => {
+        this._targetEvent = this._onMouseUp.bind(this);
+
+        this._hasButton = options.hasButton;
+        this._from = from ?? "nothing";
+        console.log(`ContextMenu:from = [${this._from}]`);
+
+        //if (this._hasButton) {
+        //    this.options.attachTo.addEventListener("mouseup", this._targetEvent);
+        //}
+        //else {
+        //    document.addEventListener("mouseup", this._targetEvent);
+        //}
+
+        if (this.options.attachTo) {
+            this.options.attachTo.addEventListener("mouseup", this._targetEvent);
+        }
+        
+        this._visible = false;
+    }
+
+    init(items, options, from);
+};
+function gColorPicker(options) {
+    if (!options) return;
+    if (!options.target) return;
+
+    let targetElement = null;
+
+    if (typeof options.target == "string") {
+        targetElement = document.querySelector(options.target);
+    } else if (options.target instanceof HTMLElement) {
+        targetElement = options.target;
+    } else {
+        console.warn("gColorPicker: target is not a valid element");
+        return;
+    }
+
+    this.id = generateSTRUID();
+
+    let wintemplate = `
+        <div id="${this.id}" class="gcolorpicker" data-visible="false">
+        </div>
+    `;
+
+    let itemtemplate = `
+        <div class="gcolorpicker-item" data-hex-value="#FF0000"></div>
+    `;
+
+    options.initialColor = options.initialColor || "#FF0000";
+    options.palette = options.palette || ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'];
+
+    function closeColorPicker() {
+        element.setAttribute("data-visible", "false");
+        window.removeEventListener("mousedown", _outsideClick);
+        setTimeout(() => {
+            element.remove();
+        }, 200);
+    }
+
+    const element = HtmlElementFromText(wintemplate);
+
+    let r = targetElement.getBoundingClientRect();
+
+    document.body.appendChild(element);
+
+    options.palette.forEach((color) => {
+        let item = HtmlElementFromText(itemtemplate);
+        item.style.backgroundColor = color;
+        item.setAttribute("data-hex-value", color);
+        item.addEventListener("click", function (e) {
+            if(typeof options.onColorSelected != "function") {
+                return;
+            }
+            options.onColorSelected(color);
+            closeColorPicker();
+        });
+        element.appendChild(item);
+    });
+
+    const _size = GSize.fromElement(element);
+
+    console.log("GSize.fromElement(element)", _size);
+
+    let _right = (r.left + ((r.right - r.left) / 2)) + (_size.outerWidth / 2);
+    let _left = (r.left + ((r.right - r.left) / 2)) - (_size.outerWidth / 2);
+    let _bottom = r.top + r.height + _size.outerHeight + 16;
+    let _top = r.top + r.height + 16;
+
+    //show
+    if (_right < document.body.clientWidth && _left > 0) {
+        element.style.left = `${(r.left + (r.width / 2)) - (_size.outerWidth / 2)}px`;
+    }
+    else if (_right >= document.body.clientWidth) {
+        element.style.left = `${(r.left + (r.width / 2)) - (_size.outerWidth)}px`;
+    }
+    else if (_left <= 0) {
+        element.style.left = `${r.left}px`;
+    }
+
+    console.log("_top", _top);
+    console.log("_bottom", _bottom);
+    console.log("document.body.clientHeight", document.body.clientHeight);
+    if (_bottom >= document.body.clientHeight) {
+        element.style.top = `${r.top - _size.outerHeight - 16}px`;
+    } else if (_top >= 0) {
+        element.style.top = `${_top}px`;
+    } else {
+        element.style.top = `${r.top}px`;
+    }
+
+    element.setAttribute("data-visible", "true");
+
+    let _outsideClick = function (e) {
+        if (!element || element.contains(e.target)) return;
+        closeColorPicker();
+    }
+
+    window.addEventListener("mousedown", _outsideClick);
+};
+function LeftWindow(options) {
+    if (!options) return;
+    if (!options.target) return;
+
+    let _options = {
+        target: options.target,
+        icon: options.icon ?? "gr-grid-plus",
+        title: options.title ?? "--",
+        readOnly: options.readOnly || false,
+        subtitle: options.subtitle ?? "--",
+        onclose: options.onclose || function() { }
+    };
+
+    let targetElement = null;
+
+    if (typeof options.target == "string") {
+        targetElement = document.querySelector(options.target);
+        if (!targetElement) {
+            console.error(`LeftWindow: target [${options?.target}] is not a valid element`);
+            return;
+        }
+    } else if (options.target instanceof HTMLElement) {
+        targetElement = options.target;
+    } else {
+        console.warn("LeftWindow: target is not a valid element");
+        return;
+    }
+
+    let selfcontainer = null;
+
+    let id = generateSTRUID();
+
+    let isLoading = false;
+
+    let wintemplate = `
+    <div data-role="left-window" data-has-note="false" data-windowtype="panel" class="bg-color-fon">
+        <div class="head-container">
+            <div class="icon gr-pic {{dicon}}"></div>
+            <label class="title">{{dtitle}}</label>
+            <label class="subtitle">{{dsubtitle}}</label>
+            <div class="close" title="{{close}}">
+                <span class="gr-pic gr-close-x-r"></span>
+            </div>
+        </div>
+        <div class="body-container">
+            <div class="loading-container" style="display: none;">
+                <div class="loading-animation">
+                    <div class="loading-line"></div>
+                    <div class="loading-line"></div>
+                    <div class="loading-line"></div>
+                    <div class="loading-line"></div>
+                </div>
+                <div class="loading-text">${gltxt("please_wait___")}</div>
+            </div>
+            <div class="note">
+            ---
+            </div>
+            <div class="container">                
+                <div class="main">                
+                </div>
+                <div class="buttons">
+                    <div class="left">
+                    </div>
+                    <div class="right">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    function BuildWindow() {
+        selfcontainer?.replaceChild();
+        selfcontainer = HtmlElementFromText(localizeHtml(wintemplate), [
+            { key: "dtitle", value: _options.title },
+            { key: "dsubtitle", value: _options.subtitle },
+            { key: "dicon", value: _options.icon },
+        ]);
+
+        let closeBtn = selfcontainer.querySelector('.close');
+        closeBtn?.addEventListener('click', function () {
+
+            if (_options.readOnly) {
+                Close();
+            }
+            else {
+                var question = gltxt("close_without_saving") + "?";
+                var okBtn = {
+                    type: "ok",
+                    action: Close,
+                    title: "",
+                    text: gltxt("yes"),
+                    icon: false,
+                    "class": "btn_confirm"
+                };
+                var cancelBtn = {
+                    type: "skip",
+                    action: function () { },
+                    title: "",
+                    text: gltxt("no"),
+                    icon: false,
+                    "class": "btn_confirm customAlertBtnCancel"
+                };
+                customConfirm(question, null, [okBtn, cancelBtn], 400, 120);
+            }
+        });
+    };
+
+    function init() {
+        BuildWindow();
+        Show();
+    };
+
+    function ShowLoading(text) {
+        isLoading = true;
+        const loadingContainer = selfcontainer.querySelector('.loading-container');        
+        const noteContainer = selfcontainer.querySelector('.note');
+        const contentContainer = selfcontainer.querySelector('.container');
+        
+        if (loadingContainer) {
+            if (text) {
+                const loadingText = loadingContainer.querySelector('.loading-text');
+                if (loadingText) loadingText.textContent = text;
+            }
+
+            loadingContainer.style.display = 'flex';            
+            if (noteContainer) noteContainer.style.display = 'none';
+            if (contentContainer) contentContainer.style.display = 'none';
+        }
+    };
+
+    function HideLoading() {
+        isLoading = false;
+        const loadingContainer = selfcontainer.querySelector('.loading-container');
+        const noteContainer = selfcontainer.querySelector('.note');
+        const contentContainer = selfcontainer.querySelector('.container');
+
+        if (loadingContainer) loadingContainer.style.display = 'none';
+        if (contentContainer) contentContainer.style.display = 'flex';
+
+        if (noteContainer && noteContainer.innerHTML !== "---") {
+            noteContainer.style.display = 'block';
+        }
+    };
+
+    function SetContent(main_content, buttons_left, buttons_right, note_md, showLoading = false, loadingText = "Analyzing...") {
+        // Show loading animation if requested
+        if (showLoading) {
+            ShowLoading(loadingText);
+        } else if (isLoading) {
+            HideLoading();
+        }
+
+        {
+            let _note = selfcontainer?.querySelector(".note");
+            if (_note && note_md) {
+                _note.innerHTML = "";
+                selfcontainer.setAttribute("data-has-note", "true");
+                _note.innerHTML = MarkdownToHtml.parse(note_md).replace(/<a /g, "<a target=\"_blank\" ");
+            }
+            else {
+                selfcontainer.setAttribute("data-has-note", "false");
+                _note.innerHTML = "";
+            }
+        }
+
+        {
+            let _main = selfcontainer?.querySelector(".main");
+            if (_main && main_content && main_content.length) {
+                _main.innerHTML = '';
+                main_content.forEach((c) => {
+                    _main.appendChild(c);
+                });
+            }
+            else {
+                _main.innerHTML = '';
+            }
+        }
+
+        {
+            let _left = selfcontainer?.querySelector(".left");
+            if (_left && buttons_left && buttons_left.length > 0) {
+                _left.innerHTML = '';
+                buttons_left.forEach((lb) => {
+                    _left.appendChild(lb.getElement());
+                });
+            }
+            else {
+                _left.innerHTML = '';
+            }
+        }
+
+        {
+            let _right = selfcontainer?.querySelector(".right");
+            if (_right && buttons_right && buttons_right.length > 0) {
+                _right.innerHTML = '';
+                buttons_right.forEach((rb) => {
+                    _right.appendChild(rb.getElement());
+                });
+            }
+            else {
+                _right.innerHTML = '';
+            }
+        }
+    };
+
+    function Show() {
+        const win = selfcontainer;
+        if (!win) return;
+        targetElement.appendChild(win);
+
+        win.style.transition = 'left 200ms ease, opacity 200ms ease';
+        win.style.left = '1px';
+        win.style.opacity = '1';
+    };
+
+    function Close() {
+        var el = selfcontainer;
+        el.style.transition = 'top 200ms ease, opacity 200ms ease';
+        el.style.top = '200px';
+        el.style.opacity = '0';
+        el.addEventListener('transitionend', function handler() {
+            el.removeEventListener('transitionend', handler);
+            kill();
+        });
+        _options.onclose();
+    };
+
+    function kill() {
+        if (selfcontainer) {
+            selfcontainer.remove();
+        }
+    };
+
+    init();
+
+    this.id = id;
+    this.SetContent = SetContent;
+    this.ShowLoading = ShowLoading;
+    this.HideLoading = HideLoading;
+    this.Show = Show;
+    this.Close = Close;
+};
+function RightWindow(name, options) {
+    const Bg = `<div data-role="right-panel-bg" data-dock="right" data-isopen="false" snap-to-top="true" class="bg-main-halo-02"></div>`;
+    const View = `
+<div data-role="right-panel" data-dock="right" data-isopen="false" data-tools="false" data-pages="false" has-header="true" snap-to-top="true">
+    <div class="right-panel-grid">
+        <div class="header">
+            <div class="header-icon gr-excavator"></div>
+            <label class="header-title">{{header_label}}</label>
+            <div class="header-close gr-close-x-r" data-action="close-window" title="{{close}}"></div>
+            <div class="header-menu gr-context-v" data-action="context-menu" title="{{context_menu}}"></div>
+        </div>
+        <div class="tools-container"></div>
+        <div class="waiter" data-visible="false"><div class="waiter-runner"></div></div>
+        <div class="content-container">
+            
+        </div>
+        <div class="paginator-container"></div>
+        <div class="status-container">
+            <div class="status-icon gr-check-circle-solid filter-success"></div>    
+            <div class="status-label">hey</div>
+        </div>
+    </div>
+    <div class="outer-close-btn" title="{{close}}"></div>
+</div>`;
+    this.initialized = false;
+    this.distroyOnClose = false;
+    this.hasHeader = true;
+    this.snapToVeryTop = true;
+    this._contextMenu = null;
+    this.ContextMenuBtn;
+    this.CloseBtn;
+    this.OuterCloseBtn;
+
+    // parts
+
+    this.WINDOW = {
+        is_visible: false,
+        is_pending: false,
+        dockEnabled: false,
+        container: null,
+        bg: null,
+        dockType: "right",
+        show: () => {
+            if (this.WINDOW.is_visible) return;
+            this.WINDOW.container.setAttribute("data-isopen", "true");
+            this.WINDOW.bg.setAttribute("data-isopen", "true");
+            window.G.UI.openAtRight();
+            this.WINDOW.is_visible = true;
+            if (!this.hasHeader && this.OuterCloseBtn) {
+                this.OuterCloseBtn.style.display = "block";
+            }
+        },
+        showIf: () => {
+            if (this.WINDOW.is_visible) return;
+            let _existing = document.querySelector("[data-role=right-panel]");
+            if (_existing) {
+                return;
+            }
+        },
+        hide: () => {
+            if (!this.WINDOW.is_visible) return;
+            this.WINDOW.container.setAttribute("data-isopen", "false");
+            this.WINDOW.bg.setAttribute("data-isopen", "false");
+            window.G.UI.closeAtRight();
+            this.WINDOW.is_visible = false;
+            if (!this.hasHeader && this.OuterCloseBtn) {
+                this.OuterCloseBtn.style.display = "none";
+            }
+        },
+        startPending: () => {
+            if (this.WINDOW.is_pending) return;
+            this.WINDOW.is_pending = true;
+            this.WINDOW.container.querySelector(".waiter").setAttribute("data-visible", "true");
+            this.TOOLS.startPending();
+            this.CONTENT.startPending();
+            this.STATUS.startPending();
+        },
+        stopPending: () => {
+            if (!this.WINDOW.is_pending) return;
+            this.WINDOW.is_pending = false;
+            this.WINDOW.container.querySelector(".waiter").setAttribute("data-visible", "false");
+            this.TOOLS.stopPending();
+            this.CONTENT.stopPending();
+            this.STATUS.stopPending();
+        },
+        changeDockType: (dock) => {
+            if (!this.WINDOW.dockEnabled) return;
+            if (!dock) return;
+            this.WINDOW.container.setAttribute("data-dock", dock);
+            this.WINDOW.bg.setAttribute("data-dock", dock);
+            if (this.WINDOW.is_visible) {
+                switch (this.WINDOW.dockType) {
+                    case "right":
+                        window.G.UI.openAtRight();
+                        break;
+                    case "fullscreen":
+                        window.G.UI.closeAtRight();
+                        break;
+                    case "bottom":
+                        window.G.UI.closeAtRight();
+                        break;
+                    default:
+                        break;
+                }
+            }
+            this.WINDOW.dockType = dock;
+        },
+        destroy: () => {
+            if (this.WINDOW.container === null) return;
+            document.body.removeChild(this.WINDOW.container);
+            document.body.removeChild(this.WINDOW.bg);
+            this.WINDOW.container = null;
+            this.WINDOW.bg = null;
+        }
+    }
+
+    this.CONTENT = {
+        is_visible: false,
+        container: null,
+        clear: () => {
+            if (this.CONTENT.container === null) return;
+            for (var i = 0; i < this.CONTENT.container.children.length; i++) {
+                this.CONTENT.container.removeChild(this.CONTENT.container.children.item(i));
+            }
+        },
+        set: (html) => {
+            this.CONTENT.clear();
+            this.CONTENT.container.appendChild(html);
+        },
+        show: () => { },
+        hide: () => { },
+        startPending: () => { },
+        stopPending: () => { }
+    }
+
+    this.TOOLS = {
+        is_visible: false,
+        container: null,
+        clear: () => {
+            if (this.TOOLS.container === null) return;
+            for (var i = 0; i < this.TOOLS.container.children.length; i++) {
+                this.TOOLS.container.removeChild(this.TOOLS.container.children.item(i));
+            }
+        },
+        set: (html) => {
+            this.TOOLS.clear();
+            this.TOOLS.container.appendChild(html);
+        },
+        show: () => {
+            if (this.TOOLS.is_visible) return;
+            this.TOOLS.is_visible = true;
+            this.TOOLS.container.setAttribute("data-tools-visible", "true");
+        },
+        hide: () => {
+            if (!this.TOOLS.is_visible) return;
+            this.TOOLS.is_visible = false;
+            this.TOOLS.container.setAttribute("data-tools-visible", "false");
+        },
+        startPending: () => { },
+        stopPending: () => { }
+    }
+
+    this.STATUS = {
+        container: null,
+        text: "",
+        setText: (text) => {
+            if (this.STATUS.container === null) return;
+            this.STATUS.text = text;
+            if (this.WINDOW.is_pending) return;
+            this.STATUS.container.querySelector(".status-label").innerHTML = this.STATUS.text;
+        },
+        startPending: () => {
+            if (this.STATUS.container === null) return;
+            this.STATUS.container.querySelector(".status-label").innerHTML = gltxt("please_wait___");
+            this.STATUS.container.querySelector(".status-icon").classList.add("status-pending");
+            this.STATUS.container.querySelector(".status-icon").classList.remove("gr-check-circle-solid");
+            this.STATUS.container.querySelector(".status-icon").classList.remove("filter-success");
+            this.STATUS.container.querySelector(".status-icon").classList.add("gr-dot-multi");
+            this.STATUS.container.querySelector(".status-icon").classList.add("filter-warning");
+        },
+        stopPending: () => {
+            if (this.STATUS.container === null) return;
+            this.STATUS.container.querySelector(".status-label").innerHTML = this.STATUS.text;
+            this.STATUS.container.querySelector(".status-icon").classList.remove("status-pending");
+            this.STATUS.container.querySelector(".status-icon").classList.remove("gr-dot-multi");
+            this.STATUS.container.querySelector(".status-icon").classList.remove("filter-warning");
+            this.STATUS.container.querySelector(".status-icon").classList.add("gr-check-circle-solid");
+            this.STATUS.container.querySelector(".status-icon").classList.add("filter-success");
+        }
+    }
+
+    this.onClose = () => { };
+
+    const init = (name, options) => {
+        this.window_name = name;
+        this.WINDOW.dockEnabled = options.dockEnabled;
+        this.distroyOnClose = options.distroyOnClose ?? false;
+        this.hasHeader = options.hasHeader ?? true;
+        this.snapToVeryTop = options.snapToVeryTop ?? true;
+        this.onClose = options.onClose ?? this.onClose;
+        switch (options.dockType) {
+            case "right":
+                this.WINDOW.dockType = "right";
+                break;
+            case "fullscreen":
+                this.WINDOW.dockType = "fullscreen";
+                break;
+            case "bottom":
+                this.WINDOW.dockType = "bottom";
+                break;
+            default:
+                this.WINDOW.dockType = "right";
+                this.WINDOW.dockEnabled = false;
+                break;
+        }
+
+        this.WINDOW.container = HtmlElementFromText(gltxt(View));
+        this.WINDOW.container.setAttribute("data-name", this.window_name);
+
+        this.WINDOW.bg = HtmlElementFromText(Bg);
+        this.WINDOW.bg.setAttribute("data-name", this.window_name);
+
+        this.CONTENT.container = this.WINDOW.container.querySelector(".content-container");
+        this.TOOLS.container = this.WINDOW.container.querySelector(".tools-container");
+        this.STATUS.container = this.WINDOW.container.querySelector(".status-container");
+
+        if (!this.hasHeader) {
+            this.WINDOW.container.querySelector(".header").style.display = "none";
+            this.WINDOW.container.setAttribute("has-header", "false");
+        }
+
+        if (!this.snapToVeryTop) {
+            this.WINDOW.container.setAttribute("snap-to-top", "false");
+            this.WINDOW.bg.setAttribute("snap-to-top", "false");
+        }
+
+        this.ContextMenuBtn = this.WINDOW.container.querySelector(".header-menu");
+        this.CloseBtn = this.WINDOW.container.querySelector(".header-close");
+        this.OuterCloseBtn = this.WINDOW.container.querySelector(".outer-close-btn");
+
+        let group = 0;
+        ///here
+        this._contextMenu = new ContextMenu(
+            [],
+            {
+                attachTo: this.ContextMenuBtn,
+                hasButton: true,
+                which_btn: 0,
+                width_px: 200
+            },
+            "RightWindow"
+        );
+
+        if (this.WINDOW.dockEnabled) {
+
+            group++;
+
+            this._contextMenu.addItem({
+                type: "button",
+                group: group,
+                icon_classes: ["gr-expand-right", "filter-primary"],
+                text: gltxt("��������� ������"), //TUDU: Localize
+                onClick: async () => {
+                    this.WINDOW.changeDockType("right");
+                }
+            });
+
+            this._contextMenu.addItem({
+                type: "button",
+                group: group,
+                icon_classes: ["gr-expand-down", "filter-primary"],
+                text: gltxt("��������� �����"), //TUDU: Localize
+                onClick: async () => {
+                    this.WINDOW.changeDockType("bottom");
+                }
+            });
+
+            this._contextMenu.addItem({
+                type: "button",
+                group: group + 1,
+                icon_classes: ["gr-expand-up", "filter-primary"],
+                text: gltxt("�� ���� �����"), //TUDU: Localize
+                onClick: async () => {
+                    this.WINDOW.changeDockType("fullscreen");
+                }
+            });
+        }
+
+        if (this._contextMenu.itemsCount() <= 0) {
+            this.ContextMenuBtn.style.display = "none";
+        }
+
+        this.CloseBtn?.addEventListener("click", () => {
+            this.hide();
+            if (this.distroyOnClose) this.destroy();
+            this.onClose();
+        });
+
+        this.OuterCloseBtn?.addEventListener("click", () => {
+            this.hide();
+            if (this.distroyOnClose) this.destroy();
+            this.onClose();
+        });
+
+        document.body.appendChild(this.WINDOW.bg);
+        document.body.appendChild(this.WINDOW.container);
+
+        this.initialized = true;
+    }
+
+    this.changeDockType = (dock) => {
+        this.WINDOW.changeDockType(dock);
+    }
+
+    this.show = () => {
+        this.WINDOW.show();
+    }
+
+    this.showIf = () => {
+        this.WINDOW.show();
+    }
+
+    this.close = () => {
+        this.hide();
+        if (this.distroyOnClose) this.destroy();
+        this.onClose();
+    }
+
+    this.hide = () => {
+        this.WINDOW.hide();
+    }
+
+    this.startPending = () => {
+        this.WINDOW.startPending();
+    }
+
+    this.stopPending = () => {
+        this.WINDOW.stopPending();
+    }
+
+    this.destroy = () => {
+        this.WINDOW.destroy();
+    }
+
+    // parts
+
+    this.setTitle = (title) => {
+        this.WINDOW.container.querySelector(".header-title").innerHTML = title;
+    }
+
+    this.setIcon = (icon_class) => {
+        let _icon = this.WINDOW.container.querySelector(".header-icon");
+        for (var i = 0; i < _icon.classList.length; i++) {
+            if (_icon.classList.item(i).startsWith("gr-")) {
+                _icon.classList.remove(_icon.classList.item(i));
+            }
+        }
+        _icon.classList.add(icon_class);
+    }
+
+    this.setContent = (html) => {
+        this.CONTENT.set(html);
+    }
+
+    this.addMenuItem = (item) => {
+        this._contextMenu.addItem(item);
+        this.ContextMenuBtn.style.display = "block";
+    }
+
+    init(name, options);
+};
+function layerSummaryCard(options) {
+    if (!options) return null;
+
+    let id = generateSTRUID();
+    this.id = id;
+    let localThis = this;
+
+    this.layerName = options.layerName || "";
+    this.layerType = options.layerType || "";
+    this.iconUrl = options.iconUrl || "";
+    this.statistics = options.statistics || {};
+    this.owner = options.owner || "";
+    this.editors = options.editors || [];
+    this.viewers = options.viewers || [];
+
+    this._generateAvatar = function (email, size = "32px") {
+        const initials = email.split('@')[0].substring(0, 2).toUpperCase();
+        return `
+            <div class="user-avatar" style="width: ${size}; height: ${size};">
+                ${initials}
+            </div>`;
+    };
+
+    this._generateStatistics = function () {
+        if (!this.statistics || Object.keys(this.statistics).length === 0) {
+            return '';
+        }
+
+        const stats = Object.entries(this.statistics).map(([key, value]) => `
+            <div class="stat-item">
+                <div class="stat-value">${value}</div>
+                <div class="stat-label">${key}</div>
+            </div>
+        `).join('');
+
+        return `
+            <div class="statistics-grid">
+                ${stats}
+            </div>`;
+    };
+
+    this._generateUserList = function (users, title) {
+        if (!users || users.length === 0) return '';
+
+        return `
+            <div class="user-section">
+                <h3 class="section-title">${title} (${users.length})</h3>
+                <div class="user-list">
+                    ${users.map(email => `
+                        <div class="user-item">
+                            ${this._generateAvatar(email, '28px')}
+                            <div class="user-email">${email}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+    };
+
+    const element = HtmlElementFromText(`
+<div id="${id}" class="layer-summary-card">
+    <div class="summary-content">
+        <div class="layer-info">
+            <h1 class="layer-name">${this.layerName}</h1>
+            <div class="layer-type">
+                <img src="${this.iconUrl}" class="layer-icon" alt="Layer icon">
+                <span>${this.layerType}</span>
+            </div>
+        </div>
+        
+        ${this._generateStatistics()}
+        
+        ${this.owner ? `
+        <div class="owner-section">
+            <h3 class="section-title">${gltxt("owner")}</h3>
+            <div class="user-item">
+                ${this._generateAvatar(this.owner)}
+                <div class="user-email">${this.owner}</div>
+            </div>
+        </div>` : ''}
+        
+        ${this._generateUserList(this.editors, gltxt("access_write"))}
+        
+        ${this._generateUserList(this.viewers, gltxt("access_read"))}
+    </div>
+</div>`);
+
+    this.getElement = function () {
+        return element;
+    };
+
+    this.updateData = function (newData) {
+        if (newData.layerName) this.layerName = newData.layerName;
+        if (newData.layerType) this.layerType = newData.layerType;
+        if (newData.iconUrl) this.iconUrl = newData.iconUrl;
+        if (newData.statistics) this.statistics = newData.statistics;
+        if (newData.owner) this.owner = newData.owner;
+        if (newData.editors) this.editors = newData.editors;
+        if (newData.viewers) this.viewers = newData.viewers;
+
+        const newElement = HtmlElementFromText("");
+        element.parentNode.replaceChild(newElement, element);
+    };
+
+    return this;
+};

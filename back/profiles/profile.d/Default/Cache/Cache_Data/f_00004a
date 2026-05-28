@@ -1,0 +1,647 @@
+window.RequestInfoInMultipleRadius = function () {
+
+    /*запросить информацию в радиусе*/
+    var localThis = this;
+    this.id = "info-radius-multi";
+    var _name = "tool_info_multi_radius";
+    this.title = gltxt(_name);
+    this.visible = false;
+    this.active = false;
+    this.topInfoToolButton = null;
+    this.options = {};
+    this.draw = null;
+    this.pending = false;
+    this.waitmarker = null;
+
+    this.additionalMeasurementsEnabled = false;
+    this.rendersLayotsElements = [];
+    this.renderPopulationCounterDetailedYears = [];
+    this.uidMaket = null;
+
+    var createButton = function () {
+        /*добавить кнопку в меню с инструментами*/
+        localThis.topInfoToolButton = window.ToolPanelModule.getNewPanelButton({
+            "type": "big",
+            "float": "info_instrument",
+            "order": 12,
+            "title": localThis.title,
+            "text": localThis.title,
+            "class": "ico iso-small ico-tools gr-radius-multi-1",
+            "onClick": localThis.tryDraw
+        });
+        localThis.topInfoToolButton.addDropDownMenu();
+    };
+
+    var onPointDownSet = function () {
+        var point = arguments[0];
+        localThis.options.addressInfo = null;
+        localThis.options.isDown = true;
+
+        localThis.options.point = point;
+        localThis.options.point.addTo(window.MAP);
+
+        localThis.options.pointAddress.val(gltxt("tool_wait"));
+
+        if (point._latlng !== null) {
+            var svc = DoWebApiAction("/geocoder/point2address", {
+                point: "" + point._latlng.lng + "," + point._latlng.lat
+            });
+            
+            svc.done(function (r) {
+                if (r.success && r.results) {
+                    localThis.options.addressInfo = r.results;
+                }
+                var addr = JoinAddressInfo(r.results);
+                localThis.options.pointAddress.val(addr);
+                localThis.options.actionButton.css({ display: "block" });
+            });
+            
+            svc.fail(function () {
+                var addr = JoinAddressInfo();
+                localThis.options.pointAddress.val(addr);
+                localThis.options.actionButton.css({ display: "block" });
+            });
+        }
+    };
+
+    var onPointUpSet = function () {
+        var mapdrawingTool = arguments[0];
+        
+        localThis.options.isDown = false;
+
+        if (typeof mapdrawingTool !== "undefined") {
+            mapdrawingTool._fireCreatedEvent();
+        }
+    };
+
+    var onMouseMove = function () {
+        var _shape = arguments[0];
+        var _options = arguments[1];
+
+        localThis.options.radius1val = _shape.getRadius().toFixed(1);
+        localThis.options.radius1.val(localThis.options.radius1val);
+
+        var poly = getCircleFromCircleAsPolygonLL(_shape);
+        localThis.options.areaval = calculateObjectArea(poly);
+        localThis.options.area.html(number_format(localThis.options.areaval, 0, ".", " "));
+
+        if (localThis.options.radius1val > window.UserModule.userData.Limits.MAX_RADIUS) {
+            localThis.options.panel.setStatus(localThis.options.helpafterradiuserror, true, false);
+            _shape.setStyle(_options.shapeOptionsError);
+            localThis.options.actionButton.css({ display: "none" });
+        } else {
+            localThis.options.panel.setStatus(localThis.options.helpafterstart, false, false);
+            _shape.setStyle(_options.shapeOptions);
+            localThis.options.actionButton.css({ display: "block" });
+        }
+    };
+
+    var onGeometryCreated = function () {
+
+        var mapdrawingTool = arguments[0];
+        var point = arguments[1];
+        var shape = arguments[2];
+
+        if (typeof shape === "undefined") {
+
+            var q1 = parseInt(localThis.options.radius1.val());
+
+            if (q1 > 0) {
+                localThis.options.radius1val = q1;
+                localThis.options.radius1.val(localThis.options.radius1val);
+            } else {
+                localThis.options.radius1val = 500;
+                localThis.options.radius1.val(localThis.options.radius1val);
+            }
+
+            localThis.options.radius2val = 300;
+            localThis.options.radius2.val(localThis.options.radius2val);
+
+            localThis.options.geometry1 = new L.Circle(point, localThis.options.radius1val, mapdrawingTool.options.shapeOptions);
+            localThis.options.geometry2 = new L.Circle(point, localThis.options.radius2val, mapdrawingTool.options.shapeOptions);
+
+        } else {
+            localThis.options.geometry1 = new L.Circle(point, shape.getRadius(), mapdrawingTool.options.shapeOptions);
+            localThis.options.geometry2 = new L.Circle(point, shape.getRadius(), mapdrawingTool.options.shapeOptions);
+        }
+
+        L.Draw.SimpleShape.prototype._fireCreatedEvent.call(mapdrawingTool, localThis.options.geometry1);
+        L.Draw.SimpleShape.prototype._fireCreatedEvent.call(mapdrawingTool, localThis.options.geometry2);
+
+        if (localThis.options.radius1val > window.UserModule.userData.Limits.MAX_RADIUS) {
+            localThis.options.panel.setStatus(localThis.options.helpafterradiuserror, true, false);
+            localThis.options.geometry1.setStyle(mapdrawingTool.options.shapeOptionsError);
+            localThis.options.actionButton.css({ display: "none" });
+        } else {
+            localThis.options.panel.hideStatus();
+            localThis.options.radiusHelp.attr("data-balloon-visible","");
+            localThis.options.geometry1.setStyle(mapdrawingTool.options.shapeOptions);
+            localThis.options.actionButton.css({ display: "block" });
+        }
+
+        try {
+            window.MAP.fitBounds(localThis.options.geometry1.getBounds());
+            window.MAP.invalidateSize();
+        } catch (z) {
+            window.MAP.invalidateSize();
+        }
+
+        localThis.measureGeometry();
+
+    };
+
+    var onEscape = function () {
+        var mapdrawingTool = arguments[0];
+        if (typeof mapdrawingTool !== "undefined" && localThis.pending !== true) {
+            localThis.options.panel.close();
+            localThis.close();
+        }
+    };
+
+    var init = function () {
+        /*инициализировать инструмент*/
+        createButton();
+
+        localThis.options.type = localThis.id;
+
+        localThis.options.onPointDownSet = onPointDownSet;
+        localThis.options.onPointUpSet = onPointUpSet;
+        localThis.options.onMouseMove = onMouseMove;
+        localThis.options.onGeometryCreated = onGeometryCreated;
+        localThis.options.onEscape = onEscape;
+
+        localThis.options.help = $("<span/>").html(gl.text.tool_help_click_and_drag_to_draw_a_circle);
+        localThis.options.helpafterstart = gl.text.tool_help_release_mouse_button_to_finish;
+        localThis.options.helpafterfinish = gl.text.tool_help_ready_change_size_and_create_report;
+        localThis.options.helpafterradiuserror = gl.text.tool_help_radius_too_big_decrease_it;
+        localThis.options.helpafterradiuserrorsmall = gl.text.tool_help_radius_too_small_increase_it;
+        localThis.options.helpafterareaerror = gl.text.tool_help_area_is_to_large;
+        localThis.options.helpafterrequest = gl.text.please_wait_for_operation_to_complete;
+
+        localThis.options.radiusCap = $("<span/>", {class:"title-radius"}).html(gl.text.radius + ": ");
+        localThis.options.radiusHelp = $("<button/>", { "data-balloon": gl.text.tool_help_you_can_change_radius_here, "data-balloon-pos": "down", "data-cap": "" }).css({
+            "position": "absolute",
+            "margin-left": "40px",
+            "top":"40px"
+        });
+
+        localThis.options.radius1 = $("<input/>", { id: "radius1", type: "number" }).css({ width: "70px" }).val(0);
+        localThis.options.radius2 = $("<input/>", { id: "radius2", type: "number" }).css({ width: "70px" }).val(0);
+
+        localThis.options.radius1val = 0;
+        localThis.options.radius2val = 0;
+
+        localThis.options.radiusunits = $("<span/>", { id: "radiusunits" }).html(gltxt("meters_short"));
+
+        localThis.options.areaCap = $("<span/>", { class: "j-1 title-area" }).html(gltxt("tool_area") + ": ");
+        localThis.options.area = $("<span/>", { id: "area" }).html("0");
+        localThis.options.areaval = 0;
+        localThis.options.areaunits = $("<span/>", { id: "areaunits" }).html(gltxt("meters_short") + "<sup>2</sup>");
+
+        localThis.options.area_alt = $("<span/>", { id: "area_alt" }).html("");
+
+        localThis.options.pointCap = $("<span/>", { class: "j-1 title-name-report" }).html(gltxt("report_name") + ": ");
+        localThis.options.pointAddress = $("<input/>", { id: "address", type: "text", maxlength: "50" }).css({ width: "250px" }).val("");
+        localThis.options.addressInfo = null;
+
+        localThis.options.actionButton = $("<div/>").html(gl.text.tool_create_report).addClass("actionButton").css({ display: "block" });
+
+        localThis.options.point = null;
+        localThis.options.geometry1 = null;
+        localThis.options.geometry2 = null;
+
+        window.clearActions.push(localThis.close); /*Добавим событие в ластик*/
+        
+    };
+
+    this.close = function () {
+        /*закрыть инструмент*/
+        if (localThis.pending) return;
+        localThis.active = false;
+
+        try {
+            localThis.draw.disable();
+        } catch (e) {
+            DoNothing();
+        }
+
+        tryRemoveGeometry(localThis.options.point);
+        tryRemoveGeometry(localThis.options.geometry1);
+        tryRemoveGeometry(localThis.options.geometry2);
+        window.mapModule01.infopanel.setRemoveClass("info-multi-radius info-tool");
+        window.mapModule01.guessMapClickAllowedOverride();
+
+        localThis.options.radiusHelp.removeAttr("data-balloon-visible");        
+    };
+
+    var checkSizes = function (rs1, rs2) {
+
+        var s1 = parseFloat(rs1);
+        var s2 = parseFloat(rs2);
+
+        var minRadius = 5;
+        if (s1>s2) {
+            if (Math.abs((s1 - s2) <= minRadius)) {
+                alert(gltxt("radiuses_difference_must_be", minRadius.toString()));
+                return false;
+            }
+        } else {
+            if (Math.abs((s2 - s1) <= minRadius)) {
+                alert(gltxt("radiuses_difference_must_be", minRadius.toString()));
+                return false;
+            }
+        }
+       
+
+        if (s1 <= minRadius || s2 <= minRadius) {
+            alert(gltxt("tool_help_radius_too_big_decrease_it"));
+            return false;
+        }
+
+        return true;
+    };
+
+    var checkGeometries = function (point1, poly1, poly2) {
+
+        if (isEmpty(point1) || isEmpty(poly1) || isEmpty(poly2)) {
+            alert(gltxt("empty_geometry"));
+            return false;
+        }
+
+        return true;
+    };
+
+    var buildMultiPolygon = function (origin, rsize1, rsize2) {
+        var size1 = parseFloat(rsize1);
+        var size2 = parseFloat(rsize2);
+
+        var _options = { steps: 120, units: 'meters'};
+        var circle1 = turf.circle(origin, size1, _options);
+        var circle2 = turf.circle(origin, size2, _options);
+
+        var multiPoly, poly1, poly2;
+
+        if (size1 > size2)
+        {
+            poly1 = turf.clone(circle2);
+            poly2 = turf.difference(circle1, circle2);
+            multiPoly = turf.multiPolygon([poly1.geometry.coordinates, poly2.geometry.coordinates]);
+        }
+        else
+        {
+            poly1 = turf.clone(circle1);
+            poly2 = turf.difference(circle2, circle1);
+            multiPoly = turf.multiPolygon([poly2.geometry.coordinates, poly1.geometry.coordinates]);
+        }
+
+        return multiPoly.geometry;
+        
+    };
+
+    this.doRequest = function(clip) {
+
+        if (!checkSizes(localThis.options.radius1val, localThis.options.radius2val)) {
+            return;
+        }
+
+        if (!checkGeometries(localThis.options.point, localThis.options.geometry1, localThis.options.geometry2)) {
+            return;
+        }
+
+        var latlng = localThis.options.point.getLatLng();
+
+        var requestPoly = buildMultiPolygon([latlng.lng, latlng.lat], localThis.options.radius1val, localThis.options.radius2val);
+
+        var requestPoly1 = JSON.parse(JSON.stringify(requestPoly.coordinates[0]));
+        var polyArea1 = turf.polygon(requestPoly1);
+        var area1 = turf.area(polyArea1);
+
+        var requestPoly2 = JSON.parse(JSON.stringify(requestPoly.coordinates[1]));
+        var polyArea2 = turf.polygon(requestPoly2);
+        var area2 = turf.area(polyArea2);
+
+        localThis.pending = true;
+
+        window.mapModule01.infopanel.setStatus(localThis.options.helpafterrequest, false, true);
+        window.mapModule01.infopanel.wait();
+
+        localThis.waitmarker = L.marker([latlng.lat, latlng.lng], {
+            icon: L.icon({
+                iconUrl: '/resources/styles/images/animan_shlyapa.gif',
+                iconSize: [50, 50],
+                iconAnchor: [25, 25],
+                popupAnchor: [25, 25]
+            }),
+            keyboard: false,
+            zIndexOffset: 10000,
+            opacity: 0.9,
+            pane: "markerPane"
+        }).addTo(window.MAP);
+
+        localThis.options.actionButton.css({ display: "none" });
+
+        /*формируем параметры запроса*/
+
+        var period = getPopulationCounterDetailedYearsPeriod();
+        
+        var request1 = {};
+        request1.Login = window.UserModule.userData.Info.Login;
+        request1.Tooltype = localThis.options.type;
+        request1.Metadata = {
+            ToolName: localThis.title,
+            Location: localThis.options.addressInfo,
+            Area: area1,
+            Perimeter: 0,
+            Buffer: localThis.options.radius1val,
+            Details: gltxt("radius") + " (" + localThis.options.radius1val + ")",
+            Params: {
+                year_1: period && period.start || undefined,
+                year_2: period && period.end || undefined,
+            }
+        };
+        request1.Address = $("input#address").val();
+        request1.Name = $("input#address").val() + " (" + localThis.options.radius1val + ")";
+        request1.Point = getPreparedGeoJsonAsObject(localThis.options.point);
+        request1.Line = null;
+        request1.Polygon = polyArea1.geometry;
+        request1.GeointellectLayers = window.layerListPanel.getEnabledLayers();
+        request1.UserLayers = window.layerListPanel.getEnabledUserLayers();
+
+        
+        var request2 = {};
+        request2.Login = window.UserModule.userData.Info.Login;
+        request2.Tooltype = localThis.options.type;
+        request2.Metadata = {
+            ToolName: localThis.title,
+            Location: localThis.options.addressInfo,
+            Area: area2,
+            Perimeter: 0,
+            Buffer: localThis.options.radius2val,
+            Details: gltxt("radius") + " (" + localThis.options.radius1val + " - " + localThis.options.radius2val + ")"
+        };
+        request2.Address = $("input#address").val();
+        request2.Name = $("input#address").val() + " (" + localThis.options.radius1val + " - " + localThis.options.radius2val + ")";
+        request2.Point = getPreparedGeoJsonAsObject(localThis.options.point);
+        request2.Line = null;
+        request2.Polygon = polyArea2.geometry;
+        request2.GeointellectLayers = window.layerListPanel.getEnabledLayers();
+        request2.UserLayers = window.layerListPanel.getEnabledUserLayers();
+
+        doIndoRequestUniversal(localThis, request1);
+
+        setTimeout(function () {
+            doIndoRequestUniversal(localThis, request2);
+        }, 2000);
+
+    };
+
+    this.changeRadius = function (number, radius) {
+        /*поменять радиус окружности*/
+        localThis.options.radiusHelp.removeAttr("data-balloon-visible");
+        if (localThis.options.geometry1 === null) return;
+        if (localThis.options.geometry2 === null) return;
+
+        localThis.options["radius" + number + "val"] = radius;
+
+        localThis.options["geometry" + number].setRadius(radius);
+
+        if (radius > window.UserModule.userData.Limits.MAX_RADIUS) {
+            localThis.options.help.html(localThis.options.helpafterradiuserror);
+            window.mapModule01.infopanel.setStatus(localThis.options.help.html(), true);
+            localThis.options["geometry" + number].setStyle(L.Draw.Circle.prototype.options.shapeOptionsError);
+            localThis.options.actionButton.css({display: "none"});
+        } else if (radius <= 0) {
+            localThis.options.help.html(localThis.options.helpafterradiuserrorsmall);
+            window.mapModule01.infopanel.setStatus(localThis.options.help.html(), true);
+            localThis.options.actionButton.css({ display: "none" });
+        } else {
+            localThis.options.help.html(localThis.options.helpafterfinish);
+            window.mapModule01.infopanel.setStatus(localThis.options.help.html(), false);
+            localThis.options["geometry" + number].setStyle(L.Draw.Circle.prototype.options.shapeOptions);
+            localThis.options.actionButton.css({ display: "block" });
+        }
+
+        localThis.options["geometry" + number].redraw();
+
+        localThis.measureGeometry();
+    };
+
+    this.measureGeometry = function () {
+
+        var r1 = localThis.options["radius" + 1 + "val"];
+        var r2 = localThis.options["radius" + 2 + "val"];
+
+        var sel = (r1 > r2) ? 1 : 2;
+
+        localThis.options.areaval = calculateObjectArea(getCircleFromCircleAsPolygonLL(localThis.options["geometry" + sel]));
+        localThis.options.area.html(number_format(localThis.options.areaval, 0, ".", " "));
+
+        if (localThis.additionalMeasurementsEnabled) {
+            try {
+                var hectars = localThis.options.areaval / 10000;
+                var kvkm = localThis.options.areaval / 1000000;
+
+                localThis.options.area_alt.html(
+                    number_format(kvkm, 2, ".", " ") + " " + gltxt("kilometers_short")+"<sup>2</sup>" + "&nbsp;&nbsp;&nbsp;" +
+                    number_format(hectars, 2, ".", " ") + " " + gltxt("unit_hextare")
+                );
+            } catch (ee) {
+                DoNothing();
+            }
+        }
+
+        return {
+            value: localThis.options.areaval
+        };
+
+    };
+    var layOutAppend = function (_parentBox) {
+        if (localThis.rendersLayotsElements.length > 0) {
+            localThis.options.aRibbonlayoutContainer = $("<div/>", { "class": "aRibbonlayoutContainer" });
+            /* Проверим: есть ли макеты в списке*/
+            (window.layoutsReport.listLayout.length === 0) ? localThis.options.aRibbonlayoutContainer.hide() : localThis.options.aRibbonlayoutContainer.show();
+            localThis.rendersLayotsElements.forEach(function (_element) {
+                localThis.options.aRibbonlayoutContainer.append(_element.element);
+                if (typeof _element.action !== "undefined" || _element.action !== null) {
+                    var a = $(_element.element);
+                    if (a.attr("data-type") === "dropbox") {
+                        _element.element.on("change", function () {
+                            localThis.uidMaket = $(this).val();
+                        });
+                    } else {
+                        _element.element.on("click", function () {
+                            _element.action;
+                        });
+                    }
+                }
+            });
+            _parentBox.append(localThis.options.aRibbonlayoutContainer);
+        }
+    };
+    var populationCounterDetailedYearsAppend = function (_parentBox) {
+        if (localThis.renderPopulationCounterDetailedYears.length > 0) {
+            localThis.renderPopulationCounterDetailedYears.forEach(function (_element) {
+                _parentBox.append(_element.renderElements());
+            });
+        }
+    };
+    var getPopulationCounterDetailedYearsPeriod = function() {
+        var period;
+
+        localThis.renderPopulationCounterDetailedYears.forEach(function (element) {
+            var p = element.getPeriod();
+            if(p.start && p.end) {
+                period = p;
+            }
+        });
+
+        return period;
+    }
+    this.tryDraw = function () {
+
+        if (localThis.active || window.mapModule01.infopanel.visible) {
+            window.mapModule01.infopanel.blink();
+            return;
+        };
+
+        var checklimit = DoWebApiAction("/user/check_request_limit", { magic: "wtf" });
+        checklimit.done(function (r) {
+            if (r.success) {
+
+                window.requestHistoryModule.clearSelection();
+
+                window.clearActions.push(localThis.close);
+
+                localThis.options.radiusHelp.removeAttr("data-balloon-visible");
+
+                window.mapModule01.infopanel.setTitle(localThis.title);
+                window.mapModule01.MapClickAllowedOverride = false;
+
+                localThis.options.help = $("<span/>").html(gltxt("tool_help_click_and_drag_to_draw_a_circle"));
+
+                localThis.options.radius1.val(0);
+                localThis.options.radius1val = 0;
+
+                localThis.options.radius2.val(0);
+                localThis.options.radius2val = 0;
+
+                localThis.options.area.html("0");
+                localThis.options.areaval = 0;
+
+                localThis.options.panel = window.mapModule01.infopanel;
+
+                localThis.options.pointCap = $("<span/>", { class: "j-1 title-name-report" }).html(gl.text.tool_report_name + ": ");
+                localThis.options.pointAddress = $("<input/>", { id: "address", type: "text", maxlength: "50" }).css({ width: "250px" }).val("");
+                localThis.options.addressInfo = null;
+
+                localThis.options.actionButton = $("<div/>").html(gl.text.tool_create_report).addClass("actionButton bg-main font-default").css({ display: "block" });
+
+                localThis.options.actionButton.on("click", function () {
+                    localThis.doRequest(false);
+                });
+
+                localThis.options.actionButton.on("old", function () {
+                    /*кнопки конфирма*/
+                    var b = {
+                        type: "ok",
+                        action: function () {
+                            localThis.doRequest(true);
+                        },
+                        title: gltxt("crop_by_natural_breaks"),
+                        text: gltxt("crop"),
+                        icon: false,
+                        "class": "btn_confirm"
+
+                    };
+
+                    var n = {
+                        type: "skip",
+                        action: function () {
+                            localThis.doRequest(false);
+                        },
+                        title: gltxt("crop_dont_by_natural_breaks"),
+                        text: gltxt("crop_dont"),
+                        icon: false,
+                        "class": "btn_confirm"
+                    };
+
+                    var hhttmmll = gltxt("crop_question1").replace("___", "<br/>") + "<br/>";
+                    hhttmmll += "<img src=\"/resources/funcparts/info-radius/clipped.gif\">";
+
+                    customConfirm(hhttmmll, null, [b, n], 380, 320);
+                });
+
+                localThis.options.point = null;
+                localThis.options.geometry1 = null;
+                localThis.options.geometry2 = null;
+
+                localThis.options.radius1.on("keyup", function () {
+                    var value = $(this).val();
+                    localThis.changeRadius(1, value);
+                });
+
+                localThis.options.radius1.on("change", function () {
+                    var value = $(this).val();
+                    localThis.changeRadius(1, value);
+                });
+
+                localThis.options.radius2.on("keyup", function () {
+                    var value = $(this).val();
+                    localThis.changeRadius(2, value);
+                });
+
+                localThis.options.radius2.on("change", function () {
+                    var value = $(this).val();
+                    localThis.changeRadius(2, value);
+                });
+
+                var content = $("<div/>")
+
+                    .append(localThis.options.radiusCap)
+                    .append(localThis.options.radiusHelp)
+                    .append(localThis.options.radius1)
+                    .append(localThis.options.radius2)
+                    .append(localThis.options.radiusunits)
+
+                    .append(localThis.options.areaCap)
+                    .append(localThis.options.area)
+                    .append(localThis.options.areaunits)
+
+                    .append(localThis.options.area_alt)
+
+                    .append(localThis.options.pointCap)
+                    .append(localThis.options.pointAddress)
+                    .append(localThis.options.actionButton);
+
+                layOutAppend(content);
+                populationCounterDetailedYearsAppend(content);
+                window.mapModule01.infopanel.setContent(content);
+                window.mapModule01.infopanel.show();
+                window.mapModule01.infopanel.setStatus(localThis.options.help.html(), false, true);
+
+               /* window.mapModule01.infopanel.onclose = [];*/
+               /* window.mapModule01.infopanel.onclose.length = 0;*/
+                window.mapModule01.infopanel.onclose.push(localThis.close);
+                window.mapModule01.infopanel.setClass("info-multi-radius info-tool");
+                window.mapModule01.infopanel.graphics = [];
+                window.mapModule01.infopanel.graphics.length = 0;
+
+                localThis.draw = new L.Draw.Circle(window.MAP, window.mapModule01.drawControl.options.circle);
+                localThis.draw.enable(localThis.options);
+
+                localThis.active = true;
+            }
+            else {
+                blinkmsg(gltxt("check_request_limit"));
+            }
+        });
+
+    };
+
+    init();
+
+};
+
+$(document).ready(function () {
+    window.requestInfoInMultipleRadius = new RequestInfoInMultipleRadius();
+});

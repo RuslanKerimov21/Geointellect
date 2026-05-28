@@ -1,0 +1,757 @@
+var TimelineWindowView = '\
+<div class="windowSelectedPeriod" data-id="window-selected-period" data-isopen="false">\
+    <div class="wrap-container">\
+        <div class="head-container">\
+            <label class="title">{{tool_select_period}}</label>\
+            <label class="title" data-role="selected-info"></label>\
+        </div>\
+        <span class="close_btn gr-close-x-r" data-role="closeWindowSelectedPeriod"></span>\
+        <div class="range-container">\
+            <input data-id="range" class="timelineSlider" />\
+        </div>\
+        <div class="datapicker-container">\
+            <div data-id="datepicker" class="datepicker"></div>\
+        </div>\
+        <div class="action-container">\
+            <div class="period-set-container">\
+                <input data-id="startDate" type="text" class="inp-period" data-include="true" data-role="changeDate" data-active="false"/>\
+                <span class="separator"></span>\
+                <input data-id="finishDate" type="text" class="inp-period" data-include="true" data-role="changeDate" data-active="false" />\
+            </div>\
+            <div class="btn-apply" data-role="btnApply" data-active="true">{{apply}}</div>\
+        </div>\
+    </div>\
+</div>\
+';
+
+var TimelineBottomSliderView = '\
+<div class="timeline-container-x" data-id="timeline-container" data-isopen="false" data-blocked="false">\
+    <div class="wrap-container">\
+        <div class="prev-btn" data-role="prevSlider">\
+            <span></span>\
+        </div>\
+        <div class="next-btn" data-role="nextSlider">\
+            <span></span>\
+        </div>\
+        <div class="slider-bg-ribbon" data-role="sliderBgRibbon">\
+            <span></span>\
+        </div>\
+        <div class="period-min-container selected-years" data-role="openWindowSelectedPeriod">\
+            <span></span>\
+            <label data-field="period-years"></label>\
+        </div>\
+        <div class="period-min-container selected-dates" data-role="openWindowSelectedPeriod_2">\
+            <span></span>\
+            <label data-field="period-dates"></label>\
+        </div>\
+        <div class="slider-container">\
+            <input type="text" data-id="select-period-slider" class="slider" />\
+        </div>\
+    </div>\
+</div>\
+';
+
+function TimelineGlobal() {
+    var localThis = this;
+
+    this.initialized = false;
+    this.visible = false;
+
+    this.image = null;
+    this.slider = null;
+    this.period = null;
+
+    this.bottomSlider = null;
+    this.calendarWindow = null;
+
+    //
+
+    var init = function () {
+        window.G.Dynamic.setValue(GiEvents.TimelineWindowIsOpen, false);
+
+        let _date1 = Cookies.get("date_from");
+        let _date2 = Cookies.get("date_to");
+
+        if (_date1 && _date2) {
+            window.G.DynamicArray.setValue(GiEvents.TimelineAppliedDates, [_date1, _date2]);
+
+            let _year1 = parseInt(_date1.split("-")[0]);
+            let _year2 = parseInt(_date2.split("-")[0]);
+            window.G.DynamicArray.setValue(GiEvents.TimelineSelectedYears, [_year1, _year2]);
+        }
+        else {
+            let _year = (new Date).getFullYear();
+            let _date_from = moment(_year + "-01-01").format("YYYY-MM-DD");
+            let _date_to = moment(_year + "-12-31").format("YYYY-MM-DD");
+
+            setSimpleCookie("date_from", _date_from);
+            setSimpleCookie("date_to", _date_to);
+
+            window.G.DynamicArray.setValue(GiEvents.TimelineAppliedDates, [_date_from, _date_to]);
+            window.G.DynamicArray.setValue(GiEvents.TimelineSelectedYears, [_year, _year]);
+        }
+
+        window.G.DynamicArray.addListener(GiEvents.TimelineSelectedYears, function (r) {
+            /* если поменялись года в нижнем слайдере */
+            /* и при этом окно с календарём было открыто */
+
+            if (localThis.calendarWindow?.visible === true) return;
+            if (!r.value || r.value[0] <= 0) return;
+
+            let _date_from = moment(r.value[0] + "-01-01").format("YYYY-MM-DD");
+            let _date_to = moment(r.value[1] + "-12-31").format("YYYY-MM-DD");
+
+            window.G.DynamicArray.setValue(GiEvents.TimelineAppliedDates, [_date_from, _date_to]);
+        });
+
+        window.G.DynamicArray.addListener(GiEvents.TimelineAppliedDates, function (r) {
+            /*если поменялись даты в календаре*/
+            
+            setSimpleCookie("date_from", r.value[0]);
+            setSimpleCookie("date_to", r.value[1]);
+
+            localThis.period = [r.value[0], r.value[1]];
+        });
+
+        localThis.bottomSlider = new BottomSlider(localThis);
+        localThis.calendarWindow = localThis.bottomSlider?.calendarWindow;
+
+        localThis.initialized = true;
+    };
+
+    init();
+
+    /*_newYears: number[]*/
+    addYears = function (_newYears) {
+        window.G.DynamicArray.addUniqueItems(GiEvents.TimelineYears, _newYears);
+    };
+
+    getPeriod = function () {
+        return localThis.period;
+    };
+
+    getDates = function () {
+        let date_from = new Date(localThis.period[0]);
+        let date_to = new Date(localThis.period[1]);
+        return [date_from, date_to];
+    };
+};
+
+function BottomSlider(_parent) {
+
+    var localThis = this;
+    this.visible = false;
+
+    this.timelineGlobal = _parent;
+    this.calendarWindow = null;
+
+    this.slider;
+
+    var firstRender = true;
+
+    this.container;
+    this.sliderContainer;
+    this.sliderElement;
+    this.btnPrev;
+    this.btnNext;
+    this.btnOpenWindow;
+    this.btnOpenWindow_2;
+    this.minContainerPeriodYears;
+    this.minContainerPeriodDates;
+
+    var init = function () {
+        window.G.DynamicArray.addListener(GiEvents.TimelineAppliedDates, function (r) {
+            var value_from;
+            var value_to;
+
+            switch (r.value.length) {
+                case 1:
+                    value_from = moment(r.value[0]).year();
+                    value_to = moment(r.value[0]).year();
+                    break;
+                case 2:
+                    value_from = moment(r.value[0]).year();
+                    value_to = moment(r.value[1]).year();
+                    break;
+                default:
+                    var _years = window.G.DynamicArray.getValue(GiEvents.TimelineYears);
+                    value_from = _years[0];
+                    value_to = _years[_years.length - 1];
+                    break;
+            }
+
+            localThis.slider.setValues(value_from, value_to);
+        });
+
+        window.G.DynamicArray.addListener(GiEvents.LayersWithTimeline, function (r) {
+            if (r.value?.length > 0) {
+                localThis.open();
+                localThis.reRender();
+            }
+            else {
+                localThis.close();
+            }
+        });
+
+        window.G.Dynamic.addListener(GiEvents.TimelineWindowIsOpen, function (r) {
+            if (r.value) {
+                localThis.block();
+            }
+            else {
+                localThis.unblock();
+            }
+        });
+
+        localThis.calendarWindow = new CalendarWindow(localThis.timelineGlobal, localThis);
+    };
+
+    init();
+
+    this.open = function () {
+        if (localThis.visible) return;
+        localThis.container = HtmlElementFromText(localizeHtml(TimelineBottomSliderView));
+
+        localThis.sliderContainer = localThis.container.querySelector(".slider-container");
+        localThis.sliderElement = localThis.container.querySelector("[data-id=select-period-slider]");
+        localThis.btnPrev = localThis.container.querySelector("[data-role=prevSlider]");
+        localThis.btnNext = localThis.container.querySelector("[data-role=nextSlider]");
+        localThis.btnOpenWindow = localThis.container.querySelector("[data-role=openWindowSelectedPeriod]");
+        localThis.btnOpenWindow_2 = localThis.container.querySelector("[data-role=openWindowSelectedPeriod_2]");
+        localThis.minContainerPeriodYears = localThis.container.querySelector("[data-field=period-years]");
+        localThis.minContainerPeriodDates = localThis.container.querySelector("[data-field=period-dates]");
+
+        document.body.appendChild(localThis.container);
+        localThis.visible = true;
+        localThis.container.setAttribute("data-isopen", "true");
+        document.body.setAttribute("data-footer-visible", "true");
+        document.querySelector(".layer-list-container").setAttribute("data-timeline-offset", "true");
+    };
+
+    this.close = function () {
+        if (!localThis.visible) return;
+        localThis.slider.destroy();
+        localThis.slider = null;
+
+        localThis.container.remove();
+        localThis.sliderContainer.remove();
+        localThis.sliderElement.remove();
+        localThis.btnPrev.remove();
+        localThis.btnNext.remove();
+        localThis.btnOpenWindow.remove();
+        localThis.btnOpenWindow_2.remove();
+        localThis.minContainerPeriodYears.remove();
+        localThis.minContainerPeriodDates.remove();
+
+        localThis.visible = false;
+
+        localThis.container.setAttribute("data-isopen", "false");
+        document.body.setAttribute("data-footer-visible", "false");
+        document.querySelector(".layer-list-container").removeAttribute("data-timeline-offset");
+    };
+
+    this.block = function() {
+        localThis.slider.disabled(true);
+        localThis.container.setAttribute("data-blocked", "true");
+    };
+
+    this.unblock = function () {
+        localThis.slider.disabled(false);
+        localThis.container.setAttribute("data-blocked", "false");
+    };
+
+    this.reRender = function () {
+        var _years = window.G.DynamicArray.getValue(GiEvents.TimelineYears);
+
+        var _first_year = Math.max(..._years);
+        var _last_year = Math.max(..._years);
+
+        var _selected_years = window.G.DynamicArray.getValue(GiEvents.TimelineSelectedYears);
+        if (_selected_years?.length == 2 && _selected_years[0] > 0) {
+            if (_years.indexOf(_selected_years[0]) != -1) {
+                _first_year = _selected_years[0];
+            }
+            if (_years.indexOf(_selected_years[1]) != -1) {
+                _last_year = _selected_years[1];
+            }
+        }
+
+        var _options = {
+            target: localThis.sliderElement,
+            values: _years,
+            set: [_first_year, _last_year],
+            range: true,
+            tooltip: false,
+            onChange: function (vals) {                
+                if (!vals) return;
+                let [start, end] = vals.split(',').map(Number);
+
+                window.G.DynamicArray.setValue(GiEvents.TimelineSelectedYears, [start, end]);
+
+                if (!firstRender) {
+                    if (localThis.calendarWindow?.visible === false) {
+
+                        let _date_from = moment(start + "-01-01").format("YYYY-MM-DD");
+                        let _date_to = moment(end + "-12-31").format("YYYY-MM-DD");
+                        window.G.DynamicArray.setValue(GiEvents.TimelineAppliedDates, [_date_from, _date_to]);
+                    }
+                    else {
+                        localThis.calendarWindow?.close();
+                    }
+                }
+
+                localThis.updateDatesButton(2);
+                localThis.updateYearsButton();
+                firstRender = false;
+            }
+        };
+
+        localThis.slider = new rSlider(_options);
+        localThis.bindEvents();
+        localThis.updateDatesButton(3);
+        localThis.updateYearsButton();
+
+        
+    };
+
+    this.updateYearsButton = function () {
+        if (!localThis.visible) return;
+        const _years = window.G.DynamicArray.getValue(GiEvents.TimelineSelectedYears);
+        let [start, end] = `${_years[0]},${_years[1]}`.split(',');
+        localThis.minContainerPeriodYears.innerHTML = `${start} - ${end}`;
+    };
+
+    this.updateDatesButton = function (from) {
+        if (!localThis.visible) return;
+        const _dates = window.G.DynamicArray.getValue(GiEvents.TimelineAppliedDates);
+        let [start, end] = `${moment(_dates[0]).format(gltxt("_locale_date_format"))},${moment(_dates[1]).format(gltxt("_locale_date_format"))}`.split(',');
+        localThis.minContainerPeriodDates.innerHTML = `${start} - ${end}`;
+    };
+
+    this.bindEvents = function () {
+        localThis.btnNext?.addEventListener("click", (e) => {
+            localThis.sliderContainer.scrollLeft += 50;
+        });
+
+        localThis.btnPrev?.addEventListener("click", (e) => {
+            localThis.sliderContainer.scrollLeft -= 50;
+        });
+
+        localThis.btnOpenWindow?.addEventListener("click", () => {
+            localThis.calendarWindow.open();
+        });
+
+        localThis.btnOpenWindow_2?.addEventListener("click", () => {
+            localThis.calendarWindow.open();
+        });
+    };
+};
+
+function CalendarWindow(_timeline, _bottomslider) {
+    var localThis = this;
+
+    this.timelineGlobal = _timeline;
+    this.bottomSlider = _bottomslider;
+
+    this.container = null;
+    this.rangeElement = null;
+    this.datePickerElement = null;
+    this.datePickerObj = null;
+    this.headerYearSlider = null;
+    this.startDateInput = {
+        element: null,
+        value: null,
+        mask: null,
+        active: false
+    };
+    this.finishDateInput = {
+        element: null,
+        value: null,
+        mask: null,
+        active: false
+    };
+    this.btnClose = null;
+    this.btnApply = null;
+    this.selectedInfoElement = null;
+
+    this.selectedYear = null;
+    this.headerFocusYear = null;
+    this.periodYears = [];
+
+    this.visible = false;
+
+    var EVENTS = {
+        ON_HEADER_SLIDER_CHANGE: function (r) {
+            localThis.scrollMultiDatePickerToYear(r.value);
+        },
+        ON_DATES_CHANGE: function (r) {
+            localThis.updateInputDates();
+            localThis.updateSelectedInfoText();
+        },
+        ON_CLOSE_BUTTON_PRESSED: function () {
+            localThis.close();
+        },
+        ON_APPLY_BUTTON_PRESSED: function () {
+            localThis.applySelectedDates();
+        }
+    };
+
+    var init = function () {
+        
+    };
+
+    init();
+
+    this.bindEvents = function () {
+        window.G.Dynamic.addListener(GiEvents.TimelineHeaderYearSlider, EVENTS.ON_HEADER_SLIDER_CHANGE);
+        window.G.DynamicArray.addListener(GiEvents.TimelineFocusedDates, EVENTS.ON_DATES_CHANGE);
+        localThis.btnClose?.addEventListener("click", EVENTS.ON_CLOSE_BUTTON_PRESSED);
+        localThis.btnApply?.addEventListener("click", EVENTS.ON_APPLY_BUTTON_PRESSED);
+    };
+
+    this.unbindEvents = function () {
+        window.G.Dynamic.removeListener(GiEvents.TimelineHeaderYearSlider, EVENTS.ON_HEADER_SLIDER_CHANGE);
+        window.G.DynamicArray.removeListener(GiEvents.TimelineFocusedDates, EVENTS.ON_DATES_CHANGE);
+        localThis.btnClose?.removeEventListener("click", EVENTS.ON_CLOSE_BUTTON_PRESSED);
+        localThis.btnApply?.removeEventListener("click", EVENTS.ON_APPLY_BUTTON_PRESSED);
+    };
+
+    this.open = function () {
+        if (localThis.visible) return;
+
+        localThis.container = HtmlElementFromText(localizeHtml(TimelineWindowView));
+        localThis.rangeElement = localThis.container.querySelector("[data-id=range]");
+        localThis.datePickerElement = localThis.container.querySelector("[data-id=datepicker]");
+
+        localThis.btnClose = localThis.container.querySelector("[data-role=closeWindowSelectedPeriod]");
+        localThis.btnApply = localThis.container.querySelector("[data-role=btnApply]");
+
+        localThis.startDateInput.element = localThis.container.querySelector("[data-id=startDate]");
+        localThis.finishDateInput.element = localThis.container.querySelector("[data-id=finishDate]");
+
+        localThis.selectedInfoElement = localThis.container.querySelector("[data-role=selected-info]");
+
+        document.body.appendChild(localThis.container);
+
+        localThis.renderMultiDatePicker();
+
+        localThis.container.setAttribute("data-isopen", "true");
+        localThis.visible = true;
+
+        window.G.Dynamic.setValue(GiEvents.TimelineWindowIsOpen, true);
+
+        /*this.renderMaskInput();*/
+        const _years = window.G.DynamicArray.getValue(GiEvents.TimelineYears);
+        const _range = window.G.DynamicArray.getValue(GiEvents.TimelineSelectedYears);
+        const _filtered = _years.filter(function (item) {
+            return item >= _range[0] && item <= _range[1];
+        });
+        localThis.renderHeaderYearsSlider(_filtered);
+
+        localThis.bindEvents();
+    };
+
+    this.close = function() {
+        if (!localThis.visible) return;
+        localThis.container.setAttribute("data-isopen", "false");
+
+        localThis.startDateInput.mask = null;
+        localThis.startDateInput.element?.remove();
+        localThis.finishDateInput.mask = null;
+        localThis.finishDateInput.element?.remove();
+
+        localThis.rangeElement.remove();
+        localThis.datePickerElement.remove();
+
+        localThis.btnClose.remove();
+        localThis.btnApply.remove();
+
+        localThis.selectedInfoElement.remove();
+
+        localThis.container.remove();
+
+        window.G.Dynamic.setValue(GiEvents.TimelineWindowIsOpen, false);
+
+        localThis.visible = false;
+
+        localThis.unbindEvents();
+    };
+
+    this.renderMultiDatePicker = function() {
+        var options = {
+            type: 'multiple',
+            months: 4,
+            jumpMonths: 1,
+            actions: {
+                clickDay: function(e, dates) {
+
+                    let ordered_dates = dates.sort(function(a, b) {
+                        return a.localeCompare(b);
+                    });
+
+                    switch (ordered_dates.length) {
+                        case 0:
+                            window.G.DynamicArray.setValue(GiEvents.TimelineFocusedDates, []);
+                            break;
+                        case 1:
+                            window.G.DynamicArray.setValue(GiEvents.TimelineFocusedDates, [ordered_dates[0]]);
+                            break;
+                        default:
+                            window.G.DynamicArray.setValue(GiEvents.TimelineFocusedDates, [ordered_dates[0], ordered_dates[ordered_dates.length - 1]]);
+                            break;
+                    }
+                    localThis.enableAllDays();
+                },
+            },
+            settings: {
+                lang: 'define',
+                iso8601: gltxt("_locale_week_starts") == "1",
+                selection: {
+                    day: 'multiple-ranged',
+                },
+                visibility: {
+                    daysOutside: false,
+                    theme: 'dark'
+                },
+            },
+            locale: {
+                months: [
+                    gltxt("mon_january", true),
+                    gltxt("mon_february", true),
+                    gltxt("mon_march", true),
+                    gltxt("mon_april", true),
+                    gltxt("mon_may", true),
+                    gltxt("mon_june", true),
+                    gltxt("mon_july", true),
+                    gltxt("mon_august", true),
+                    gltxt("mon_september", true),
+                    gltxt("mon_october", true),
+                    gltxt("mon_november", true),
+                    gltxt("mon_december", true)
+                ],
+                weekday: [
+                    gltxt("week_sun", true),
+                    gltxt("week_mon", true),
+                    gltxt("week_tue", true),
+                    gltxt("week_wed", true),
+                    gltxt("week_thu", true),
+                    gltxt("week_fri", true),
+                    gltxt("week_sat", true)
+                ]
+
+            }
+        };
+
+        localThis.datePickerObj = new VanillaCalendar(localThis.datePickerElement, options);
+        localThis.datePickerObj.init();
+    };
+
+    this.enableAllDays = function () {
+        localThis.datePickerObj.settings.range.disabled = [];
+        localThis.datePickerObj.update();
+    };
+
+    this.updateSelectedInfoText = function () {
+        let selectedDates = localThis.datePickerObj.selectedDates;
+        let count = selectedDates.length;
+        let text = gltxt("Дней", true);
+        localThis.selectedInfoElement.innerHTML = `${text}: ${count}`;
+    };
+
+    this.disableSomeDates = function (_firstDay) {
+        const a = window.G.Dynamic.getValue(GiEvents.TimelinePeriod);
+        const array = _stats.generateSeriesFromString(a);
+        const firstDay = moment(_firstDay).subtract(1, 'd').format('YYYY-MM-DD');
+        localThis.datePickerObj.settings.range.disabled = [`${array[0]}-01-01:${firstDay}`];
+        localThis.datePickerObj.update();
+    };
+
+    this.updateInputDates = function () {
+        if (!localThis.datePickerObj?.selectedDates) {
+            localThis.startDateInput.element.value = "";
+            localThis.finishDateInput.element.value = "";
+            return;
+        }
+        let dates = localThis.datePickerObj.selectedDates;
+        switch (dates.length) {
+            case 0:
+                localThis.startDateInput.element.value = "";
+                localThis.finishDateInput.element.value = "";
+                break;
+            case 1:
+                localThis.startDateInput.element.value = moment(dates[0]).format(gltxt("_locale_date_format"));
+                localThis.finishDateInput.element.value = moment(dates[0]).format(gltxt("_locale_date_format"));
+                break;
+            default:
+                localThis.startDateInput.element.value = moment(dates[0]).format(gltxt("_locale_date_format"));
+                localThis.finishDateInput.element.value = moment(dates[dates.length - 1]).format(gltxt("_locale_date_format"));
+                break;
+        }
+    };
+
+    this.renderHeaderYearsSlider = function (_array) {
+        localThis.periodYears = _array;
+        if (localThis.headerYearSlider) localThis.headerYearSlider.destroy();
+        localThis.headerYearSlider = null;
+        localThis.headerYearSlider = new rSlider({
+            target: localThis.rangeElement,
+            values: _array,
+            range: false,
+            tooltip: false,
+            onChange: function (val) {
+                window.G.Dynamic.setValue(GiEvents.TimelineHeaderYearSlider, parseInt(val));
+            }
+        });
+    };
+
+    this.scrollMultiDatePickerToYear = function (_year) {
+        const _years = window.G.DynamicArray.getValue(GiEvents.TimelineYears);
+        const _range = window.G.DynamicArray.getValue(GiEvents.TimelineSelectedYears);
+        const _filtered = _years.filter(function (item) {
+            return item >= _range[0] && item <= _range[1];
+        });
+        localThis.datePickerObj.settings.range.min = `${_filtered[0]}-01-01`;
+        localThis.datePickerObj.settings.range.max = `${_filtered[_filtered.length - 1]}-12-31`;
+        localThis.datePickerObj.settings.selected.year = _year;
+        localThis.datePickerObj.settings.selected.month = 0;
+        localThis.datePickerObj.update();
+    };
+
+    this.applySelectedDates = function () {
+        let _dates = window.G.DynamicArray.getValue(GiEvents.TimelineFocusedDates);
+        let _years = window.G.DynamicArray.getValue(GiEvents.TimelineSelectedYears);
+        let _selected_dates = [];
+        switch (_dates.length) {
+            case 0:
+                _selected_dates = [`${_years[0]}-01-01`, `${_years[_years.length - 1]}-12-31`];
+                break;
+            case 1:
+                _selected_dates = [_dates[0], _dates[0]];
+                break;
+            default:
+                _selected_dates = [_dates[0], _dates[_dates.length - 1]];
+                break;
+        }
+        window.G.DynamicArray.setValue(GiEvents.TimelineAppliedDates, _selected_dates);        
+    };
+
+    this.renderMaskInput = function () {
+        const a = moment(localThis.getPeriodYears()[0] + ".01.01");
+        const b = moment(localThis.getPeriodYears()[localThis.getPeriodYears().length - 1] + ".12.31");
+
+        localThis.startDateInput.mask.on('accept', (_e) => {
+            localThis.startDateInput.mask.masked.min = new Date(a.format('YYYY-MM-DD'));
+        });
+
+        localThis.startDateInput.mask.on('complete', (a) => {
+            localThis.startDateInput.value = localThis.startDateInput.mask._value;
+            const stringDate = localThis.startDateInput.value.split(".");
+            let _date = moment(stringDate[2] + "." + stringDate[1] + "." + stringDate[0]).add(1, 'days');
+            localThis.finishDateInput.mask.masked.min = new Date(_date.format('YYYY-MM-DD'));
+            localThis.datePickerObj.settings.range.disabled = [];
+            localThis.datePickerObj.update();
+            localThis.applyDatesDatePicker(localThis.getValStartInputFormatDatePicker(), localThis.getValFinishInputFormatDatePicker());
+        });
+
+        localThis.finishDateInput.mask.on('complete', () => {
+            localThis.finishDateInput.value = localThis.finishDateInput.mask._value;
+            let minDate = moment(localThis.getValStartInput(), gltxt("_locale_date_format")).format("YYYY.MM.DD");
+
+            localThis.finishDateInput.mask.masked.min = new Date(minDate);
+            localThis.applyDatesDatePicker(localThis.getValStartInputFormatDatePicker(), localThis.getValFinishInputFormatDatePicker());
+        });
+    };
+
+    this.getSelectedYear = function () {
+        return localThis.selectedYear;
+    };
+
+    this.getPeriodYears = function () {
+        return localThis.periodYears;
+    };
+
+    this.getValuesInputs = function () {
+        alert("use getValStartInput");
+        return null;
+    };
+
+    this.getValStartInput = function () {
+        return localThis.startDateInput.element.value;
+    };
+
+    this.getValFinishInput = function () {
+        return localThis.finishDateInput.element.value;
+    };
+
+    this.getValStartInputFormatDatePicker = function () {
+        let str = localThis.startDateInput.element.value;
+        let a = str.split(".");
+        return moment(a[2] + "-" + a[1] + "-" + a[0]);
+    };
+
+    this.getValFinishInputFormatDatePicker = function () {
+        let str = localThis.finishDateInput.element.value;
+        let a = str.split(".");
+        return moment(a[2] + "-" + a[1] + "-" + a[0]);
+    };
+
+    this.applyDatesDatePicker = function (_start, _finish) {
+        let a = moment(_start).format("YYYY-MM-DD");
+        let b = moment(_finish).format("YYYY-MM-DD");
+        let str = `${a}:${b}`;
+
+        localThis.disableSomeDates(a);
+        localThis.datePickerObj.update();
+        localThis.btnApply.setAttribute("data-active", "true");
+    };
+
+    this.setValues = function (_start, _finish) {
+        localThis.renderMaskInput();
+        localThis.applyDatesDatePicker(_start, _finish);
+
+        localThis.startDateInput.element.value = _start.format(gltxt("_locale_date_format"));
+        localThis.finishDateInput.element.value = _finish.format(gltxt("_locale_date_format"));
+    };
+
+    this.resetForm = function() {
+        localThis.startDateInput.element.value = "";
+        localThis.finishDateInput.element.value = "";
+
+        localThis.datePickerObj.reset();
+        localThis.datePickerObj.settings.range.disabled = [];
+        localThis.datePickerObj.update();
+
+        /*Кнопку Применить делаем неактивной */
+        localThis.btnApply.setAttribute("data-active", "false");
+    }
+
+    this.setActiveInput = () => {
+        const start = localThis.startDateInput.element.getAttribute("data-active");
+        const finish = localThis.finishDateInput.element.getAttribute("data-active");
+
+        localThis.startDateInput.active = (start === "true");
+        localThis.finishDateInput.active = (finish === "true");
+    };
+
+    this.isActiveInput = function (_input) {
+        const start = localThis.startDateInput.element.getAttribute("data-active");
+        const finish = localThis.finishDateInput.element.getAttribute("data-active");
+
+        if (start === "true" || finish === "true") {
+            localThis.startDateInput.element.setAttribute("data-active", "false");
+            localThis.finishDateInput.element.setAttribute("data-active", "false");
+        }
+
+        _input.setAttribute("data-active", "true");
+
+        localThis.setActiveInput();
+    };
+};
+
+var tlglobaltimer = setInterval(function () {
+    if (window.G?.Dynamic && window.G?.DynamicArray) {
+        window.timeline_global = new TimelineGlobal();
+        clearInterval(tlglobaltimer);
+        delete (tlglobaltimer);
+    }
+}, 200);
+

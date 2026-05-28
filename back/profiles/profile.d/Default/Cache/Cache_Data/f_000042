@@ -1,0 +1,2103 @@
+function ProjectCardGeoNoAccess() {
+    var localThis = this;
+    this.id = "project-card-noAccess";
+    this.dialogWindow = null;/*див с окном*/
+    var _window = null;
+    this.visible = false;/*открыто или нет*/
+    this.statuses_selector = null;
+    this.statuses_container = null;
+    this.window_pelena = null;
+    this.windowPrognozTo = null;
+    this.container = null;/*вся часть окна ниже узкой шапки с кнопкой х*/
+    this.formcontainer = null;/*див, внутри которого генерятся поля проекта*/
+    this.coreFields = {};/*тут все дивы и инпуты для полей проекта, которые есть всегда и везде*/
+    this.geometry = null;/*?*/
+    this.zones = [];/*массив зон проекта*/
+    this.point = null;/*точка проекта, если null, то сервер сгенерит центроид*/
+    this.type = "create";/*create - значит создаём проект, update - редактируем проект, view - открыли только для чтения*/
+    this.scheme = null;/*сюда кладётся схема конкретного типа проекта*/
+    this.data = null;
+    this.timeline_history = null;
+    this.linked_users = null;
+    this.project_voting = null;
+    this.onClose = null;
+    this.listItem = null;
+    this.properties = null;
+    this.loader = null;
+    this.lineoptions = null;
+    this.polyoptions = null;
+    this.cutter = null;
+    this.draw = null;
+    this.scheme_uid = null;
+    this.project_uid = null;
+
+    this.ext = {};
+
+    var scheme = {
+        "SchemaUid": "e1881d83-e168-44cf-92df-59d9315e4e24",
+        "Caption": "Перекрытия дорог",
+        "Url": "",
+        "Created": "2021-03-24T10:49:15",
+        "Schema": [
+            {
+                "Name": "project_kind",
+                "Caption": "Вид работ",
+                "Format": "String",
+                "Type": "select",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 3,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [
+                    "ДТП",
+                    "Авария",
+                    "Дорожные работы",
+                    "Строительство",
+                    "Реконструкция",
+                    "Плановые"
+                ],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "work_name",
+                "Caption": "Название работ",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 4,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "address",
+                "Caption": "Адрес объекта",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 5,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "additional_info",
+                "Caption": "Описание проекта",
+                "Format": "String",
+                "Type": "textarea",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 6,
+                "Editable": false,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "date_start",
+                "Caption": "Дата начала",
+                "Format": "Date",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 1,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 50,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "date_end",
+                "Caption": "Дата окончания",
+                "Format": "Date",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 2,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 50,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "claimed_by",
+                "Caption": "Заявитель",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 6,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "orientir",
+                "Caption": "Ориентир",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 7,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "length",
+                "Caption": "Протяженность",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 8,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "area_part",
+                "Caption": "Участок",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 9,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "responsible",
+                "Caption": "Ответственный за проведение работ",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 10,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "responsible_phone",
+                "Caption": "Номер телефона",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 11,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "control_by",
+                "Caption": "Контролирующий представитель заказчика",
+                "Format": "String",
+                "Type": "input",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 12,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "control_phone",
+                "Caption": "Номер телефона",
+                "Format": "String",
+                "Type": "input",
+                "Mask": "+998 XX XXX XX XX",
+                "Placeholder": "+998 xx xxx xx xx",
+                "Rules": [],
+                "Visible": true,
+                "Index": 13,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 100,
+                "Group": "Основная информация"
+            },
+            {
+                "Name": "check1",
+                "Caption": "Согласовано с 1",
+                "Format": "Int",
+                "Type": "checkbox",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 14,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 50,
+                "Group": "Согласования"
+            },
+            {
+                "Name": "check2",
+                "Caption": "Согласовано с 2",
+                "Format": "Int",
+                "Type": "checkbox",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 15,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 50,
+                "Group": "Согласования"
+            },
+            {
+                "Name": "check3",
+                "Caption": "Согласовано с 3",
+                "Format": "Int",
+                "Type": "checkbox",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 16,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 50,
+                "Group": "Согласования"
+            },
+            {
+                "Name": "check4",
+                "Caption": "Согласовано с 4",
+                "Format": "Int",
+                "Type": "checkbox",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 17,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 50,
+                "Group": "Согласования"
+            },
+            {
+                "Name": "check5",
+                "Caption": "Согласовано с 5",
+                "Format": "Int",
+                "Type": "checkbox",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 18,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 50,
+                "Group": "Согласования"
+            },
+            {
+                "Name": "check6",
+                "Caption": "Согласовано с 6",
+                "Format": "Int",
+                "Type": "checkbox",
+                "Mask": null,
+                "Placeholder": null,
+                "Rules": [],
+                "Visible": true,
+                "Index": 19,
+                "Editable": true,
+                "Highlighted": false,
+                "ErrorMessages": [],
+                "Editors": [
+                    "*"
+                ],
+                "Viewers": [
+                    "*"
+                ],
+                "Values": [],
+                "Width": 50,
+                "Group": "Согласования"
+            }
+        ],
+        "Statuses": [
+            {
+                "Id": 0,
+                "Status": "Поступила заявка",
+                "Days": 0,
+                "Type": "confirmed",
+                "Color": "#707070",
+                "Next": [
+                    1,
+                    10,
+                    403,
+                    1000
+                ],
+                "expired_next": -1,
+                "Read_Only": false,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 1,
+                "Status": "Согласование с СБ",
+                "Days": 0,
+                "Type": "modify",
+                "Color": "#18BC9C",
+                "Next": [
+                    2,
+                    403
+                ],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 2,
+                "Status": "Согласовано с СБ",
+                "Days": 0,
+                "Type": "confirmed",
+                "Color": null,
+                "Next": [
+                    10
+                ],
+                "expired_next": -1,
+                "Read_Only": false,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 10,
+                "Status": "Согласование бегунка",
+                "Days": 0,
+                "Type": "modify",
+                "Color": null,
+                "Next": [
+                    11,
+                    403
+                ],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 11,
+                "Status": "Бегунок согласован",
+                "Days": 0,
+                "Type": "confirmed",
+                "Color": null,
+                "Next": [
+                    12,
+                    500
+                ],
+                "expired_next": -1,
+                "Read_Only": false,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 12,
+                "Status": "Договор направлен Заказчику",
+                "Days": 0,
+                "Type": "modify",
+                "Color": null,
+                "Next": [
+                    13,
+                    500
+                ],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 13,
+                "Status": "Договор подписан",
+                "Days": 0,
+                "Type": "confirmed",
+                "Color": null,
+                "Next": [
+                    14,
+                    500
+                ],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 14,
+                "Status": "Ордер выдан",
+                "Days": 0,
+                "Type": "confirmed",
+                "Color": null,
+                "Next": [
+                    15,
+                    500
+                ],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 15,
+                "Status": "Согласование с ГАИ",
+                "Days": 0,
+                "Type": "modify",
+                "Color": null,
+                "Next": [
+                    16,
+                    403
+                ],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 16,
+                "Status": "Согласовано ГАИ",
+                "Days": 0,
+                "Type": "confirmed",
+                "Color": null,
+                "Next": [
+                    17,
+                    500
+                ],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 17,
+                "Status": "Проведение работ",
+                "Days": 0,
+                "Type": "modify",
+                "Color": null,
+                "Next": [
+                    200
+                ],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 200,
+                "Status": "Работы проведены",
+                "Days": 0,
+                "Type": "confirmed",
+                "Color": "#1BA1E2",
+                "Next": [],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 403,
+                "Status": "Отказано",
+                "Days": 0,
+                "Type": "canceled",
+                "Color": null,
+                "Next": [
+                    1000
+                ],
+                "expired_next": -1,
+                "Read_Only": false,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 500,
+                "Status": "Отменено",
+                "Days": 1,
+                "Type": "canceled",
+                "Color": null,
+                "Next": [
+                    1000
+                ],
+                "expired_next": 1000,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            },
+            {
+                "Id": 1000,
+                "Status": "В архиве",
+                "Days": 0,
+                "Type": "canceled",
+                "Color": "#707070",
+                "Next": [],
+                "expired_next": -1,
+                "Read_Only": true,
+                "Options": [],
+                "Notifications": [],
+                "Triggers": []
+            }
+        ],
+        "Color": "#D80202",
+        "ColorNames": [],
+        "CanBeExpired": false,
+        "ShortName": "YE",
+        "MustTranslit": 0
+    };
+
+    var testJSON = {
+        "status": "success",
+        "success": true,
+        "message": "",
+        "details": "",
+        "results": {
+            "feature": {
+                "geometry": {
+                    "coordinates": [
+                        69.27977,
+                        41.31118
+                    ],
+                    "type": "Point"
+                },
+                "properties": {
+                    "project_kind": "Дорожные работы",
+                    "address": "Jxtym lkbyysq flhtc? rjnjhsq gj bltt yt ljk;ty evtcnbnmcz d jlye cnhjxre b ghjcnj j,zpfy gthtytcnbnm yf vyjuj vyjuj cnhjr? lj nbt[ gjh gjrf yt yfxy`n kjvfnm bynthatqc cbcntvs b djn",
+                    "additional_info": null,
+                    "date_start": "2021-10-28T00:00:00",
+                    "date_end": "2021-10-08T00:00:00",
+                    "control_phone": null,
+                    "check1": 1,
+                    "check2": 1,
+                    "created_user": "sendrr@yandex.ru",
+                    "created_date": "2021-10-08T07:46:45.887342",
+                    "edited_user": "sendrr@yandex.ru",
+                    "edited_date": "2022-09-14T17:22:59.805651",
+                    "project_uid": "6855ea6c-c9a2-4ed7-925c-9e54a9a001d2",
+                    "project_name": "Amir Temur shoh ko'chasi 4",
+                    "project_type": "e1881d83-e168-44cf-92df-59d9315e4e24",
+                    "project_value": 0,
+                    "status": "Поступила заявка",
+                    "status_external": null,
+                    "priority": 1,
+                    "hrid": "67-YE-000013-2021",
+                    "calc_data": null,
+                    "report_data": null,
+                    "calc_statuses": []
+                },
+                "type": "Feature"
+            },
+            "zones": [],
+            "points": [],
+            "statushistory": [
+                {
+                    "Id": 28,
+                    "ProjectUid": "6855ea6c-c9a2-4ed7-925c-9e54a9a001d2",
+                    "StatusDate": "2021-10-08T07:46:45",
+                    "StatusUser": "sendrr@yandex.ru",
+                    "StatusId": 0,
+                    "Status": "Поступила заявка",
+                    "PrevId": 0,
+                    "Options": null,
+                    "Comment": null
+                }
+            ],
+            "scheme": [
+                {
+                    "Name": "date_start",
+                    "Caption": "Дата начала",
+                    "Format": "Date",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 1,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 50,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "date_end",
+                    "Caption": "Дата окончания",
+                    "Format": "Date",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 2,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 50,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "project_kind",
+                    "Caption": "Вид работ",
+                    "Format": "String",
+                    "Type": "select",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 3,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [
+                        "ДТП",
+                        "Авария",
+                        "Дорожные работы",
+                        "Строительство",
+                        "Реконструкция",
+                        "Плановые"
+                    ],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "work_name",
+                    "Caption": "Название работ",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 4,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "address",
+                    "Caption": "Адрес объекта",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 5,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "claimed_by",
+                    "Caption": "Заявитель",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 6,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "additional_info",
+                    "Caption": "Описание проекта",
+                    "Format": "String",
+                    "Type": "textarea",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 6,
+                    "Editable": false,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "orientir",
+                    "Caption": "Ориентир",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 7,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "length",
+                    "Caption": "Протяженность",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 8,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "area_part",
+                    "Caption": "Участок",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 9,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "responsible",
+                    "Caption": "Ответственный за проведение работ",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 10,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "responsible_phone",
+                    "Caption": "Номер телефона",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 11,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "control_by",
+                    "Caption": "Контролирующий представитель заказчика",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 12,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "control_phone",
+                    "Caption": "Номер телефона",
+                    "Format": "String",
+                    "Type": "input",
+                    "Mask": "+998 XX XXX XX XX",
+                    "Placeholder": "+998 xx xxx xx xx",
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 13,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 100,
+                    "Group": "Основная информация"
+                },
+                {
+                    "Name": "check1",
+                    "Caption": "Согласовано с 1",
+                    "Format": "Int",
+                    "Type": "checkbox",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 14,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 50,
+                    "Group": "Согласования"
+                },
+                {
+                    "Name": "check2",
+                    "Caption": "Согласовано с 2",
+                    "Format": "Int",
+                    "Type": "checkbox",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 15,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 50,
+                    "Group": "Согласования"
+                },
+                {
+                    "Name": "check3",
+                    "Caption": "Согласовано с 3",
+                    "Format": "Int",
+                    "Type": "checkbox",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 16,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 50,
+                    "Group": "Согласования"
+                },
+                {
+                    "Name": "check4",
+                    "Caption": "Согласовано с 4",
+                    "Format": "Int",
+                    "Type": "checkbox",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 17,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 50,
+                    "Group": "Согласования"
+                },
+                {
+                    "Name": "check5",
+                    "Caption": "Согласовано с 5",
+                    "Format": "Int",
+                    "Type": "checkbox",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 18,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 50,
+                    "Group": "Согласования"
+                },
+                {
+                    "Name": "check6",
+                    "Caption": "Согласовано с 6",
+                    "Format": "Int",
+                    "Type": "checkbox",
+                    "Mask": null,
+                    "Placeholder": null,
+                    "Rules": [],
+                    "Visible": true,
+                    "Index": 19,
+                    "Editable": true,
+                    "Highlighted": false,
+                    "ErrorMessages": [],
+                    "Editors": [
+                        "*"
+                    ],
+                    "Viewers": [
+                        "*"
+                    ],
+                    "Values": [],
+                    "Width": 50,
+                    "Group": "Согласования"
+                }
+            ]
+        }
+    };
+    var _t = {}; /*все шаблоны*/
+
+    var _parts = {};
+
+    var loadTemplateUrl = "/resources/engine/project-card-noAccess/projectCard.html";
+    this.tools = {};
+    var _timers = {};
+    /*Кнопка в идентификаторе*/
+    var btnToPopup = $("<div/>", {
+        "data-action": "openProjectCard",
+        "class": "toolleft gr-briefcase filter-default filter-hover-primary",
+        "title": "Открыть карточку проекта",
+        "show-on": "contains_field:project_uid,contains_field:project_type"
+    });
+
+    var appendApi = function () {
+        var z = $.getScript("/resources/engine/project-card-noAccess/api.js");
+        return $.when(z);
+    };
+
+    var createBtnIdentificator = function () {
+        _timers.wait_pop = setInterval(function () {
+            if (typeof window.mapInfoPopupModule?.mapInfoPopup?.addActionButton != "function") return;
+
+            if (window.mapInfoPopupModule?.mapInfoPopup?.selfpopup?.find("[data-action]").length > 0) {
+                localThis.popup = window.mapInfoPopupModule;
+                localThis.popup.mapInfoPopup.addActionButton("openProjectCard", btnToPopup, function (xlon, ylat) {
+                    localThis.open();
+                });
+                clearInterval(_timers.wait_pop);
+                delete _timers.wait_pop;
+            }
+        }, 1000);
+
+    };
+
+    this.layer = {
+        isOn: false,
+        ZONES_LAYER: null,
+        POINT_LAYER: null,
+        features: [],
+        point: null,
+        selectedFeature: null,
+        renderer: function (feature) {
+            var color = {
+                color: feature.properties.color,
+                /*color: "#3d91de",*/
+                weight: 2,
+                opacity: 0.99,
+                fillColor: "#FFFFFF",
+                fillOpacity: 0.1
+            };
+            return color;
+        },
+        show: function () {
+            localThis.layer.ZONES_LAYER = L.geoJson(localThis.layer.features, {
+                style: function (feature) {
+                    return localThis.layer.renderer(feature);
+                },
+                /*onEachFeature: localThis.layer.onClick,*/
+                pane: "specialFX",
+                clickable: false,
+                interactive: false
+            }).addTo(window.MAP);
+
+            if (localThis?.layer?.point) {
+
+                localThis.layer.POINT_LAYER = L.geoJson(localThis.layer.point, {
+                    pointToLayer: function (feature, latlng) {
+                        return new L.Marker(latlng, {
+                            icon: L.icon({
+                                iconUrl: "/resources/styles/pins/HexicIcon16.png",
+                                iconSize: [33, 31],
+                                iconAnchor: [16, 15],
+                                popupAnchor: [0, -20]
+                            }),
+                            clickable: false,
+                            opacity: 0.99,
+                            riseOnHover: true,
+                            pane: "specialFX"
+                        });
+                    },
+                    pane: "specialFX"
+                }).addTo(window.MAP);
+            }
+
+            localThis.layer.isOn = true;
+        },
+        hide: function () {
+            localThis.layer.features = [];
+            localThis.layer.features.length = 0;
+            if (localThis.layer.ZONES_LAYER !== null) {
+                window.MAP.removeLayer(localThis.layer.ZONES_LAYER);
+                localThis.layer.ZONES_LAYER.remove();
+                localThis.layer.ZONES_LAYER = null;
+            }
+            if (localThis.layer.POINT_LAYER !== null) {
+                window.MAP.removeLayer(localThis.layer.POINT_LAYER);
+                localThis.layer.POINT_LAYER.remove();
+                localThis.layer.POINT_LAYER = null;
+            }
+            localThis.layer.isOn = false;
+        },
+        zoomTo: function () {
+            console.log("point", localThis.layer.point);
+            var xlon = localThis.layer.point.coordinates[0];
+            var ylat = localThis.layer.point.coordinates[1];
+            window.MAP.setView([ylat, xlon], 17);
+            window.MAP.invalidateSize();
+        },
+        onClick: function (feature, layer) {
+            layer.on({
+                click: function (e) {
+                    localThis.layer.selectedFeature = e.target.feature;
+                }
+            });
+        }
+    };
+
+    var loadTemplates = function () {
+        return $.get(loadTemplateUrl).done(function (r1) {
+            _t._window_template = $(localizeHtml(r1));
+
+            _t._group_template = _t._window_template.find(".group").clone();
+            _t._clickbg_template = _t._window_template.find(".click-container").clone();
+            _t._statusselector_template = _t._window_template.find(".status-selector-container").clone();
+            _t._statusselector_item_template = _t._statusselector_template.find(".status-item:first").clone();
+
+            _t._priority_template = _t._window_template.find(".priority-selector-container").clone();
+            _t._priority_item_template = _t._priority_template.find(".priority-item:first").clone();
+
+            _t._input_template = _t._group_template.find("[data-type=input_text]").clone();
+            _t.no_access_template = _t._group_template.find("[data-access=false]").clone();
+            _t._checkBox_template = _t._group_template.find("[data-type=checkBox]").clone();
+            _t._select_template = _t._group_template.find("[data-type=select]").clone();
+            _t._select_template.find("option").remove();
+            _t._select_template.find("select").append($("<option/>", { value: "" }).html("-"));
+
+            _t._textarea_template = _t._group_template.find("[data-type=textarea]").clone();
+
+            _t._statusselector_template.children().remove();
+            _t._priority_template.children().remove();
+
+            _t._group_template.find(".body-container").children().remove();
+            _t._window_template.find("[data-role=groups_container]").children().remove();
+            _t._window_template.find(".click-container").remove();
+            _t._window_template.find(".status-selector-container").remove();
+        });
+    };
+
+    var renderWindow = function (scheme) {
+        if (_window != null) {
+            _window.remove();
+        }
+        _window = _t._window_template.clone();
+        _parts = null;
+        _parts = {};
+        _parts.window_title = _window.find("[data-role=window_title]");
+        _window.find("[data-role]").each(function () {
+            var _name = $(this).attr("data-role");
+            if (_parts.hasOwnProperty(_name) == false) {
+                _parts[_name] = $(this);
+            }
+        });
+
+        scheme.sort(function (a, b) { return (a.Index > b.Index) ? 1 : -1; });
+
+        renderAllFields(scheme);
+    };
+
+    var guessWidth = function (_width) {
+        var _w = _width;
+        if (_width >= 100 || _width <= 10) {
+            _w = 100;
+        }
+        else if (_width <= 50) {
+            _w = 49;
+        }
+        else if (Math.abs(_width - 50) <= 5) {
+            _w = 49;
+        }
+        else {
+            _w = 100;
+        }
+        return _w;
+    };
+
+    var renderOneFieldNoAccess = function (_field_info) {
+        var _result = null;
+        var v = _field_info;
+        if (v == null) {
+            return _result;
+        }
+        _result = _t.no_access_template.clone();
+        _result.css("flex-basis", (guessWidth(v.Width)) + "%");
+        _result.attr("data-field-name", v.Name);
+        _result.attr("data-field-format", v.Format);
+        _result.attr("data-type", v.Type);
+        _result.find("label").html(v.Caption);
+
+        var _txt = _result.find("[data-label=text]");
+
+        _txt.attr({ "data-field": v.Name, "data-format": v.Format });
+
+        return _result;
+    };
+
+    var renderAllFields = function (scheme) {
+
+        var _groups = [];
+        scheme.forEach(function (v) {
+            var _gr = v.Group;
+            if (_groups.indexOf(_gr) == -1) {
+                _groups.push(_gr);
+            }
+        });
+
+        _groups.forEach(function (_gr) {
+            var scheme_filtered = scheme.filter(function (el) { return el.Group == _gr; });
+
+            scheme_filtered = scheme_filtered.sort(function (a, b) {
+                if (a.Index < b.Index) {
+                    return -1;
+                }
+                if (a.Index > b.Index) {
+                    return 1;
+                }
+                if (a.Index == b.Index) {
+                    if (a.Name < b.Name) {
+                        return -1;
+                    }
+                    return 1;
+                }
+                return 0;
+            });
+
+            var _group_div = _t._group_template.clone();
+
+            _group_div.find("label[data-id]").html(_gr);
+
+            scheme_filtered.forEach(function (_fld) {
+
+                if (["value", "project_value"].indexOf(_fld.Name) !== -1) {
+                    return;
+                }
+
+                if (localThis.data.hasOwnProperty(_fld.Name) === false) {
+                    return;
+                }
+
+                if (_fld.Visible === false) {
+                    return;
+                }
+
+                var field = renderOneFieldNoAccess(_fld);
+                /* console.log("=======================",field);*/
+
+                if (field != null) {
+                    _group_div.find(".body-container").append(field);
+                }
+
+                field.find("[data-field=" + _fld.Name + "]").attr("disabled", _fld.Editable == false);
+
+                if (_fld.Highlighted === true) {
+                    var err_message = "Проверьте значения:\n";
+                    if (_fld.hasOwnProperty("ErrorMessages") && _fld.ErrorMessages !== null && _fld.ErrorMessages.length > 0) {
+                        _fld.ErrorMessages.forEach(function (item) {
+                            err_message += "- " + item + "\n";
+                        });
+                    }
+                    field.find("[data-field=" + _fld.Name + "]").attr("highlighted", true).attr("title", err_message);
+                }
+                else {
+                    field.find("[data-field=" + _fld.Name + "]").attr("highlighted", false);
+                }
+
+            });
+
+            _group_div.find(".arrow-down").on("click", function () {
+                if ($(this).parent().parent(".group").attr("expanded") == "true") {
+                    $(this).parent().parent(".group").attr("expanded", "false");
+                }
+                else {
+                    $(this).parent().parent(".group").attr("expanded", "true");
+                }
+            });
+
+            _parts.groups_container.append(_group_div);
+
+        });
+
+        fields.helpers.checkFieldsDisabled();
+
+    };
+
+    var setFormDataNoAccess = function (json) {
+        _window.find("[data-field]").each(function () {
+            var _type = $(this)[0].nodeName.toLowerCase();
+            var _name = $(this).attr("data-field");
+            var _format = $(this).attr("data-format");
+
+            if (_name == "project_name") {
+                /*Удалим input*/
+                var _container = $(this).parent();
+                $(this).remove();
+                _container.append($("<span/>").attr("data-field", "project_name").text(json[_name]));
+            }
+            if (_name == "status") {
+                $(this).text(json[_name]);
+                $(this).removeAttr("data-action");
+                $(this).attr("data-access", "false");
+                status.changeStatusPlate(json[_name]);
+                /* updateFieldsEditability();*/
+            }
+            else if (_name == "priority") {
+                if (json.hasOwnProperty(_name)) {
+                    $(this).parent().find("label").text("");
+                    if (json[_name] == 1) {
+                        $(this).parent().find("span.i").addClass("priority-ico");
+                        $(this).parent().find("label").text("Срочно!");
+                    }
+                    $(this).remove();
+                }
+            }
+            else if (_name == "created_date") {
+                if (json.hasOwnProperty(_name)) {
+                    $(this).html(moment(json[_name]).format('L') + " " + moment(json[_name]).format('LT'));
+                }
+            }
+            else {
+
+                switch (_type) {
+                    case "span":
+                    case "label":
+                    case "div":
+                        if (json.hasOwnProperty(_name)) {
+                            if ($(this).parent().attr("data-type") == "checkBox") {
+                                $(this).attr("data-active", json[_name] == 1 ? "true" : "false");
+                            }
+                            else if (["Date", "DateTime"].indexOf(_format) != -1) {
+                                $(this).html(moment(json[_name]).format('L'));
+                            }
+                            else {
+                                if (json[_name] == null || json[_name] == "null") {
+                                    $(this).html("Нет информации");
+                                }
+                                else if ($(this).parent().attr("data-type") == "checkbox") {
+                                    $(this).text(json[_name] == 1 ? "Да" : "Нет");
+                                }
+                                else {
+                                    $(this).html(json[_name]);
+                                }
+                            }
+                        }
+                        break;
+                    case "input":
+                    case "textarea":
+                    case "select":
+                        if (json.hasOwnProperty(_name)) {
+                            if (["Date", "DateTime"].indexOf(_format) != -1) {
+                                $(this).val(moment(json[_name]).format('L'));
+                            }
+                            else {
+                                $(this).val(json[_name]);
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+        });
+    };
+    var init = function () {        
+        $.when(loadTemplates(), appendApi()).done(function () {
+            createBtnIdentificator();
+            GiLocalStorageForOld_GC.collectExpiredItems();
+        });
+
+    };
+
+    var bindEvents = function () {
+        _window.find("[data-action]").each(function () {
+            var action = $(this).attr("data-action");
+            console.log(action);
+            var _this = $(this);
+            if (typeof (_data_actions[action]) === "function") {
+                $(this).on("click",
+                    function () {
+                        _data_actions[action](_this);
+                    });
+            }
+        });
+    };
+
+    /* методы для генерации полей проекта, очистки или вообще удаления */
+
+    var _data_actions = {
+        close: function () {
+            if (localThis.visible == false) {
+                return;
+            }
+            _data_actions.do_close();
+            _statusCommentWindow = null;
+        },
+        do_close: function () {
+            localThis.layer.hide();
+
+            _window.transition({ "right": "-600px", easing: "cubic-bezier(0.915, 0.825, 0.345, 1.075)", duration: 200 }, function () {
+                localThis.visible = false;
+
+                _window.children().remove();
+                _window.remove();
+                _window = null;
+
+                if (localThis.onClose !== null && typeof localThis.onClose === "function") {
+                    localThis.onClose();
+                    localThis.onClose = null;
+                }
+            });
+        },
+    };
+
+    var pelena = {
+        show: function (bg, onOpen, onClick) {
+
+            if (_window.find(".click-container").length > 0) {
+                return;
+            }
+
+            var _cl = _t._clickbg_template.clone();
+
+            if (typeof bg == "object") {
+                _cl.css(bg);
+            }
+
+            if (typeof onClick == "function") {
+                _cl.on("click", function () {
+                    pelena.hide();
+                    onClick();
+                });
+            }
+            else {
+                _cl.on("click", function () {
+                    pelena.hide();
+                });
+            }
+
+            _cl.attr("data-active", "true");
+
+            _window.append(_cl);
+
+            if (typeof onOpen == "function") {
+                onOpen();
+            }
+        },
+        hide: function () {
+
+            var _cl = _window.find(".click-container");
+
+            if (_cl.length > 0) {
+                _cl.remove();
+            }
+        }
+    };
+
+    var status = {
+        helpers: {
+            findStatusId: function (status) {
+                var selected = -1;
+                localThis.scheme.Statuses.forEach(function (o) {
+                    if (o.Status.toLowerCase() === status.toLowerCase()) {
+                        selected = o.Id;
+                    }
+                });
+                return selected;
+            },
+            findStatusInfoById: function (status_id) {
+                var selected = null;
+                localThis.scheme.Statuses.forEach(function (o) {
+                    if (o.Id === status_id) {
+                        selected = JSON.parse(JSON.stringify(o));
+                    }
+                });
+                return selected;
+            },
+            findStatusInfoByName: function (status) {
+                var selected = null;
+                localThis.scheme.Statuses.forEach(function (o) {
+                    if (o.Status.toLowerCase() === status.toLowerCase()) {
+                        selected = JSON.parse(JSON.stringify(o));
+                    }
+                });
+                return selected;
+            },
+            findNextStatusIds: function (status_id) {
+                var selected = [];
+
+                var status_info = status.helpers.findStatusInfoById(status_id);
+
+                if (status_info === null) {
+                    return selected;
+                }
+
+                selected = status_info.Next;
+
+                return selected;
+            },
+            addFakeStatus: function (_s) {
+                var one = _t._statusselector_item_template.clone();
+                one.attr("data-status-item-id", getRandomInt(1000, 1000000));
+                one.attr("data-status-item-name", _s);
+                one.css({ "opacity": 0 });
+                one.html(_s);
+                return one;
+            }
+        },
+        changeStatusPlate: function (name) {
+            var _id = status.helpers.findStatusId(name);
+            var _info = status.helpers.findStatusInfoById(_id);
+            if (_info?.Read_Only) {
+                _editable = false;
+            }
+            else {
+                _editable = true;
+            }
+            _parts.status.html(_info?.Status);
+            _parts.status.attr("data-type", _info?.Type);
+            _parts.status.attr("data-status-id", _id);
+            if (_info?.Color != null && _info?.Color != "") {
+                _parts.status.css({ "background-color": _info?.Color + " !important", "boo": "yes" });
+            }
+        }
+    };
+    this.ext.findStatusId = status.helpers.findStatusId;
+    this.ext.findStatusInfoById = status.helpers.findStatusInfoById;
+
+    var fields = {
+        helpers: {
+            getFieldType: function (fieldname) {
+                var type = "String";
+                localThis.scheme.Schema.forEach(function (o) {
+                    if (o.Name === fieldname) {
+                        type = o.Format;
+                    }
+                });
+                return type;
+            },
+            checkFieldsDisabled: function () {
+
+                var current_status_name = localThis.data.status;
+                var current_status_id = status.helpers.findStatusId(current_status_name);
+                var stt = status.helpers.findStatusInfoById(current_status_id);
+                if (stt != null && stt != undefined) {
+                    if (stt.Read_Only === true) {
+                        _window.find("select[data-field]").attr("disabled", true);
+                        _window.find("input[data-field]").attr("disabled", true);
+                        _window.find(".checkBox[data-field]").attr("data-editable", false);
+                    }
+                }                
+            },
+            getValueAsString: function (_name, _type) {
+                var _value = null;
+                for (var _prop in localThis.data) {
+                    if (localThis.data.hasOwnProperty(_prop) && _prop == _name) {
+                        var _v = localThis.data[_prop];
+                        if (_v == null) {
+                            _value = "";
+                        }
+                        else {
+                            if (_type == "DateTime") {
+                                _value = moment(_v).format('L');
+                            }
+                            else {
+                                _value = _v;
+                            }
+                        }
+                    }
+                }
+                return _value;
+            },
+            findFieldInSchema: function (name) {
+                var _column = null;
+                localThis.scheme.Schema.forEach(function (o) {
+                    if (o.Name === name) {
+                        _column = o;
+                    }
+                });
+                return _column;
+            },
+            checkIfFieldIsEditable: function (name) {
+                var _result = false;
+                var _column = fields.helpers.findFieldInSchema(name);
+                if (_column !== null) {
+                    _result = _column.Editable;
+                }
+                return _result;
+            },
+            getColumnRule: function (column, rule) {
+                var _rule = null;
+                localThis.scheme.Schema.forEach(function (o) {
+                    if (o.Name === column) {
+
+                        o.Rules.forEach(function (_rul) {
+                            if (_rul !== "") {
+                                var _parts = _rul.split("|");
+                                if (_parts.length === 2) {
+
+                                    if (_parts[0] === rule) {
+
+                                        if (_parts[0] === "default") {
+                                            _rule = {
+                                                type: _parts[0],
+                                                condition: _parts[1]
+                                            };
+                                        }
+                                        else if (_parts[0] === "show") {
+                                            var _show = _parts[1].split("=");
+                                            _rule = {
+                                                type: _parts[0],
+                                                condition: {
+                                                    column: _show[0],
+                                                    value: _show[1]
+                                                }
+                                            };
+                                        }
+
+                                    }
+
+
+                                }
+                            }
+                        });
+                    }
+                });
+                return _rule;
+            },
+            findValueDropBox: function (dropBox, value) {
+                dropBox.find("select option").each(function (i, v) {
+                    if ($(v).text() === value) {
+                        $(this).attr("selected", true);
+                    }
+                });
+            },
+            checkField: function (self) {
+                var active = self.attr("data-active");
+                if (self.attr("data-editable") == "false") {
+                    return false;
+                }
+                self.attr("data-active", (active == '0') ? '1' : '0');
+            },
+            clearFields: function () {
+                for (var name in localThis.coreFields) {
+                    if (localThis.coreFields.hasOwnProperty(name)) {
+
+                        var elem = localThis.coreFields[name];
+
+                        if (elem.attr("data-type") === "txt") {
+                            elem.text("");
+                        }
+                        else if (elem.attr("data-type") === "val") {
+                            elem.val("");
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    var zones = {
+        helpers: {
+            featuresToZones: function (features, label) {
+                var geoms = Object.assign({}, features);
+                var zones = [];
+                zones.length = 0;
+
+                if (typeof label === "undefined") {
+                    label = "мин";
+                }
+
+                geoms.forEach(function (o) {
+                    if (o.hasOwnProperty("geometry")) {
+                        zones.push({
+                            zone_name: "" + parseInt(o.properties.size) + " " + label,
+                            zone_size: parseInt(o.properties.size),
+                            zone_size_label: label,
+                            color: o.properties.color,
+                            geom: o.geometry
+                        });
+                    }
+                });
+
+                return zones;
+            },
+            createZones: function (features, label) {
+
+                localThis.zones = [];
+                localThis.zones.length = 0;
+
+                if (typeof label === "undefined") {
+                    label = gl.text.minutes1;
+                }
+
+                localThis.zones = zones.helpers.featuresToZones(features, label);
+
+                return localThis.zones;
+            }
+        }
+    };
+    this.ext.setZones = zones.setZones;
+    this.ext.featuresToZones = zones.helpers.featuresToZones;
+
+    this.GetData = function () {
+        localThis.scheme_uid = window.mapInfoPopupModule.mapInfoPopup.selectedFeature.properties.project_type;
+        localThis.project_uid = window.mapInfoPopupModule.mapInfoPopup.selectedFeature.properties.project_uid;
+
+        if (GiLocalStorageForOld.exists("project_catd_no_access_scheme_" + localThis.scheme_uid)) {
+            localThis.scheme = GiLocalStorageForOld.getItem("project_catd_no_access_scheme_" + localThis.scheme_uid);
+            if (localThis.scheme != null) {
+                let project_api = localThis.GetProjectInfo();
+                project_api.done(function (p_resp) {
+                    if (localThis.data != null) {
+                        generateWindow();
+                    }
+                });
+            }
+        } else {
+            let scheme_api = localThis.GetScheme();
+            scheme_api.done(function (resp) {
+                if (localThis.scheme != null) {
+                    let project_api = localThis.GetProjectInfo();
+                    project_api.done(function (p_resp) {
+                        if (localThis.data != null) {
+                            generateWindow();
+                        }
+                    });
+                }
+            });
+        }        
+    };
+
+    var generateWindow = function () {
+        renderWindow(localThis.scheme.Schema);
+
+        /*toggleActionIdButtonsFor("open");*/
+
+        $("body").append(_window);
+
+        _parts.window_title.html(localThis.scheme.Caption);
+
+        setFormDataNoAccess(localThis.data);
+
+        bindEvents();
+
+        _window.css({ "right": "-600px" });
+        window.window.right_z += 1;
+        _window.css({ display: "block", "z-index": window.window.right_z });
+        _window.transition({ "right": "35px", easing: "cubic-bezier(0.915, 0.825, 0.345, 1.075)", duration: 200 });
+
+        _window.find(".groups-container").slimScroll({
+            height: (_window.height() - 320),
+            width: "100%",
+            size: "3px",
+            railVisible: true,
+            railOpacity: 0.3,
+            railColor: "#88BD1F",
+            color: "#88BD1F"
+        });
+        _window.find(".slimScrollDiv").css({ position: "absolute" });
+
+        localThis.visible = true;
+
+        localThis.layer.features = [];
+        localThis.layer.features.length = 0;
+        localThis.zones.forEach(function (o) {
+            console.log("zone", o);
+            localThis.layer.features.push({
+                geometry: o.geom,
+                properties: {
+                    color: o.color
+                },
+                type: "Feature"
+            });
+        });
+
+        localThis.layer.show();
+        localThis.layer.zoomTo();
+
+        localThis.type = "update";
+
+
+        localThis.coreFields = null;
+        localThis.coreFields = {};
+        localThis.coreFields.project_uid = _window.find("[data-field=\"project_uid\"]");
+        localThis.coreFields.project_name = _window.find("[data-field=\"project_name\"]");
+        localThis.coreFields.created_user = _window.find("[data-field=\"created_user\"]");
+        localThis.coreFields.created_date = _window.find("[data-field=\"created_date\"]");
+        localThis.coreFields.priority = _window.find("[data-field=\"priority\"]");
+        localThis.coreFields.status = _window.find("[data-field=\"status\"]");
+
+        if (_window.find("[data-field=\"project_value\"]").length > 0) {
+            localThis.coreFields.project_value = _window.find("[data-field=\"project_value\"]");
+        }
+
+        _window.find("[action-id]").each(function () {
+            var action = $(this).attr("action-id");
+            if (action == "add_zone" && localThis.zones && localThis.zones.length == 0) {
+                $(this).attr("data-used", "false");
+            }
+        });
+    };
+
+    this.open = function () {
+        console.log("open_project");
+        localThis.layer.features = [];
+        localThis.layer.hide();
+        localThis.GetData();
+    };
+
+    init();
+};
+
+window.projectCardGeoNoAccess = new ProjectCardGeoNoAccess();
+
+

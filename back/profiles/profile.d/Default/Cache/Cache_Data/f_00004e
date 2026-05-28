@@ -1,0 +1,506 @@
+window.RequestInfoInServiceAreaPed = function () {
+    /*запросить информацию в пешеходной зоне*/
+    var localThis = this;
+    this.id = "info-pesh-area";
+    this.title = gl.text.tool_info_service_area_walking;
+    this.visible = false;
+    this.active = false;
+    this.topInfoToolButton = null;
+    this.options = {};
+    this.draw = null;
+    this.pending = false;
+    this.waitmarker = null;
+    this.fixedvalue = 10;
+    this.direction = 0;
+
+    this.layerIsOn = false;
+    this.layer = null;
+    this.features = [];
+    this.rendersLayotsElements = [];
+    this.renderPopulationCounterDetailedYears = [];
+    this.uidMaket = null;
+
+    var colors = {
+        "1": { color: "#3D91DE", opacity: 0.5 },
+        "2": { color: "#3D91DE", opacity: 0.1 },
+        "3": { color: "#3D91DE", opacity: 0.1 }
+    };
+
+    this.layerrenderers = {
+        idx: function (feature) {
+            var color = {
+                color: colors["" + feature.id].color,
+                weight: 1.5,
+                opacity: 0.9,
+                fillColor: colors["" + feature.id].color,
+                fillOpacity: colors["" + feature.id].opacity
+            };
+            return color;
+        }
+    };
+
+    var createButton = function() {
+        localThis.topInfoToolButton = window.ToolPanelModule.getNewPanelButton({
+            "type": "big",
+            "float": "info_instrument",
+            "order": 14,
+            "title": localThis.title,
+            "mobile":true,
+            "text": localThis.title,
+            "class": "ico iso-small ico-tools gr-pedestrian-1",
+            "onClick": localThis.tryDraw
+        });
+        localThis.topInfoToolButton.addDropDownMenu();
+    };
+
+    this.hideLayer = function () {
+        localThis.features = [];
+        localThis.features.length = 0;
+        tryRemoveGeometry(localThis.layer);
+        localThis.layerIsOn = false;
+    };
+
+    this.layerLoaded = function () {
+    };
+
+    var whenClicked = function (e) {
+    };
+
+    var onFeatureClicked = function (feature, layer) {
+        layer.on({
+            click: whenClicked
+        });
+    };
+
+    this.showLayer = function () {
+        for (var i = 0; i < localThis.features.length; i++) {
+            if (localThis.features[i].properties === null) {
+                localThis.features[i].properties = {};
+            }
+            if (!localThis.features[i].properties.hasOwnProperty("color")) {
+                localThis.features[i].properties["color"] = colors["" + (i+1)].color;
+            }
+        }
+
+        localThis.layer = L.geoJson(localThis.features, {
+            style: function (feature) {
+                return localThis.layerrenderers.idx(feature);
+            },
+            onEachFeature: onFeatureClicked,
+            pane: "specialFX"
+        }).addTo(window.MAP);
+
+        localThis.layerIsOn = true;
+        localThis.layerLoaded();
+
+        localThis.features.forEach(function (feature) {
+            /*тут потом придумать красивую анимацию*/
+        });
+    };
+
+    var onPointDownSet = function () {
+        var point = arguments[0];
+        localThis.options.addressInfo = {};
+        localThis.options.geometry = point;
+        localThis.options.pointAddress.val(gl.text.please_wait___);
+        if (point._latlng !== null) {
+            var svc = DoWebApiAction("/geocoder/point2address", {
+                point: "" + point._latlng.lng + "," + point._latlng.lat
+            });
+            
+            svc.done(function (r) {
+                if (r.success && r.results) {
+                    localThis.options.addressInfo = r.results;
+                }
+                var addr = JoinAddressInfo(r.results);
+                localThis.options.pointAddress.val(addr);
+                localThis.options.addressInfo.Caption = addr;
+                localThis.options.actionButton.css({ display: "block" });
+
+                localThis.calculateArea(point._latlng.lng, point._latlng.lat);
+            });
+            
+            svc.fail(function () {
+                var addr = JoinAddressInfo();
+                localThis.options.pointAddress.val(addr);
+                localThis.options.addressInfo.Caption = addr;
+                localThis.options.actionButton.css({ display: "block" });
+            });
+        }
+    };
+
+    var onUpdateRibbon = function () {
+        var point = arguments[0];
+        localThis.options.pointAddress.val(localThis.options.addressInfo.Caption);
+        localThis.options.actionButton.css({ display: "none" });
+        localThis.options.calcZoneButton.css({ display: "none" });
+        localThis.recalcZone();
+    };
+
+    var init = function () {
+        createButton();
+
+        localThis.options.type = localThis.id;
+
+        localThis.options.onPointDownSet = onPointDownSet;
+        localThis.options.onUpdateRibbon = onUpdateRibbon;
+
+        localThis.options.help = $("<span/>").html(gl.text.tool_set_point_on_map);
+        localThis.options.helpbeforefinish = gl.text.tool_recalculate_zone;
+        localThis.options.helpafterfinish = gl.text.tool_calculating_zone;
+        localThis.options.helpafterfinish2 = gl.text.tool_set_report_name_and_do;
+        localThis.options.helpafterrequest = gl.text.tool_wait_creating_report;
+
+        localThis.options.breaksCap = $("<span/>").html(gl.text.tool_zone_size + ": ");
+        localThis.options.breaks = $("<input/>", { id: "breaks", type: "number" }).css({ width: "70px" }).val("10");
+        localThis.options.breaksunits = $("<span/>", { id: "breaksunits" }).html(gl.text.tool_minutes);
+
+        localThis.options.pointCap = $("<span/>").html("&nbsp;&nbsp;" + gl.text.tool_report_name + ": ");
+        localThis.options.pointAddress = $("<input/>", { id: "address", type: "text" }).css({ width: "250px" }).val("");
+
+        localThis.options.actionButton = $("<div/>").html(gl.text.tool_create_report).addClass("actionButton").css({ display: "none" });
+        localThis.options.calcZoneButton = $("<div/>").html(gl.text.tool_recalculate_zone_btn).addClass("actionButton bg-main font-default").css({ display: "none" });
+
+        localThis.options.startPoint = null;
+        localThis.options.geometry = null;
+
+        window.clearActions.push(localThis.close);  /*добавляем событие в "ластик"*/
+    };
+
+    this.close = function () {
+        /*закрыть инструмент*/
+        if (localThis.pending) return;
+        localThis.active = false;
+
+        if (window.detectMobile() == "mobile") {
+            window.mobileToolsPanel.close();
+        }
+
+        try {
+            localThis.draw.disable();
+            window.MAP.removeLayer(localThis.options.startPoint);
+            localThis.hideLayer();
+        } catch (e) {
+            DoNothing();
+        }
+        localThis.topInfoToolButton.onEnd(); 
+        window.mapModule01.infopanel.setRemoveClass("info-pesh-zone info-tool");
+        window.mapModule01.guessMapClickAllowedOverride();
+    };
+
+    this.doRequest = function () {
+        /*выполнить запрос*/
+        /*если геометрия не пустая, то делаем*/
+        if (localThis.options.startPoint !== null && localThis.features.length > 0) {
+            localThis.pending = true;
+
+            /*фитим геометрию в центре карты
+            window.MAP.fitBounds(localThis.options.geometry.getBounds());*/
+
+            window.mapModule01.infopanel.setStatus(localThis.options.helpafterrequest, false, true);
+            window.mapModule01.infopanel.wait();
+            breaksVisible(false);
+
+            var latLng = localThis.options.startPoint.getLatLng();
+
+            localThis.waitmarker = L.marker(latLng, {
+                icon: L.icon({
+                    iconUrl: '/resources/styles/images/animan_shlyapa.gif',
+                    iconSize: [50, 50],
+                    iconAnchor: [25, 25],
+                    popupAnchor: [25, 25]
+                }),
+                keyboard: false,
+                zIndexOffset: 10000,
+                opacity: 0.9,
+                pane: "markerPane"
+            }).addTo(window.MAP);
+
+            localThis.options.actionButton.css({ display: "none" });
+
+            /*формируем параметры запроса*/
+
+            var area = parseInt(turf.area(localThis.features[0]));
+            var period = getPopulationCounterDetailedYearsPeriod();
+            
+            var request = {};
+            request.Login = window.UserModule.userData.Info.Login;
+            request.Tooltype = localThis.options.type;
+            request.Metadata = {
+                ToolName: localThis.title,
+                Location: localThis.options.addressInfo,
+                Area: area,
+                Perimeter: 0,
+                Buffer: localThis.fixedvalue,
+                Params: {
+                    year_1: period && period.start || undefined,
+                    year_2: period && period.end || undefined,
+                }
+            };
+            request.Address = $("input#address").val();
+            request.Name = $("input#address").val();
+            request.Point = getPreparedGeoJsonAsObject(localThis.options.startPoint);
+            request.Line = null;
+            request.Polygon = localThis.features[0].geometry;
+            request.GeointellectLayers = window.layerListPanel.getEnabledLayers();
+            request.UserLayers = window.layerListPanel.getEnabledUserLayers();
+
+            doIndoRequestUniversal(localThis, request);
+
+        } else {
+            alert(gl.text.error_unable_to_execute_empty_geometry);
+        }
+    };
+
+    var checkBreaks = function () {
+        /*проверяем параметры всякие*/
+        var msg;
+        var breaks = parseInt(localThis.options.breaks.val());
+        if (breaks > window.UserModule.userData.Limits.MAX_MINUTES_PED_ZONE) {
+            msg = gl.text.tool_max_zone_size_is + " <br/><b>" + window.UserModule.userData.Limits.MAX_MINUTES_PED_ZONE + " " + gl.text.minutes1 + "</b>";
+            window.mapModule01.infopanel.setStatus(msg, true, false);
+            localThis.options.breaks.blur();
+            return false;
+        }
+        if (breaks <= 0) {
+            msg = gl.text.tool_increase_zone_size;
+            window.mapModule01.infopanel.setStatus(msg, true, false);
+            return false;
+        }
+        return true;
+    };
+
+    var breaksVisible = function (isIt) {
+        if (isIt === true) {
+            localThis.options.breaksCap.css({ display: "inline-block" });
+            localThis.options.breaks.css({ display: "inline-block" });
+            localThis.options.breaksunits.css({ display: "inline-block" });
+            localThis.options.pointDirection.css({ display: "inline-block" });
+        } else {
+            localThis.options.breaksCap.css({ display: "none" });
+            localThis.options.breaks.css({ display: "none" });
+            localThis.options.breaksunits.css({ display: "none" });
+            localThis.options.pointDirection.css({ display: "none" });
+        }
+    };
+
+    this.calculateArea = function (x, y) {
+        if (!checkBreaks() || localThis.options.startPoint === null) return;
+
+        localThis.hideLayer();
+
+        localThis.options.actionButton.css({ display: "none" });
+        breaksVisible(false);
+        localThis.options.calcZoneButton.css({ display: "none" });
+        window.mapModule01.infopanel.setStatus(localThis.options.helpafterfinish, false, true);
+        window.mapModule01.infopanel.wait();
+        localThis.fixedvalue = ""+localThis.options.breaks.val();
+        localThis.direction = parseInt(localThis.options.pointDirection.val());
+
+        var point = getPreparedGeoJsonAsObject(localThis.options.startPoint);
+
+        var mydata = {
+            login: window.UserModule.userData.Info.Login,
+            xlon: point.coordinates[0],
+            ylat: point.coordinates[1],
+            minutes: localThis.fixedvalue,
+            direction: localThis.direction === 0 ? "from_point" : "to_point",
+            aswgs: true
+        };
+        
+        localThis.pending = true;
+
+        var query = DoWebApiAction("/network/walking_iso", mydata);
+
+        query.done(function (e) {
+            if (e.status === "success") {
+                localThis.features = e.results;
+                localThis.showLayer();
+                window.MAP.fitBounds(localThis.layer.getBounds());
+            } else {
+                alert(e.message + "<br/>" +
+                    gl.text.error_ask_for_help + " " +
+                    "<a href='mailto:csr@geointellect.com' target='_blank'>" + gl.text.support_team + "</a>");
+            }
+        });
+
+        query.fail(function (a, b, c) {
+        });
+
+        query.always(function () {
+            localThis.pending = false;
+            localThis.options.actionButton.css({ display: "inline-block" });
+
+            breaksVisible(true);
+            window.mapModule01.infopanel.setStatus(localThis.options.helpafterfinish2, false, true);
+            window.mapModule01.infopanel.resume();
+            localThis.fixedvalue = localThis.options.breaks.val();
+        });
+    };
+    var layOutAppend = function (_parentBox) {
+        if (localThis.rendersLayotsElements.length > 0) {
+            localThis.options.aRibbonlayoutContainer = $("<div/>", { "class": "aRibbonlayoutContainer" });
+            /* Проверим: есть ли макеты в списке*/
+            (window.layoutsReport.listLayout.length === 0) ? localThis.options.aRibbonlayoutContainer.hide() : localThis.options.aRibbonlayoutContainer.show();
+            localThis.rendersLayotsElements.forEach(function (_element) {
+                localThis.options.aRibbonlayoutContainer.append(_element.element);
+                if (typeof _element.action !== "undefined" || _element.action !== null) {
+                    var a = $(_element.element);
+                    if (a.attr("data-type") === "dropbox") {
+                        _element.element.on("change", function () {
+                            localThis.uidMaket = $(this).val();
+                        });
+                    } else {
+                        _element.element.on("click", function () {
+                            _element.action;
+                        });
+                    }
+                }
+            });
+            _parentBox.append(localThis.options.aRibbonlayoutContainer);
+        }
+    };
+    var populationCounterDetailedYearsAppend = function (_parentBox) {
+        if (localThis.renderPopulationCounterDetailedYears.length > 0) {
+            localThis.renderPopulationCounterDetailedYears.forEach(function (_element) {
+                _parentBox.append(_element.renderElements());
+            });
+        }
+    };
+    var getPopulationCounterDetailedYearsPeriod = function() {
+        var period;
+
+        localThis.renderPopulationCounterDetailedYears.forEach(function (element) {
+            var p = element.getPeriod();
+            if(p.start && p.end) {
+                period = p;
+            }
+        });
+
+        return period;
+    }
+   
+    this.tryDraw = function () {
+
+        if (localThis.active || window.mapModule01.infopanel.visible) {
+            window.mapModule01.infopanel.blink();
+            return;
+        }
+
+        var checklimit = DoWebApiAction("/user/check_request_limit", { magic: "wtf" });
+        checklimit.done(function (r) {
+            if (r.success) {
+                window.requestHistoryModule.clearSelection();
+
+                window.mapModule01.MapClickAllowedOverride = false;
+
+                window.mapModule01.infopanel.setTitle(localThis.title);
+                localThis.options.help = $("<span/>").html(gl.text.tool_set_point_on_map);
+                localThis.options.panel = window.mapModule01.infopanel;
+
+                localThis.options.pointDirection = $("<select/>").addClass("actionDropdown dropbox-direction").html("<option value='0' selected>" + gl.text.tool_from_point + "</option><option value='1'>" + gl.text.tool_to_point + "</option>");
+
+                localThis.options.pointCap = $("<span/>", {class:"j-name-report"}).html(gl.text.tool_report_name + ": ");
+                localThis.options.pointAddress = $("<input/>", { id: "address", type: "text" }).css({ width: "250px" }).val("");
+                localThis.options.addressInfo = null;
+
+                localThis.options.breaksCap = $("<span/>", { class: "j-pesh-zone" }).html(gl.text.tool_zone_size + ": ");
+                localThis.options.breaks = $("<input/>", { id: "breaks", type: "number" }).css({ width: "70px" }).val("10");
+                localThis.options.breaksunits = $("<span/>", { id: "breaksunits" }).html(gl.text.tool_minutes);
+
+                localThis.options.pointDirection.on("change", function (e) {
+
+                    var value = parseInt($(this).val());
+                    if (localThis.options.startPoint === null) {
+                        localThis.direction = value;
+                    } else if (value !== localThis.direction && checkBreaks()) {
+                        localThis.options.actionButton.css({ display: "none" });
+                        localThis.options.calcZoneButton.css({ display: "inline-block" });
+                        window.mapModule01.infopanel.setStatus(localThis.options.helpbeforefinish, true, false);
+                    } else if (!checkBreaks()) {
+                        localThis.options.actionButton.css({ display: "none" });
+                        localThis.options.calcZoneButton.css({ display: "inline-block" });
+                    }
+                });
+
+                localThis.options.breaks.on("propertychange change keyup input paste", function (e) {
+                    var value = $(this).val();
+                    if (localThis.options.startPoint !== null && value !== localThis.fixedvalue && checkBreaks()) {
+                        localThis.options.actionButton.css({ display: "none" });
+                        localThis.options.calcZoneButton.css({ display: "inline-block" });
+                        window.mapModule01.infopanel.setStatus(localThis.options.helpbeforefinish, true, false);
+                    } else if (!checkBreaks()) {
+                        localThis.options.actionButton.css({ display: "none" });
+                        localThis.options.calcZoneButton.css({ display: "inline-block" });
+                    }
+                });
+
+                localThis.options.btnSettingsInstr = $("<div/>", { title: gl.text.settings }).addClass("smallButton").addClass("settings-ico").css({ "margin-right": "10px" }).hide();
+                localThis.options.actionButton = $("<div/>").html(gl.text.tool_create_report).addClass("actionButton bg-main font-default").css({ display: "none" });
+                localThis.options.calcZoneButton = $("<div/>").html(gl.text.tool_recalculate_zone_btn).addClass("actionButton rebuild-zone bg-attention font-default").css({ display: "none" });
+
+                localThis.options.btnSettingsInstr.on("click", function () {
+                    if (localThis.pending) {
+                        console.log("localThis.options.btnSettingsInstr.click", "Нельзя открыть свойства, инструмент занят");
+                    } else {
+                        console.log("localThis.options.btnSettingsInstr.click", "А теперь инструмент ничем не занят, можно открывать и менять что угодно");
+                    }
+                });
+
+                localThis.options.actionButton.on("click", function () {
+                    localThis.doRequest();
+                });
+
+                localThis.options.calcZoneButton.on("click", function () {
+                    localThis.calculateArea();
+                });
+
+                localThis.options.recalcZone = localThis.calculateArea;
+
+                localThis.options.startPoint = null;
+                localThis.layer = null;
+                localThis.features = [];
+                localThis.features.length = 0;
+
+                var content = $("<div/>")
+                    .append(localThis.options.btnSettingsInstr)
+
+                    .append(localThis.options.breaksCap)
+                    .append(localThis.options.breaks)
+                    .append(localThis.options.breaksunits)
+
+                    .append(localThis.options.pointDirection)
+                    .append(localThis.options.pointCap)
+                    .append(localThis.options.pointAddress)
+
+                    .append(localThis.options.calcZoneButton)
+                    .append(localThis.options.actionButton);
+
+                layOutAppend(content);
+                populationCounterDetailedYearsAppend(content);
+
+                window.mapModule01.infopanel.setContent(content);
+                window.mapModule01.infopanel.show();
+                window.mapModule01.infopanel.setStatus(localThis.options.help.html(), false, true);
+                window.mapModule01.infopanel.setStatus(localThis.options.dropBox);
+               /* window.mapModule01.infopanel.onclose = [];*/
+               /* window.mapModule01.infopanel.onclose.length = 0;*/
+                window.mapModule01.infopanel.onclose.push(localThis.close);
+                window.mapModule01.infopanel.setClass("info-pesh-zone info-tool");
+                localThis.draw = new L.Draw.Marker(window.MAP, window.mapModule01.drawControl.options.marker);
+                localThis.draw.enable(localThis.options);
+                localThis.active = true;
+            }
+            else {
+                blinkmsg(gltxt("check_request_limit"));
+            }
+        });
+
+    };
+
+    init();
+};
+
+$(document).ready(function() {
+    window.requestInfoInServiceAreaPed = new RequestInfoInServiceAreaPed();
+});

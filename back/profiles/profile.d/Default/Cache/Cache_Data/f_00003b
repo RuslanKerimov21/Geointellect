@@ -1,0 +1,575 @@
+window.ActionRibbon = function () {
+    /*белая полоса сверху с информацией*/
+    var localThis = this;
+    this.initialized = false;
+    this.visible = false;
+    this.selfcontainer = null;
+    this.image = null;
+    this.onclose = [];
+    this.graphics = [];
+    this.onabort = null;
+    localThis.top = 0;
+    this.type = null;
+    this.subToolsBtn = null;
+    let loader = null;
+    var createDiv = function () {
+        localThis.top = $("#top-panel").height();
+        localThis.selfcontainer = $("<div/>").addClass("ActionRibbon").addClass("font-primary bg-color-fon");
+        localThis.selfcontainer.append($("<div/>").addClass("left_block"));
+        localThis.selfcontainer.append($("<div/>").addClass("center_block"));
+        localThis.selfcontainer.append($("<div/>").addClass("close icon-close-30"));
+        localThis.selfcontainer.append($("<div/>").addClass("minimize-btn"));
+
+        $("body").append(localThis.selfcontainer);
+        $(".left_block").append($("<div/>").addClass("title"));
+        $(".left_block").append($("<div/>").addClass("subtitle"));
+        $(".left_block").append($("<div/>").addClass("titleIcon"));
+        localThis.selfcontainer.append($("<div/>").addClass("status ok"));
+        $(".center_block").append($("<div/>").addClass("content"));
+        /*localThis.selfcontainer.css({ top: localThis.top });*/
+
+        var nadpis = gl.text.tool_close_and_clear_map;
+        localThis.selfcontainer.children(".close").attr("title", nadpis);
+    };
+
+    var init = function () {
+        window.clearActions.push(localThis.hide);
+
+        createDiv();
+        localThis.selfcontainer.on("click", ".close", function () {
+            localThis.close();
+        });
+
+        localThis.selfcontainer.on("click", ".minimize-btn", function () {
+            localThis.minimize();
+        });
+
+        localThis.initialized = true;
+
+        localThis.resize();
+        localThis.hide();
+    };
+
+    var checkType = function () {
+
+        if (localThis.selfcontainer.css("content")=='"panel"') {
+            localThis.selfcontainer.attr("data-type", "panel");
+            localThis.type = "panel";
+        } else {
+            localThis.selfcontainer.attr("data-type", "ribbon");
+            localThis.type = "ribbon";
+        }
+    };
+    this.setTitle = function (title) {
+        if (typeof title === "string") {
+            localThis.selfcontainer.children().children(".title").html(title);
+        }
+    };
+
+    this.setSubTitle = function (subtitle) {
+        if (typeof subtitle === "string") {
+            localThis.selfcontainer.children().children(".subtitle").html(subtitle);
+        }
+    };
+
+
+    this.changeTitleIcon = function (_class) {
+        var titleIcon = localThis.selfcontainer.find(".titleIcon");
+        titleIcon.removeClass().addClass("titleIcon " + _class);
+    };
+
+    this.setClass = function (_class) {
+        localThis.selfcontainer.addClass(_class);
+    };
+
+    this.setRemoveClass = function (_class) {
+        localThis.selfcontainer.removeClass(_class);
+    };
+
+    this.setStatus = function (status, error, staticus) {
+        /*устанавливает для сообщения текст, цвет и "статичность"*/
+        /*статичность - это способ показывания: true = просто показать или false = выпрыгнуть с анимацией*/
+        var err = error || false;
+        var stat = staticus || false;
+
+        localThis.selfcontainer.children(".status").removeClass("off");
+       
+        if (typeof status === "string") {
+           
+             
+            var top = $(".ActionRibbon").height();           
+            if (stat) {
+                localThis.selfcontainer.children(".status").css({ top: "" + (top - 20) + "px", opacity: 0.3 });
+                localThis.selfcontainer.children(".status").children().remove();
+                localThis.selfcontainer.children(".status").html(status);
+                localThis.selfcontainer.children(".status").append("<div class='triangle'/>");
+
+                if (err) {
+                    localThis.selfcontainer.children(".status").removeClass("ok").addClass("er");
+                } else {
+                    localThis.selfcontainer.children(".status").removeClass("er").addClass("ok");
+                }
+
+                localThis.selfcontainer.children(".status").transit({ duration: 200, top: "" + top + "px", opacity: 1.0 }, function () {
+                });
+            } else {
+                localThis.selfcontainer.children(".status").css({ top: "" + top + "px" });
+                localThis.selfcontainer.children(".status").children().remove();
+                localThis.selfcontainer.children(".status").html(status);
+                localThis.selfcontainer.children(".status").append("<div class='triangle'/>");
+
+                if (err) {
+                    localThis.selfcontainer.children(".status").removeClass("ok").addClass("er");
+                } else {
+                    localThis.selfcontainer.children(".status").removeClass("er").addClass("ok");
+                }
+            }
+        }
+
+        /*Проверим: если статус пустой: то скроем треугольник */
+
+        if (status?.length <= 0 || status === null) {
+            localThis.selfcontainer.find(".triangle").hide();
+        }
+    };
+
+    this.clearStatus = function () {
+        localThis.selfcontainer.children(".status").removeClass("ok").removeClass("er").addClass("off");
+    };
+
+    this.hideStatus = function () {
+        localThis.selfcontainer.children(".status").hide();
+    };
+
+    this.showStatus = function () {
+        localThis.selfcontainer.children(".status").show();
+    };
+
+    this.setContent = function (content) {
+        if (typeof content === "object") {
+            localThis.selfcontainer.children(".content").children().children().remove();
+            localThis.selfcontainer.children().children(".content").html("");
+            localThis.selfcontainer.children().children(".content").append(content);
+        }
+    };
+
+    this.clearContent = function () {
+        localThis.selfcontainer.children(".content").children().remove();
+        localThis.selfcontainer.children(".content").html("");
+        $.each(localThis.graphics, function (i, o) {
+            window.MAP.removeLayer(o);
+        });
+    };
+
+    this.show = function () {
+       
+        /*показать полоску*/
+        localThis.showStatus();
+        if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+            window.mapModule01.MapClickAllowed = false;
+            window.mapModule01.guessMapClickAllowedOverride();
+        }
+
+        localThis.selfcontainer.attr("visible", "true");
+
+        localThis.selfcontainer.css({
+            opacity: 0.0,
+            /*top: "" + (localThis.top + 10) + "px",*/
+            display: "block"
+        });
+
+        localThis.selfcontainer.transit({
+            duration: 200,
+            easing: "snap",
+            /*top: localThis.top,*/
+            opacity: 1.0
+        });
+
+        localThis.selfcontainer.children(".title").css({
+            top: "-50px"
+        });
+        localThis.selfcontainer.children(".title").transit({
+            duration: 500,
+            easing: "snap",
+            top: "0px"
+        });
+
+        localThis.selfcontainer.children(".content").css({
+            top: "-50px"
+        });
+        localThis.selfcontainer.children(".content").transit({
+            duration: 700,
+            easing: "snap",
+            top: "0px"
+        });
+        localThis.visible = true;
+        checkType();
+        if (localThis.type == "panel") {
+            onRightPanelExpanded(localThis.selfcontainer);
+            window.window.right_z += 1;
+            localThis.selfcontainer.css({ "z-index": window.window.right_z });
+        }
+
+    };
+
+    this.hide = function () {
+        /*спрятать полоску*/
+
+        if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+            window.mapModule01.MapClickAllowed = true;
+            window.mapModule01.guessMapClickAllowedOverride();
+        }
+
+        localThis.selfcontainer.attr("visible", "false");
+
+        localThis.visible = false;
+
+        localThis.selfcontainer.transit({
+            duration: 200,
+            easing: "snap",
+            /*top: "" + (localThis.top - 10) + "px",*/
+            opacity: 0.0
+        }, function () {
+            localThis.selfcontainer.css({
+                opacity: 0.0,
+                /*top: "" + (localThis.top + 10) + "px",*/
+                display: "none"
+            });
+            localThis.visible = false;
+        });
+
+        if (localThis.type == "panel") {
+            onRightPanelCollapsed();
+        }
+    };
+
+    this.minimize = function () {
+        localThis.subToolsBtn = window.ToolPanelModule.getNewPanelButton({
+            "title": "Развернуть панель инструментов",
+            "class": "sub-tools-btn-action-panel rightRibbonButton ico ico-small gr-gears",
+            "onClick": function () {
+                localThis.subToolsBtn.off();
+                localThis.show();
+                localThis.subToolsBtn.$elemButton.remove();
+            },
+            "order": 1,
+            "type": "small",
+            "float": "rightPanelCenter",
+            "mapContainer": "mapPanel"
+        });
+
+        localThis.subToolsBtn.addToTopPanel();
+        localThis.hide();
+       /* localThis.subToolsBtn.$elemButton.remove();*/
+    };
+    this.close = function () {
+        /*закрыть полоску*/
+        localThis.onclose.forEach(function (func) {
+            if (typeof func === "function") {
+                func();
+            }
+        });
+        if (typeof localThis.onabort === "function") {
+            localThis.onabort();
+            setTimeout(function () { localThis.onabort = null; }, 1000);
+        }
+        localThis.clearContent();
+        localThis.hide();
+    };
+
+    this.resize = function () {
+        if (window.G && window.G.Dynamic) {
+            window.G.Dynamic.addListener("right-window-open", function (e) {
+                if (window.G.Dynamic.getValue("right-window-initialized") === 1) {
+                    return;
+                }
+                if (e.value === true) {
+                    var position = "39.1rem";
+                    localThis.selfcontainer.css({ "right": position});
+                }
+                else if (e.value === false) {
+                    var position = "0px";
+                    localThis.selfcontainer.css({ "right": position});
+                }
+            });
+        }
+    };
+
+    this.wait = function () {
+        /*убрать крестик и включить крутилку*/
+        /* localThis.selfcontainer.children(".close").css({ display: "none" });*/
+        localThis.selfcontainer.children(".close").remove();
+        localThis.selfcontainer.children(".minimize-btn").remove();
+        loader = new Loading(localThis.selfcontainer[0]);
+        loader.init();
+        loader.showLoader();
+
+    };
+
+    this.resume = function () {
+        /*убрать крутилку и вернуть крестик*/
+        localThis.selfcontainer.append($("<div/>").addClass("close icon-close-30"));
+        localThis.selfcontainer.append($("<div/>").addClass("minimize-btn"));
+        loader?.removeLoader();
+    };
+
+    this.allowCancel = function (onabort) {
+        localThis.selfcontainer.children(".close").css({ display: "block" });
+        if (typeof onabort === "function") {
+            localThis.onabort = onabort;
+        }
+    };
+
+    this.blink = function () {
+        blinkmsg(gltxt("tool_close_current_to_continue"));
+        var old = localThis.selfcontainer.css("background-color");
+        localThis.selfcontainer.transit({ "background-color": "#FFFF00", duration: 100 }, function () {
+            localThis.selfcontainer.transit({ "background-color": old, duration: 100 }, function () {
+                localThis.selfcontainer.transit({ "background-color": "#FFFF00", duration: 100 }, function () {
+                    localThis.selfcontainer.transit({ "background-color": old, duration: 100 }, function () {
+                        localThis.selfcontainer.transit({ "background-color": "#FFFF00", duration: 100 }, function () {
+                            localThis.selfcontainer.transit({ "background-color": old, duration: 100 }, function () {
+
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    };
+
+    init();
+};
+
+window.ActionRibbon_Old = function () {
+    /*белая полоса сверху с информацией*/
+    var localThis = this;
+    this.initialized = false;
+    this.visible = false;
+    this.selfcontainer = null;
+    this.image = null;
+    this.onclose = [];
+    this.graphics = [];
+    localThis.top = 0;
+
+    var createDiv = function () {
+        localThis.top = $("#top-panel").height();
+        localThis.selfcontainer = $("<div/>").addClass("ActionRibbon").addClass("font-primary bg-color-fon");
+        localThis.selfcontainer.append($("<div/>").addClass("left_block"));
+        localThis.selfcontainer.append($("<div/>").addClass("center_block"));
+        localThis.selfcontainer.append($("<div/>").addClass("close icon-close-30"));
+        $("body").append(localThis.selfcontainer);
+        $(".left_block").append($("<div/>").addClass("title"));
+        localThis.selfcontainer.append($("<div/>").addClass("status ok"));
+        $(".center_block").append($("<div/>").addClass("content"));
+        localThis.selfcontainer.css({ top: localThis.top });
+
+        var nadpis = gl.text.tool_close_and_clear_map;
+        localThis.selfcontainer.children(".close").attr("title", nadpis);
+    };
+
+    var init = function () {
+        /*инициализация белой полоски*/
+        window.clearActions.push(localThis.hide);    /*добавляем событие в "ластик"*/
+        createDiv();
+        localThis.selfcontainer.on("click", ".close", function () {
+            localThis.close();
+        });
+        localThis.initialized = true;       
+    };
+
+    this.setTitle = function (title) {
+        /*меняет название полоски*/
+        if (typeof title === "string") {
+            localThis.selfcontainer.children().children(".title").html(title);
+        }
+    };
+
+    this.setClass = function (_class) {
+        localThis.selfcontainer.addClass(_class);
+    };
+
+    this.setRemoveClass = function (_class) {
+        localThis.selfcontainer.removeClass(_class);
+    };
+
+    this.setStatus = function (status, error, staticus) {
+        /*устанавливает для сообщения текст, цвет и "статичность"*/
+        /*статичность - это способ показывания: true = просто показать или false = выпрыгнуть с анимацией*/
+        var err = error || false;
+        var stat = staticus || false;
+
+        localThis.selfcontainer.children(".status").removeClass("off");
+
+        if (typeof status === "string") {
+            var top = $(".ActionRibbon").height();
+            if (stat) {
+                localThis.selfcontainer.children(".status").css({ top: "" + (top - 20) + "px", opacity: 0.3 });
+                localThis.selfcontainer.children(".status").children().remove();
+                localThis.selfcontainer.children(".status").html(status);
+                localThis.selfcontainer.children(".status").append("<div class='triangle'/>");
+
+                if (err) {
+                    localThis.selfcontainer.children(".status").removeClass("ok").addClass("er");
+                } else {
+                    localThis.selfcontainer.children(".status").removeClass("er").addClass("ok");
+                }
+
+                localThis.selfcontainer.children(".status").transit({ duration: 200, top: "" + top + "px", opacity: 1.0 }, function () {
+                });
+            } else {
+                localThis.selfcontainer.children(".status").css({ top: "" + top + "px" });
+                localThis.selfcontainer.children(".status").children().remove();
+                localThis.selfcontainer.children(".status").html(status);
+                localThis.selfcontainer.children(".status").append("<div class='triangle'/>");
+
+                if (err) {
+                    localThis.selfcontainer.children(".status").removeClass("ok").addClass("er");
+                } else {
+                    localThis.selfcontainer.children(".status").removeClass("er").addClass("ok");
+                }
+            }
+        }
+    };
+
+    this.clearStatus = function () {
+        localThis.selfcontainer.children(".status").removeClass("ok").removeClass("er").addClass("off");
+    };
+
+    this.hideStatus = function () {
+        localThis.selfcontainer.children(".status").hide();
+    };
+
+    this.showStatus = function () {
+        localThis.selfcontainer.children(".status").show();
+    };
+
+    this.setContent = function (content) {
+        if (typeof content === "object") {
+            localThis.selfcontainer.children(".content").children().children().remove();
+            localThis.selfcontainer.children().children(".content").html("");
+            localThis.selfcontainer.children().children(".content").append(content);
+        }
+    };
+
+    this.clearContent = function () {
+        localThis.selfcontainer.children(".content").children().remove();
+        localThis.selfcontainer.children(".content").html("");
+        $.each(localThis.graphics, function (i, o) {
+            window.MAP.removeLayer(o);
+        });
+    };
+
+    this.show = function () {
+        /*показать полоску*/
+        localThis.showStatus();
+        if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+            window.mapModule01.MapClickAllowed = false;
+            window.mapModule01.guessMapClickAllowedOverride();
+        }
+
+        localThis.selfcontainer.attr("visible", "true");
+
+        localThis.selfcontainer.css({
+            opacity: 0.0,
+            top: "" + (localThis.top + 10) + "px",
+            display: "block"
+        });
+
+        localThis.selfcontainer.transit({
+            duration: 200,
+            easing: "snap",
+            top: localThis.top,
+            opacity: 1.0
+        });
+
+        localThis.selfcontainer.children(".title").css({
+            top: "-50px"
+        });
+        localThis.selfcontainer.children(".title").transit({
+            duration: 500,
+            easing: "snap",
+            top: "0px"
+        });
+
+        localThis.selfcontainer.children(".content").css({
+            top: "-50px"
+        });
+        localThis.selfcontainer.children(".content").transit({
+            duration: 700,
+            easing: "snap",
+            top: "0px"
+        });
+        localThis.visible = true;
+    };
+
+    this.hide = function () {
+        /*спрятать полоску*/
+
+        if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+            window.mapModule01.MapClickAllowed = true;
+            window.mapModule01.guessMapClickAllowedOverride();
+        }
+
+        localThis.selfcontainer.attr("visible", "false");
+
+        localThis.visible = false;
+
+        localThis.selfcontainer.transit({
+            duration: 200,
+            easing: "snap",
+            top: "" + (localThis.top - 10) + "px",
+            opacity: 0.0
+        }, function () {
+            localThis.selfcontainer.css({
+                opacity: 0.0,
+                top: "" + (localThis.top + 10) + "px",
+                display: "none"
+            });
+            localThis.visible = false;
+        });
+    };
+
+    this.close = function () {
+        /*закрыть полоску*/
+        localThis.onclose.forEach(function (func) {
+            if (typeof func === "function") {
+                func();
+            }
+        });
+        localThis.clearContent();
+        localThis.hide();
+    };
+
+    this.wait = function () {
+        /*убрать крестик и включить крутилку*/
+        localThis.selfcontainer.children(".close").css({ display: "none" });
+        localThis.selfcontainer.append($("<div class=\"spinner\"><div class=\"bounce1 bg-color-primary\"></div><div class=\"bounce2 bg-color-primary\"></div><div class=\"bounce3 bg-color-primary\"></div></div>"));
+    };
+
+    this.resume = function () {
+        /*убрать крутилку и вернуть крестик*/
+        localThis.selfcontainer.children(".spinner").css({ display: "none" });
+        localThis.selfcontainer.append($("<div/>").addClass("close icon-close-30"));
+    };
+
+    this.blink = function () {
+        blinkmsg(gltxt("tool_close_current_to_continue"));
+        var old = localThis.selfcontainer.css("background-color");
+        localThis.selfcontainer.transit({ "background-color": "#FFFF00", duration: 100 }, function () {
+            localThis.selfcontainer.transit({ "background-color": old, duration: 100 }, function () {
+                localThis.selfcontainer.transit({ "background-color": "#FFFF00", duration: 100 }, function () {
+                    localThis.selfcontainer.transit({ "background-color": old, duration: 100 }, function () {
+                        localThis.selfcontainer.transit({ "background-color": "#FFFF00", duration: 100 }, function () {
+                            localThis.selfcontainer.transit({ "background-color": old, duration: 100 }, function () {
+
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    };
+
+    init();
+};

@@ -1,0 +1,3783 @@
+function RequestHistoryModule(varname) {
+
+    var localThis = this;
+
+    let reportsRibbon = null;
+
+    this.selectedUids = [];
+
+    this.varname = varname;
+    this.id = "request-history";
+    this.dialogWindow = null;
+    
+    this.historyElements = [];
+    this.visible = false;
+    this.initialized = false;
+    this.loaded_history = false;
+
+    this.listItemTemplate = null;
+    this.resultItemTemplate = null;
+    this.toolDialogTemplate = null;
+    this.hideOnZoom = [0, 11];
+    this.datesReports = ["14.02.2022", "15.02.2022", "16.02.2022"];
+    this.arrayPrev = [];
+    this.rendersLayotsElements = [];
+    this.renderPopulationCounterDetailedYearsElements = [];
+    var _timers = {};
+    this.mobileStickerBtn = null;
+    this.filterPanel = null;
+
+    this.markerStyle = {
+        icon: vertexIcon,
+        opacity: 1.0
+    };
+    
+    function createRibbon() {
+        reportsRibbon = HtmlElementFromText(localizeHtml(`
+            <div class="sticker-container bg-color-secondary font-secondary" data-elem="sticker-container">
+                <div class="stickerContainerContent">
+                    <k>{{rep_reports}}</k>
+                    </br>
+                    <k data-elem="query-kolvo">
+                    </k>
+                </div>
+            </div>`));
+
+        if (window.detectMobile() == "mobile") {
+            localThis.mobileStickerBtn = window.ToolPanelModule.getNewPanelButton({
+                "type": "small",
+                "float": "rightPanelCenter",
+                "order": 1,
+                "mobile": true,
+                "onClick": function () {
+                    if (!localThis.visible) localThis.dialogWindow.on();
+                },
+                "title": "",
+                "class": "rightRibbonButton gr-file",
+                "mapContainer": "mapPanel"
+            });
+            localThis.mobileStickerBtn.addToTopPanel();
+            localThis.mobileStickerBtn.$elemButton.attr("data-help", "reports-btn");
+            localThis.mobileStickerBtn.$elemButton[0].appendChild(reportsRibbon);
+
+        } else {
+            document.getElementById("reportsRibbon").appendChild(reportsRibbon);
+        }
+
+        reportsRibbon.addEventListener("click", function (e) {
+            if (!localThis.visible) localThis.dialogWindow.on();
+        });
+    };
+
+    /*---------------------------------*/
+    /*      публичные методы           */
+    /*---------------------------------*/
+
+    this.setRibbonValue = function (value) {
+        reportsRibbon.querySelector("[data-elem=query-kolvo]").innerHTML = value;
+    };
+
+    this.setRibbonValueFx = function (value) {
+        localThis.setRibbonValue(value);
+        localThis.jumpSquareReports();
+    };
+
+    this.jumpSquareReports = function () {
+        let old = getComputedStyle(reportsRibbon).marginTop;
+
+        function animateRibbon(to, dur, delay, cb) {
+            setTimeout(function () {
+                let el = reportsRibbon;
+                el.style.transition = `margin-top ${dur}ms ease`;
+                el.style.marginTop = to;
+
+                el.addEventListener('transitionend', function handler() {
+                    el.removeEventListener('transitionend', handler);
+                    if (cb) cb();
+                });
+            }, delay);
+        }
+
+        animateRibbon('-20px', 100, 100, function () {
+            animateRibbon('20px', 100, 100, function () {
+                animateRibbon(old, 100, 100);
+            });
+        });
+    };
+
+    /*показать перелёт отчёта в блокнотик (анимация)*/
+    this.dropFlyerFx = function (point) {
+        const the_flyer = HtmlElementFromText(`<div class="flyer"></div>`);
+
+        Object.assign(the_flyer.style, {
+            position: 'absolute',
+            top: '0px',
+            left: '0px',
+            opacity: '0',
+            transform: 'scale(1)'
+        });
+
+        let sourceTop, sourceLeft;
+        if (point && point._icon) {
+            sourceTop = point._icon._leaflet_pos.y - 50;
+            sourceLeft = point._icon._leaflet_pos.x - 50;
+        } else {
+            sourceTop = 400;
+            sourceLeft = 750;
+        }
+        the_flyer.style.top = `${sourceTop}px`;
+        the_flyer.style.left = `${sourceLeft}px`;
+
+        document.body.appendChild(the_flyer);
+        the_flyer.getBoundingClientRect();
+
+        the_flyer.style.transition = 'opacity 200ms ease';
+        the_flyer.style.opacity = '0.9';
+
+        function onFade(e) {
+            if (e.propertyName !== 'opacity') return;
+            the_flyer.removeEventListener('transitionend', onFade);
+
+            const container = document.body.querySelector('[data-elem=sticker-container]');
+            const size = GSize.fromElement(container);
+            const targetTop = size.top - 20;
+            const targetLeft = size.left - 20;
+
+            the_flyer.style.transition = 'top 300ms ease, left 300ms ease, transform 300ms ease';
+            the_flyer.style.top = `${targetTop}px`;
+            the_flyer.style.left = `${targetLeft}px`;
+            the_flyer.style.transform = 'scale(0.1)';
+
+            the_flyer.addEventListener('transitionend', onMove, { once: true });
+        };
+
+        function onMove(e) {
+            if (e.propertyName !== 'transform') return;
+
+            the_flyer.style.transition = 'transform 300ms ease, opacity 300ms ease';
+            the_flyer.style.transform = 'scale(0.1)';
+            the_flyer.style.opacity = '0';
+
+            the_flyer.addEventListener('transitionend', onHide);
+        };
+
+        function onHide(e) {
+            if (e.propertyName !== 'opacity') return;
+            the_flyer.removeEventListener('transitionend', onHide);
+            the_flyer.remove();
+        };
+
+        the_flyer.addEventListener('transitionend', onFade);
+
+        setTimeout(function () {
+            if (the_flyer) {
+                the_flyer.style.opacity = '0.1';
+                the_flyer.style.transform = 'scale(0.1)';
+                the_flyer.remove();
+            }
+        }, 1000);
+    };
+
+    function DeleteAllReports() {
+        var svc = DoWebApiAction("/requesthistory/delete_all", { magic: "wtf" });
+        svc.done(function (r) {
+            if (r.success) {
+                blinkmsg("deleted", 1000, "success");
+                localThis.reload();
+            }
+            else {
+                blinkmsg(r.message, 5000, "danger");
+            }
+        });
+    };
+
+    this.removeAllReports = function () {
+        let hhttmmll = gltxt("delete_all_reports_sure_q");
+        let b = {
+            type: "ok",
+            action: function () {
+                DeleteAllReports();
+            },
+            title: "",
+            text: gltxt("yes"),
+            icon: false,
+            "class": "btn_confirm"
+        };
+        let n = {
+            type: "skip",
+            action: function () { },
+            title: "",
+            text: gltxt("no"),
+            icon: false,
+            "class": "btn_confirm customAlertBtnCancel"
+        };
+
+        customConfirm(hhttmmll, null, [b, n], 400, 120);
+    };
+
+    this.clearSelection = function () {
+        window.requestHistoryModule.historyElements.forEach(function (o) {
+            o.unselect();
+        });
+        localThis.selectionChanged();
+    };
+
+    this.turnOnVisible = function () {
+
+        localThis.selectedUids = [];
+        localThis.selectedUids.length = 0;
+
+        window.requestHistoryModule.historyElements.forEach(function (o) {
+            o.unselect();
+        });
+
+        window.requestHistoryModule.historyElements.forEach(function (o) {
+            if (o.expanded) {
+                o.select();
+            }
+        });
+
+        localThis.selectionChanged();
+    };
+
+    /*список всех включённых галочек*/
+    this.selectedIds = function () {
+        return window.requestHistoryModule.historyElements
+            .filter(function (o) { return o.selected; })
+            .map(function (o) {return o.data.Uid; });
+    };
+
+    /*инициализация модуля*/
+    function init() {
+       
+        if (localThis.initialized) return;
+
+        createRibbon();
+       
+        localThis.dialogWindow = new RequestHistoryDialog(localThis);
+        localThis.dialogWindow.createDialog();
+
+        localThis.dialogWindow.getHistoryList();
+
+        _timers.wait_history_list = setInterval(function () {
+
+            console.log("=====> localThis.loaded_history", localThis.loaded_history);
+            
+            if (localThis.loaded_history) {
+
+                clearInterval(_timers.wait_history_list);
+
+                console.log("=====> localThis.dialogWindow.GetReportShareToken()", localThis.dialogWindow.GetReportShareToken());
+
+                if (localThis.dialogWindow.GetReportShareToken() !== null) {
+
+                    let select_elem = null;
+
+                    localThis.historyElements.forEach(function (elem) {
+                        if (elem.data.SharedToken == localThis.dialogWindow.GetReportShareToken()) {
+                            select_elem = elem;
+                        }
+                    });
+
+                    localThis.dialogWindow.on();
+                    if (select_elem != null) {
+                        select_elem.select();
+                    }
+
+                }
+            }
+        }, 1000);
+
+        localThis.initialized = true;
+
+        console.log("=====> localThis.initialized", localThis.initialized);
+
+        if (window.clearActions) {
+            window.clearActions.push(localThis.clearSelection);
+        }
+
+        window.mapModule01.registerMapMoveEndEvent(localThis.onZoomChanged);
+    };
+
+    /*--------------------------*/
+    /*триггеры, условия и прочее*/
+    /*--------------------------*/
+
+    this.reload = function () {
+        localThis.clearSelection();
+
+        localThis.arrayPrev = [];
+        localThis.arrayPrev.length = 0;
+
+        localThis.historyElements.forEach(function (o) {
+            localThis.arrayPrev.push(o.data.Id);
+            o.destroy();
+        });
+
+        this.dialogWindow.getHistoryList();
+    };
+
+    /*при изменении выбранных отчётов (когда галочка тогглется)*/
+    this.selectionChanged = function () {
+
+        var selected = 0;
+
+        localThis.historyElements.forEach(function (o) {
+            if (o.selected) {
+                selected++;
+            }
+        });
+
+        /*todo: расхардкодить максимальное количество полигонов в налажаторе*/
+        var max = 21;
+        if (selected >= 2 && selected <= max) {
+            $(".nalagator-ico").attr("active", "true").css({ opacity: 1.0 }).attr("title", gl.text.rep_intersector_title);
+        } else if (selected < 2) {
+            $(".nalagator-ico").attr("active", "false").css({ opacity: 0.3 }).attr("title", gl.text.rep_intersector_title + ". " + gl.text.rep_intersector_select_some_reports);
+        } else {
+            $(".nalagator-ico").attr("active", "false").css({ opacity: 0.3 }).attr("title", gl.text.rep_intersector_title + ". " + gl.text.rep_intersector_to_many_reports.replace("{0}", "" + max));
+        }
+
+        localThis.dialogWindow.listActions.find(".left-container").children().remove();
+
+        if (location.host.indexOf("digital") == -1) {
+            localThis.dialogWindow.listActions.find(".left-container").append($("<span/>", { action: "check" }).addClass("bg-main-darker").addClass("font-default").html(gl.text.all_on));
+            localThis.dialogWindow.listActions.find(".left-container").append($("<span/>", { action: "uncheck" }).addClass("bg-main-darker disabled").addClass("font-default").html(gl.text.all_off));
+        }
+
+        if (selected > 0) {
+            localThis.dialogWindow.listActions.find(".left-container [action=uncheck]").removeClass("disabled");
+        }
+
+        window.MAP.invalidateSize();
+    };
+
+    this.onZoomChanged = function () {
+        var _zoom = window.MAP.getZoom();
+        if (_zoom >= localThis.hideOnZoom[0] && _zoom <= localThis.hideOnZoom[1]) {
+            localThis.historyElements.forEach(function (item) {
+                if (item.selected) {
+                    if (item.data.Point != null && item.data.Polygon != null) {
+                        tryRemoveGeometry(item.data.Point);
+                        item.point_visible = false;
+                    }
+                }
+            });
+        }
+        else {
+            localThis.historyElements.forEach(function (item) {
+                if (item.selected) {
+                    if (item.data.Point != null && item.data.Polygon != null) {
+                        if (item.point_visible == false) {
+                            item.data.Point.addTo(window.MAP);
+                            item.point_visible = true;
+                        }
+                    }
+                }
+            });
+        }
+    };
+    init();
+};
+
+function mobilePartsModule(_parent) {
+    /* Кнопка вернуть список отчетов */
+     var showListReports = document.createElement("div");
+     showListReports.classList.add('show-list-reports');
+     showListReports.setAttribute("data-action", "show-list-reports");
+    showListReports.addEventListener("click", function () {
+        _parent.selfelement.find(".right-panel").attr("data-isOpen", false);
+    });
+    _parent.selfelement.find(".right-panel [data-elem=request-tool-panel] .container-tools[data-position=left]").append(showListReports);
+
+    /*Кнопка: Выбрать все отчеты, не выбрать все отчеты */
+    var btnSelectedReports = document.createElement("div");
+    btnSelectedReports.classList.add('control-icon', 'geo-icon', 'icon-size-normal', 'gr-check-multi', 'request-filter');
+    btnSelectedReports.setAttribute("data-type", "selectedAll");
+
+    btnSelectedReports.addEventListener("click", function () {
+        var typeBtn = btnSelectedReports.getAttribute("data-type");
+        if (typeBtn === "selectedAll") {
+            _parent.parent.turnOnVisible();
+            btnSelectedReports.setAttribute("data-type", "unselectedAll");
+        }else{
+            _parent.parent.clearSelection();
+            btnSelectedReports.setAttribute("data-type", "selectedAll");
+        } 
+    });
+
+    _parent.selfelement.find(".left-panel [data-elem=request-search-panel]").append(btnSelectedReports);
+};
+
+function RequestHistoryDialog(parent) {
+    var localThis = this;
+    var loadCssUrl = "/resources/funcparts/request-history/styles/style.css";
+    var loadCssUrlsecondary = "/resources/styles/funcparts/request-history/style.css";
+    this.selfelement = null;
+    this.tooldialog = null;
+    this.parent = parent;
+    var _timers = {
+    };
+
+    this.listActions = $("<div/>").addClass("listActions").append(
+        $("<div/>").addClass("left-container"),
+        $("<div/>").addClass("right-container")
+    );
+
+    /*Кнопка "Удалить все отчеты"*/
+    this.btnRemoveAllReports = $("<span class='bg-main-darker font-default'/>").html(gltxt("delete_all_reports"));
+    this.btnRemoveAllReports.attr("action", "removeAllReports");
+    localThis.listActions.find(".right-container").append(localThis.btnRemoveAllReports);
+
+    this.listActions.on("click", "span[action=check]", function () {
+        localThis.parent.turnOnVisible();
+    });
+
+    this.listActions.on("click", "span[action=uncheck]", function () {
+        localThis.parent.clearSelection();
+    });
+
+    this.listActions.on("click", "span[action=removeAllReports]", function () {
+        localThis.parent.removeAllReports();
+    });
+
+    this.createDialog = function () {
+
+        appendHeadStyle(loadCssUrl);
+        appendHeadStyle(loadCssUrlsecondary);
+        let r1 = `<div>
+    <div class="left-panel bd-disabled m2">
+        <div class="search-panel bg-color-disabled" data-elem="request-search-panel">
+            <input type="text" placeholder="{{search}}" class="control-search gr-lens input-icon bd-disabled"  data-elem="request-search-field" />
+            <div class="control-icon geo-icon icon-size-normal filter-ico request-filter" title="{{filter_setup}}" data-elem="fiter-icon"></div>
+            <div class="control-icon geo-icon icon-size-normal cancel-filter-ico request-filter" title="{{filter_clear}}" data-display="0" data-elem="cancel-fiter-icon"></div>
+        </div>
+        <div class="wrap-list-filter-container">
+            <div class="request-filter-panel min-blue-scroll" data-elem="request-filter-panel">
+
+                <div class="filter-element" data-object="filterDate" data-lock="true">
+                    <div class="locked-container"></div>
+                    <div class="head-filter-element">
+                        <span class="checkbox" data-elem="toggle-lock"></span>
+                        <label>{{date}}</label>
+                    </div>
+                    <div class="content-filter-element">
+                        <div data-elem="filter-date"></div>
+                    </div>
+                </div>
+
+                <div class="filter-element" data-object="filterColor" data-lock="true">
+                    <div class="locked-container"></div>
+                    <div class="head-filter-element">
+                        <span class="checkbox" data-elem="toggle-lock"></span>
+                        <label>{{color}}</label>
+                    </div>
+                    <div class="content-filter-element">
+                        <div class="colors-select-container">
+                            <input data-elem="filter-color" />
+                        </div>
+                    </div>
+                </div>
+
+                <div data-elem="filter-button" class="request-filter-button">
+
+                    <div data-elem="confirm-filter" class="btn-filter bg-main-contrast font-default">
+                        <e>{{apply}}</e>
+                    </div>
+
+                    <div data-elem="cancel-filter" class="btn-filter bg-main-cancel font-default">
+                        <e>{{cancel}}</e>
+                    </div>
+
+                </div>
+            </div>
+            <div data-elem="request-history-container" class="min-blue-scroll" id="ListQuery"></div>
+        </div>
+        <script id="request-history-elem-template" type="text/template">
+            <table class="history-elem block-transition block-hover hover-select border-myquery select" data-elem="history-elem" id="" border="0">
+                <tr>
+                    <td rowspan="2" class="select-item" data-elem="select" data-active="0">
+                        <div class="color-status"></div>
+                        <div class="item-shared"></div>
+                    </td>
+                    <td colspan="2" style="position: relative;">
+                        <div class="name font-size-h5" data-elem="name"></div>
+
+                    </td>
+                    <td rowspan="2" class="data-delete"><div class="delete-item geo-icon gr-close-x-thin ui-icon-closethick" title="{{delete}}" data-elem="delete-item"></div></td>
+                </tr>
+                <tr>
+                    <td style="text-align:left;">
+                        <div class="date font-disabled font-size-sm color-text-date-tim" data-elem="date"></div>
+                    </td>
+                </tr>
+            </table>
+        </script>
+    </div>
+    <div class="right-panel m2">
+        <div class="request-tool-panel bg-color-disabled" data-elem="request-tool-panel">
+            <div class="container-tools" data-position="left"></div>
+            <div class="container-tools" data-position="right"></div>
+        </div>
+        <div data-elem="request-elem-results" class="min-blue-scroll">
+        </div>
+        <script data-elem="row-WindowsList" type="text/template">
+            <div class="response-row shadow-PO" data-elem="RowList"></div>
+        </script>
+        <script data-elem="row-template" type="text/template">
+            <div class="response-row bd-primary-top shadow-soft" data-elem="row">
+                <div class="row-toolbox" data-elem="row-toolbox"></div>
+                <table width="100%" border="0" class="renderOperationData">
+                    <tr class="row-first">
+                        <td><div class="row-title font-size-h4 " data-elem="row-title"></div></td>
+                        <td class="right-td"><div class="row-title font-size-h5 " data-elem="row-title-date"></div></td>
+                    </tr>
+
+                    <tr>
+                        <td colspan="2" class="word-break"><div class="row-description" data-elem="row-description"></div></td>
+
+                    </tr>
+                    <tr>
+                        <td colspan="2"><div class="row-description" data-elem="row-description-list"></div></td>
+
+                    </tr>
+                </table>
+
+                <div class="row-content">
+                    <table class="table-default" data-elem="row-content"></table>
+                </div>
+
+            </div>
+        </script>
+        <script data-elem="row-element-template" type="text/template">
+            <tr class="row-object">
+                <td class="element-key bd-disabled font-primary" data-elem="key"></td>
+                <td class="element-value bd-disabled" data-elem="value"></td>
+            </tr>
+        </script>
+
+    </div>
+    <div class="request-history-tool-dialog"></div>
+    <div style="clear: both;"></div>
+</div>`;
+
+        localThis.selfelement = $(localizeHtml(r1)).geodialog({
+            autoOpen: false,
+            width: 1000,
+            minWidth: 800,
+            height: 700,
+            minHeight: 300,
+            open: localThis.on,
+            close: localThis.off,
+            resize: localThis.resize,
+            resizable: true,
+            draggable: true,
+            title: gltxt("rep_window_title"),
+            isTitleLogo: false,
+            dialogClass: "request-history-dialog rounded"
+        });
+
+        $(".request-history-dialog").draggable({ containment: false, scroll: false });
+        $(".request-history-dialog").find(".footer-container").append(localThis.listActions);
+        
+        var $headerGeodialog = $(".request-history-dialog .dialog-header");
+        $headerGeodialog.append("<div class=\"logoHeader gr-file\"></div>");
+
+        localThis.parent.listItemTemplate = $(trim11($("#request-history-elem-template", localThis.selfelement).html()));
+        localThis.parent.resultItemTemplate = $(trim11($("[data-elem=\"row-template\"]", localThis.selfelement).html()));
+        localThis.parent.toolDialogTemplate = $(trim11($(".request-history-tool-dialog", localThis.selfelement).html()));
+
+        localThis.tooldialog = localThis.selfelement.find(".request-history-tool-dialog");
+
+        if (window.detectMobile() == "mobile") {
+            mobilePartsModule(localThis);
+        }
+
+        localThis.parent.filterPanel = new RequestFilter(localThis);
+        localThis.parent.filterPanel.init();
+        window.clearActions.push(localThis.off);/*добавляем событие в "ластик"*/
+    };
+
+    this.on = function () {
+        /*открыть окно с отчётами*/
+        if (localThis.parent.visible) return;
+        localThis.parent.visible = true;
+        localThis.selfelement.geodialog("open");
+        localThis.resize();
+       
+       (window.detectMobile() == "mobile")? localThis.selfelement.find("[data-elem=request-search-field]").blur(): localThis.selfelement.find("[data-elem=request-search-field]").focus();
+    };
+
+    this.off = function () {
+        /*закрыть окно с отчётами*/
+        localThis.parent.visible = false;
+        localThis.selfelement.geodialog("close");
+        if (window.detectMobile() == "mobile") {          
+            parent.mobileStickerBtn.off();
+        }
+    };
+
+    this.resize = function () {
+        /*вызывается при изменении размера окна*/
+        var height = localThis.selfelement.height();
+        var leftHeigth = height;
+        var rightHeigth = height - $("[data-elem=\"request-tool-panel\"]", localThis.selfelement).outerHeight();
+        var leftOpt = {};
+        var rightOpt = {};
+        leftOpt.height = leftHeigth -40 + "px";
+        rightOpt.height = rightHeigth + "px";
+        $(".left-panel [data-elem=request-history-container]").height(leftOpt.height);
+        $(".left-panel [data-elem=request-filter-panel]").height(leftOpt.height);
+        $(".right-panel [data-elem=request-elem-results]", localThis.selfelement).height(rightOpt.height);
+    };
+
+    this.addHistoryItem = function (o) {
+        /*инициализирует элемент истории*/
+        new HistoryElement(localThis.parent, o);
+    };
+
+    /*показывает див с диалоговым окном (наложатор например) внутри главного окна с отчётами*/
+    this.showToolDialog = function () {
+        localThis.tooldialog.css({ opacity: 0.0, display: "block", top: "100px", right: "100px", bottom: "100px", left: "100px" });
+        localThis.tooldialog.transit({ opacity: 1.0, top: "0px", right: "0px", bottom: "0px", left: "0px", duration: 300 });
+    };
+
+    this.closeToolDialog = function () {
+        localThis.tooldialog.transit({ opacity: 0.0, top: "100px", right: "100px", bottom: "100px", left: "100px", duration: 300 }, function () {
+            localThis.tooldialog.css({ display: "none" });
+            localThis.tooldialog.children().remove();
+        });
+    };
+
+    /*заполнение диалогового окна*/
+    this.setToolDialogContent = function (content) {
+        localThis.tooldialog.children().remove();
+        localThis.tooldialog.append(content);
+    };
+
+    this.GetReportShareToken = function () {
+        var token = null;
+        if (window.giLinksImplement?.parameters !== undefined) {
+            if (window.giLinksImplement?.parameters !== null) {
+                window.giLinksImplement.parameters.forEach(function (operation) {
+                    if (operation.type == "report") {
+                        if (window.giLinksImplement?.token !== undefined) {
+                            token = window.giLinksImplement?.token;
+                        }
+                    }
+                });
+            }
+        }
+
+        return token;
+    };
+
+    this.getHistoryList = function () {
+        /*загружает историю отчётов с сервера*/
+
+        console.log("=====> this.getHistoryList");
+
+        _timers.wait_history_list = setInterval(function () {
+
+            console.log("=====> _timers.wait_history_list");
+
+            if (typeof window.UserModule?.userData?.Info?.Login !== "undefined") {
+                clearInterval(_timers.wait_history_list);
+
+                localThis.parent.setRibbonValue(0);
+                localThis.parent.datesReports = [];
+
+                let mydata = {
+                    login: window.UserModule.userData.Info.Login,
+                    content: "{}"
+                };
+
+                let query_token = null;
+                let query = DoWebApiAction("/requesthistory/list", mydata);
+
+                if (localThis.GetReportShareToken() !== null) {
+                    query_token = DoWebApiAction("/requesthistory/get_one_by_shared_token", { shared_token: localThis.GetReportShareToken() });
+                }
+
+                if (query_token !== null) {
+                    $.when(query, query_token).done(function (boo, voo) {
+                        localThis.MergeHistoryList(boo, voo);
+                    });
+                }
+                else {
+                    query.done(function (boo) {
+                        localThis.MergeHistoryList(boo, null);
+                    });
+                }
+            }
+        }, 1000);
+
+
+    };
+
+    this.MergeHistoryList = function (boo_resp, voo_resp) {
+        var counter = 0;
+        var boo = null;
+        var voo = null;
+
+        if (boo_resp !== null) {
+            if (boo_resp.length !== undefined) {
+                boo = boo_resp[0];
+            } else {
+                boo = boo_resp;
+            }
+        }
+
+        if (voo_resp != null) {
+            if (voo_resp.length !== undefined) {
+                voo = voo_resp[0];
+            } else {
+                voo = voo_resp;
+            }
+        }
+
+        if (boo != null) {
+            if (boo.success) {
+                counter += boo.results.length;
+
+                boo.results.forEach(function (o) {
+
+                    localThis.addHistoryItem(o);
+                    localThis.parent.datesReports.push(moment(o.Recdate).format("DD.MM.YYYY"));
+
+                    if (localThis.parent.arrayPrev.length > 0) {
+
+                        localThis.parent.historyElements.forEach(function (item) {
+
+                            if (localThis.parent.arrayPrev.indexOf(item.data.Id) === -1) {
+                                item.select();
+                            }
+
+                        });
+
+                    }
+
+                });
+
+                localThis.parent.selectionChanged();
+
+                localThis.parent.arrayPrev = [];
+                localThis.parent.arrayPrev.length = 0;
+
+            } else {
+                /*ShowInfoMessage(gl.text.ATTENTION, boo.message, 500);*/
+            }
+
+            if (voo != null) {
+                if (voo.success) {
+                    if (voo.results !== null) {
+                        var check = false;
+                        localThis.parent.historyElements.forEach(function (item) {
+                            if (item.data.Uid === voo.results.Uid) {
+                                check = true;
+                            }
+                        });
+
+                        if (!check) {
+                            counter += 1;
+                            localThis.addHistoryItem(voo.results);
+                            /*localThis.parent.datesReports.push(moment(voo.results.Recdate).format("DD.MM.YYYY"));*/
+                        }
+                    }
+                }
+            }
+
+        }
+        localThis.parent.setRibbonValue(counter);
+        localThis.parent.loaded_history = true;
+    };
+
+   
+
+};
+
+function RequestFilter(parent) {
+    var localThis = this;
+    this.parent = parent;
+    this.isActive = false;
+    this.data = null;
+
+    this.selfelement = null;
+    this.filterBtn = null;
+    this.searchField = null;
+    this.clearBtn = null;
+    this.filterString = "";
+
+    this.selectedProps = {
+        filterString: "",
+        filterDate: {
+            value: null,
+            disabled: true
+        },
+        filterColor: {
+            value: null,
+            disabled: true
+        },
+    };
+    var filterBtnClick = function () {
+        /*при клике на кнопку с фильтром*/
+        localThis.parent.parent.datesReports = getDateReports();
+        localThis.parent.parent.reload();
+
+        $("[data-elem=\"filter-date\"]", localThis.selfelement).datepicker("refresh");
+        $("[data-elem=\"filter-date\"]", localThis.selfelement).find(".ui-state-active").removeClass("ui-state-active");
+
+        /* Считаем выбранные значения с объекта */
+        if (localThis.selectedProps.filterDate.value !== null) {
+            $("[data-elem=\"filter-date\"]", localThis.selfelement).datepicker("setDate", localThis.selectedProps.filterDate.value);
+        }
+
+        if (localThis.selectedProps.filterColor.value !== null) {
+            $("[data-elem=\"filter-color\"]", localThis.selfelement).spectrum("set", localThis.selectedProps.filterColor.value);
+        }
+        localThis.showFilter();
+    };
+
+    var renderWidgets = function () {
+        $("[data-elem=\"filter-color\"]", localThis.selfelement).spectrum({
+            type: "flat",
+            showPalette: true,
+            showPaletteOnly: true,
+            color: "transparent",
+            palette: ["#1abc9c", "#16a085", "#2ecc71", "#27ae60", "#3d91de", "#2980b9", "#9b59b6", "#8e44ad", "#34495e", "#2c3e50", "#f1c40f", "#f39c12", "#e67e22", "#d35400", "#e74c3c", "#c0392b", "#ecf0f1"],
+            move: function (color) {
+                localThis.selectedProps.filterColor.value = color.toHexString();
+            }
+        });
+
+        $("[data-elem=\"filter-date\"]", localThis.selfelement).datepicker({
+            dateFormat: "dd.mm.yy",
+            onSelect: function (dateText) {
+                localThis.selectedProps.filterDate.value = moment(dateText, "DD.MM.YYYY").format("L");
+            },
+            beforeShowDay: function (date) {
+
+                var a = moment(date).format("DD.MM.YYYY");
+                return [localThis.parent.parent.datesReports.indexOf(a) != -1];
+            }
+        });
+
+        localThis.filterBtn[0].focus();
+    };
+
+    /*Метод  возвращает массив с датами для календаря*/
+    var getDateReports = function () {
+        var dates = [];
+        localThis.parent.parent.historyElements.forEach(function (o) {
+            dates.push(moment(o.data.Recdate).format("DD.MM.YYYY"));
+        });
+        return dates;
+    };
+
+    var bindEvents = function () {
+        /*привязка событий к контролам*/
+        localThis.filterBtn.on("click", function () {
+            filterBtnClick();
+        });
+
+        localThis.clearBtn.on("click", function () {
+            localThis.clearFilter();
+        });
+
+        $("[data-elem=\"filter-button\"]", localThis.selfelement).on("click", "[data-elem=confirm-filter]", function () {
+            localThis.applyFilter(localThis.selectedProps);
+            localThis.hideFilter();
+        });
+
+        $("[data-elem=\"filter-button\"]", localThis.selfelement).on("click", "[data-elem=cancel-filter]", function () {
+            localThis.clearFilter();
+            localThis.hideFilter();
+        });
+        /*клик по галочки в фильтре(разблокировать,заблокировать)*/
+        $("[data-elem=\"toggle-lock\"]", localThis.selfelement).on("click", function () {
+            var parElem = $(this).parent().parent();
+            var namePanel = parElem.attr("data-object");
+
+            if (parElem.attr("data-lock") !== "true") {
+                parElem.attr("data-lock", "true");
+                enableAndDisablePropsFilterObject(namePanel, true);
+
+            } else {
+                parElem.attr("data-lock", "false");
+                enableAndDisablePropsFilterObject(namePanel, false);
+            }
+        });
+
+        localThis.searchField.bind("propertychange change click keyup input paste", function (e) {
+
+
+            var _val0 = trim11(localThis.searchField.val());
+
+            if (_val0.length > 0) {
+                localThis.selectedProps.filterString = _val0;
+                localThis.applyFilter(localThis.selectedProps);
+            }
+        });
+    };
+    function enableAndDisablePropsFilterObject(_name, _disable) {
+        $.each(localThis.selectedProps, function (key) {
+            if (_name === key) {
+                localThis.selectedProps[key].disabled = _disable;
+            }
+        });
+    };
+    this.init = function () {
+        /*инициализация*/
+        moment.locale("ru");
+        localThis.selfelement = $("body").find("[data-elem=\"request-filter-panel\"]");
+        localThis.filterBtn = $("body").find("[data-elem=\"fiter-icon\"]");
+        localThis.searchField = $("body").find("[data-elem=\"request-search-field\"]");
+        localThis.clearBtn = $("body").find("[data-elem=\"cancel-fiter-icon\"]");
+
+        bindEvents();
+        renderWidgets();
+        $(".control-search").attr("data-width", "max");
+        $(".ui-datepicker-inline").addClass("myKalendar");
+
+    };
+
+    this.showFilter = function () {
+        localThis.selfelement.css({ opacity: 0.0, display: "block", left: "-100px", transform: "perspective(500px) rotateY(180deg)" });
+        localThis.selfelement.transit({ opacity: 1.0, duration: 200, left: "0px", easing: "snap", perspective: "500px", rotateY: "0deg" });
+    };
+
+    this.hideFilter = function () {
+        localThis.selfelement.transit({ opacity: 0.0, duration: 200, left: "-100px", easing: "snap" }, function () {
+            localThis.selfelement.css({ opacity: 0.0, display: "none", left: "-100px", transform: "perspective(500px) rotateY(180deg)" });
+        });
+    };
+
+    this.applyFilter = function (f) {
+        /*применить фильтр*/
+        if (typeof f.filterString === "undefined") return;
+
+        var _val0 = f.filterString.toLowerCase();
+        _val0 = _val0.replace(/\,/g, " ");
+        _val0 = _val0.replace(/\;/g, " ");
+        _val0 = _val0.replace(/\|/g, " ");
+        _val0 = _val0.replace(/\s\s+/g, " ");
+
+        var _vals0 = _val0.split(" ");
+        var _vals0str = _vals0.join(",");
+
+        localThis.parent.parent.historyElements.forEach(function (o) {
+            var show = false;
+            /*Проверим строку поиска */
+            (_vals0str.length > 0) ? show = checkFilter(f, o, _vals0str) : show = checkFilter(f, o);
+
+            if (show) {
+                o.expand();
+            } else {
+                o.collapse();
+            }
+        });
+
+        localThis.clearBtn.css({ display: "block" });
+
+        $(".control-search").attr("data-width", "min");
+    };
+
+    function checkFilter(_objectFilter, _objectItem, _stringSearch) {
+        var reg = /#([a-f0-9]{3}){1,2}\b/gi; /*Регулярка, которая находит цвет */
+        var color = _objectItem.data.PolygonSymbol.match(reg)[0];
+        var show = false;
+
+        /* Если фильтр заблокирован*/
+        if (_objectFilter.filterDate.disabled && _objectFilter.filterColor.disabled) {
+            if (typeof _stringSearch === "undefined") { show = true; }
+            else {
+                if (_objectItem.data.Name.containsOneOf(_stringSearch, true)) show = true;
+                if (_objectItem.data.Address.containsOneOf(_stringSearch, true)) show = true;
+            }
+        }
+        /* Если выбрали дату только*/
+        if (!_objectFilter.filterDate.disabled && _objectFilter.filterColor.disabled) {
+            if (moment(new Date(_objectItem.data.Recdate)).format("DD.MM.YYYY").containsOneOf(_objectFilter.filterDate.value, true)) {
+                if (typeof _stringSearch === "undefined") { show = true; }
+                else {
+                    if (_objectItem.data.Name.containsOneOf(_stringSearch, true)) show = true;
+                    if (_objectItem.data.Address.containsOneOf(_stringSearch, true)) show = true;
+                }
+            }
+        }
+        /* Если выбрали цвет только*/
+        if (_objectFilter.filterDate.disabled && !_objectFilter.filterColor.disabled) {
+            if (color.containsOneOf(_objectFilter.filterColor.value, true)) {
+                if (typeof _stringSearch === "undefined") { show = true; }
+                else {
+                    if (_objectItem.data.Name.containsOneOf(_stringSearch, true)) show = true;
+                    if (_objectItem.data.Address.containsOneOf(_stringSearch, true)) show = true;
+                }
+            }
+        }
+
+        /* Если выбрали цвет и дату*/
+        if (!_objectFilter.filterDate.disabled && !_objectFilter.filterColor.disabled) {
+            if (color.containsOneOf(_objectFilter.filterColor.value, true)) {
+                if (moment(new Date(_objectItem.data.Recdate)).format("DD.MM.YYYY").containsOneOf(_objectFilter.filterDate.value, true)) {
+                    if (typeof _stringSearch === "undefined") { show = true; }
+                    else {
+                        if (_objectItem.data.Name.containsOneOf(_stringSearch, true)) show = true;
+                        if (_objectItem.data.Address.containsOneOf(_stringSearch, true)) show = true;
+                    }
+                }
+            }
+        }
+
+        return show;
+    };
+
+    this.clearFilter = function () {
+        /*очистить фильтр*/
+        localThis.parent.parent.historyElements.forEach(function (o) {
+            o.expand();
+        });
+        localThis.searchField.val("");
+        localThis.selectedProps = {
+            filterString: "",
+            filterDate: {
+                value: null,
+                disabled: true
+            },
+            filterColor: {
+                value: null,
+                disabled: true
+            },
+        };
+        $("[data-elem=\"filter-date\"]", localThis.selfelement).find(".ui-state-active").removeClass("ui-state-active");
+        $("[data-elem=\"filter-color\"]", localThis.selfelement).spectrum("set", "transparent");
+        localThis.selfelement.find("[data-object=\"filterDate\"]").attr("data-lock", "true");
+        localThis.selfelement.find("[data-object=\"filterColor\"]").attr("data-lock", "true");
+        localThis.hideFilter();
+        localThis.clearBtn.css({ display: "none" });
+        $(".control-search").attr("data-width", "max");
+    };
+
+};
+
+$(document).ready(function () {
+    window.requestHistoryModule = new RequestHistoryModule("requestHistoryModule");    
+});
+
+function HistoryElement(parent, _data) {
+    /*один элемент списка*/
+    var localThis = this;
+
+    this.data = null;
+
+    this.listelement = null;
+    this.resultelement = null;
+    this.result = null;
+
+    this.isLoaded = false;
+    this.parent = parent;
+    this.selected = false;
+    this.point_visible = true;
+
+    this.expanded = true;
+
+    /*180 меридиан, убираю бордер*/
+
+    var emptyPolyStyle = {
+        clickable: true,
+        /*color: "#3d91de",*/
+        fill: false,
+        fillColor: "red",
+        fillOpacity: 0.0,
+        /*opacity: 0,
+        stroke: false,
+        weight: 2*/
+    };
+
+    /*180 меридиан, убираю бордер*/
+    this.feature_renderer = function (feature) {
+        var color = {
+            // color: feature.properties.color,
+            weight: 0.9,
+            // opacity: 0.9,
+            fillColor: feature.properties.color,
+            fillOpacity: 0.7
+        };
+        return color;
+    };
+
+    this.features_layer = null;
+
+    var onEachFeature = function (feature, layer) {
+        if (feature.properties) {
+            var content = "";
+            content += "<span style='color:#000000'><b>" + gl.text.rep_filtered_results + "</b></span><br/>";
+            var name, value;
+            for (name in feature.properties) {
+                if (feature.properties.hasOwnProperty(name)) {
+                    if ([gltxt("total_people"), gltxt("total_abonents") + " МТС"].indexOf(name) !== -1) {
+                        value = "" + feature.properties[name];
+                        if (value === "0") {
+                            content += "<span style='color:#afaeae'><b>" + gltxt("total_abonents") + " МТС" + "</b>: " + feature.properties[name] + "</span><br/>";
+                        }
+                        else {
+                            content += "<span style='color:#E30611'><b>" + gltxt("total_abonents") + " МТС" + "</b></span>: " + feature.properties[name] + "<br/>";
+                        }
+                    }
+                    if ([gltxt("total_abonents")].indexOf(name) !== -1) {
+                        value = "" + feature.properties[name];
+                        if (value === "0") {
+                            content += "<span style='color:#afaeae'><b>" + gltxt("total_abonents") + "</b>: " + feature.properties[name] + "</span><br/>";
+                        }
+                        else {
+                            content += "<span style='color:#E30611'><b>" + gltxt("total_abonents") + "</b></span>: " + feature.properties[name] + "<br/>";
+                        }
+                    }
+                }
+            }
+            content += "<hr/>";
+            for (name in feature.properties) {
+                if (feature.properties.hasOwnProperty(name)) {
+                    if ([gltxt("workers"), gltxt("residents"), gltxt("transient_people")].indexOf(name) !== -1) {
+                        value = "" + feature.properties[name];
+                        if (value === "0") {
+                            content += "<span style='color:#afaeae'><b>" + name + "</b>: " + feature.properties[name] + "</span><br/>";
+                        }
+                        else {
+                            content += "<span style='color:#E30611'><b>" + name + "</b></span>: " + feature.properties[name] + "<br/>";
+                        }
+                    }
+                }
+            }
+            content += "<hr/>";
+            for (name in feature.properties) {
+                if (feature.properties.hasOwnProperty(name)) {
+                    if (["color", "value", gltxt("total_people"), gltxt("total_abonents"), gltxt("total_abonents") + " МТС", gltxt("workers"), gltxt("residents"), gltxt("transient_people")].indexOf(name) !== -1) {
+                        continue;
+                    }
+                    value = "" + feature.properties[name];
+                    if (value === "0") {
+                        content += "<span style='color:#afaeae'><b>" + name + "</b>: " + feature.properties[name] + "</span><br/>";
+                    }
+                    else {
+                        content += "<span style='color:#E30611'><b>" + name + "</b></span>: " + feature.properties[name] + "<br/>";
+                    }
+
+                }
+            }
+            layer.bindPopup(content, { closeButton: false, offset: L.point(0, -20) });
+            layer.on("mouseover", function () { layer.openPopup(); });
+            layer.on("mouseout", function () { layer.closePopup(); });
+        }
+        return;
+    };
+
+    var showFeatures = function (features) {
+        localThis.features_layer = L.geoJson(features, {
+            style: function (feature) {
+                return localThis.feature_renderer(feature);
+            },
+            onEachFeature: onEachFeature,
+            pane: "specialFX"
+        }).addTo(window.MAP);
+    };
+
+    var hideFeatures = function () {
+        tryRemoveGeometry(localThis.features_layer);
+    };
+
+    var addToArray = function () {
+        /*добавляем в массив, в див и во все остальные места*/
+        localThis.parent.historyElements.splice(0, 0, localThis);
+        $('[data-elem="request-history-container"]', localThis.parent.selfelement).prepend(localThis.listelement);
+        $('[data-elem="request-elem-results"]', localThis.parent.selfelement).prepend(localThis.resultelement);
+    };
+
+    this.setColor = function (color) {
+
+        if (typeof color !== "undefined") {
+            localThis.listelement.find(".color-status").css({ "background-color": color });
+            if (localThis.data.PolygonSymbol) {
+                localThis.data.PolygonSymbol.color = color;
+            }
+        }
+        else {
+            localThis.listelement.find(".color-status").css({ "background-color": "#3D91DE" });
+        }
+
+        if (localThis.data.Polygon !== null && typeof localThis.data.Polygon !== "undefined") {
+            try {
+
+                localThis.data.PolygonSymbol.color = color;
+                /*180 меридиан, убираю бордер*/
+                localThis.data.Polygon.setStyle({
+                    stroke: true,
+                    color: color,
+                    weight: 1.5,
+                    opacity: 0.9,
+                    fill: true,
+                    fillColor: color,
+                    fillOpacity: 0.3,
+                    clickable: false,
+                    interactive: false
+                });
+            } catch (e) {
+                DoNothing();
+            }
+        }
+    };
+
+    var fillListItem = function () {
+        /*заполняем хтмл данными из data*/
+        $('[data-elem="name"]', localThis.listelement).html(localThis.data.Name || "");
+        $('[data-elem="date"]', localThis.listelement).html(localThis.data.RecdateStr || "");
+        localThis.listelement.attr("id", localThis.data.Uid);
+    };
+
+    this.loadData = function () {
+        /*грузит все данные одного отчёта с сервака на клиент*/
+
+        if (localThis.isLoaded && localThis.data.Status === "done") {
+            return $.Deferred().resolve();
+        }
+
+        var mydata = {
+            login: window.UserModule.userData.Info.Login,
+            "uid": localThis.data.Uid
+        };
+        var service = "GetOne";
+
+        if (localThis.data.SharedToken && localThis.data.UserId != window.UserModule.userData.Info.Login) {
+            mydata = {
+                shared_token: localThis.data.SharedToken
+            };
+            service = "GetOneBySharedToken";
+        }
+
+        var query = DoWebApiAction("/RequestHistory/" + service, mydata);
+
+        return $.when(query).done(function (r1) {
+            if (r1.status === "success") {
+                localThis.data = r1.results;
+                moment.locale(gltxt("_locale"));
+                var a = moment.utc(localThis.data.Recdate).toDate();
+                localThis.data.RecdateStr = moment(a).local().format("LLL");
+
+                if (localThis.data.Point !== null) {
+
+                    if (localThis.data.Tooltype === "info-multi-point") {
+
+                        localThis.data.Points = [];
+                        localThis.data.Point.coordinates.forEach(function (elem) {
+                            var point = {
+                                "type": "Point",
+                                "coordinates": elem
+                            };
+                            var pt = L.geoJson(point, { style: function () { return localThis.parent.markerStyle } });
+                            pt.options.Uid = localThis.data.Uid;
+                            localThis.data.Points.push(pt);
+                        });
+                    } else {
+
+                        localThis.data.Point = L.geoJson(localThis.data.Point, { style: function () { return localThis.parent.markerStyle } });
+                        localThis.data.Point.options.Uid = localThis.data.Uid;
+                    }
+
+                }
+
+                if (localThis.data.Polygon !== null) {
+
+                    if (localThis.data.Tooltype === "info-multi-point") {
+
+                        localThis.data.Polygons = [];
+                        localThis.data.Polygon.coordinates.forEach(function (elem) {
+                            var poly = {
+                                "type": "Polygon",
+                                "coordinates": elem
+                            };
+                            var pl = L.geoJson(poly);
+                            pl.options.Uid = localThis.data.Uid;
+                            localThis.data.Polygons.push(pl);
+                        });
+                    } else {
+                        console.log("convertLongitudesTo360", deepCopy(localThis.data.Polygon));
+                        var poly_json = convertLongitudesTo360(deepCopy(localThis.data.Polygon));
+                        localThis.data.Polygon = L.geoJson(poly_json);
+                        localThis.data.Polygon.options.Uid = localThis.data.Uid;
+                    }
+
+                }
+
+                var content = localThis.data.ReportContent;
+
+                if (localThis.data.Tooltype === "info-kvadratgimts") {
+
+                    if (content !== null && content.hasOwnProperty("Values") && content.Values.length > 0) {
+                        content.Values.forEach(function (item) {
+                            localThis.data.features = [];
+                            localThis.data.features.length = 0;
+                            localThis.data.features = item.Values[0].kvadrats;
+
+                            showFeatures(localThis.data.features);
+                        });
+                    }
+
+                }
+                if (localThis.data.Tooltype === "info-kvadratgitoshkent" || localThis.data.Tooltype === "info-kvadratgikcell") {
+
+                    if (content !== null && content.hasOwnProperty("Values") && content.Values.length > 0) {
+                        content.Values.forEach(function (item) {
+                            localThis.data.features = [];
+                            localThis.data.features.length = 0;
+                            localThis.data.features = item.Values[0].kvadrats;
+
+                            showFeatures(localThis.data.features);
+                        });
+                    }
+
+                }
+
+            }
+        });
+    };
+
+    var deleteRightPanel = function () {
+        /*удаляет правую панель*/
+        localThis.result.remove();
+    };
+
+    this.select = function () {
+        /*выбирает элемент*/
+        localThis.result.setWaiter();
+
+        localThis.loadData().then(function () {
+            localThis.isLoaded = true;
+            localThis.result.renderData();
+            localThis.result.show();
+            localThis.drawGraphics();
+        });
+
+        if (window.detectMobile() == "mobile") {
+            var showAllSelectedReport = document.createElement("span");
+            showAllSelectedReport.classList.add("btn-show-all-selected-report");
+            showAllSelectedReport.setAttribute("action", "showAllSelectedReport");
+            showAllSelectedReport.innerHTML = "Показать выбранные отчеты";
+            showAllSelectedReport.addEventListener("click", function () {
+                localThis.parent.dialogWindow.selfelement.find(".right-panel").attr("data-isOpen", true);
+            });
+
+            var Lbox = localThis.parent.dialogWindow.listActions[0].querySelectorAll(".left-container")[0];
+            var Rbox = localThis.parent.dialogWindow.listActions[0].querySelectorAll(".right-container")[0];
+
+            if (!checkSelectedReports()) {
+                /*Скроем все кнопки в футоре */
+                Lbox.setAttribute("data-disable", true);
+                Rbox.setAttribute("data-disable", true);
+                /*Добавим кнопку "Показать отчеты" */
+                localThis.parent.dialogWindow.listActions[0].append(showAllSelectedReport);
+            }
+        }
+
+        localThis.parent.selectedUids.push(localThis.data.Uid);
+        localThis.selected = true;
+        localThis.listelement.find('[data-elem="select"]').attr("data-active", "1");
+        localThis.listelement.addClass("selected");
+        localThis.parent.dialogWindow.resize();
+        localThis.parent.selectionChanged();
+        
+    };
+
+    this.unselect = function () {
+        /*отменяет выборку элемента (делает его невыбранным)*/
+        if (!localThis.selected) return;
+        localThis.selected = false;
+        deleteRightPanel();
+        localThis.listelement.find('[data-elem="select"]').attr("data-active", "0");
+        localThis.listelement.removeClass("selected");
+        localThis.clearGraphics();
+        localThis.parent.selectionChanged();
+
+
+        if (window.detectMobile() == "mobile") {
+            var indexUid = localThis.parent.selectedUids.indexOf(localThis.data.Uid);
+            localThis.parent.selectedUids.splice(indexUid, 1);
+
+            console.log(localThis.data.Uid);
+            console.log(localThis.parent.selectedUids);
+
+            var Lbox = localThis.parent.dialogWindow.listActions[0].querySelectorAll(".left-container")[0];
+            var Rbox = localThis.parent.dialogWindow.listActions[0].querySelectorAll(".right-container")[0];
+
+            if (!checkSelectedReports()) {
+                Lbox.removeAttribute("data-disable", true);
+                Rbox.removeAttribute("data-disable", true);
+                localThis.parent.dialogWindow.listActions[0].querySelectorAll("[action=showAllSelectedReport]")[0].remove();
+            }
+        }
+    };
+
+    this.repeat = function () {
+        /*повторить отчёт*/
+        if (!localThis.selected) return;
+
+        var request = {};
+        request.Login = window.UserModule.userData.Info.Login;
+        request.Tooltype = localThis.data.Tooltype;
+        request.Metadata = {
+            ToolName: localThis.data.ReportMetadata.ToolName,
+            Location: localThis.data.ReportMetadata.Location,
+            Area: localThis.data.ReportMetadata.Area,
+            Perimeter: localThis.data.ReportMetadata.Perimeter,
+            Buffer: localThis.data.ReportMetadata.Buffer
+        };
+        request.Address = localThis.data.Address;
+        request.Name = gl.text.copy_of + " - " + localThis.data.Name;
+        request.Point = getPreparedGeoJsonAsObject(localThis.data.Point);
+        request.Line = localThis.data.Line;
+        request.Polygon = getPreparedGeoJsonAsObject(localThis.data.Polygon);
+        request.GeointellectLayers = window.layerListPanel.getEnabledLayers();
+        request.UserLayers = window.layerListPanel.getEnabledUserLayers();
+
+        window.mapModule01.infopanel.setTitle(gltxt(localThis.data.ReportMetadata.ToolName));
+        var content = $("<div/>");
+        window.mapModule01.infopanel.setContent(content);
+        window.mapModule01.infopanel.show();
+        window.mapModule01.infopanel.setStatus(gl.text.please_wait_for_operation_to_complete, false, true);
+
+        window.mapModule01.infopanel.onclose = [];
+        window.mapModule01.infopanel.onclose.length = 0;
+
+        window.mapModule01.infopanel.graphics = [];
+        window.mapModule01.infopanel.graphics.length = 0;
+
+        window.mapModule01.infopanel.wait();
+
+        var repeater = {};
+
+        repeater.options = {
+            startPoint: undefined
+        };
+
+        doIndoRequestUniversal(repeater, request);
+
+    };
+
+    var checkSelectedReports = function () {
+        var selected;
+        localThis.parent.selectedUids.length > 0 ? selected = true : selected = false;
+        return selected
+    };
+
+    this.zoomToGraphics = function () {
+        /*приблизить к полигону*/
+        if (localThis.data.Polygons !== undefined && localThis.data.Polygons !== null) {
+            if (localThis.data.Polygons.length) {
+                window.MAP.fitBounds(localThis.data.Polygons[0].getBounds());
+                window.MAP.invalidateSize();
+            }
+        }
+        if (localThis.data.Polygon !== null) {
+            console.log(localThis.data.Polygon);
+            window.MAP.fitBounds(localThis.data.Polygon.getBounds());
+            window.MAP.invalidateSize();
+        }
+    };
+
+    this.highlightResult = function () {
+        /*подсветить результат в правой панели и проскроллировать туда*/
+        if (localThis.isLoaded && localThis.selected) {
+            /*если данные загружены и галочка включена, то */
+            /*прокрутить правую часть до нашего элемента*/
+            var elemtop = localThis.result.selfelement.position().top;
+            var pelemtop = localThis.result.selfelement.parent("[data-elem=request-elem-results]").position().top;
+            var realtop = "" + (Math.abs(pelemtop - elemtop)) + "px";
+
+            localThis.zoomToGraphics();
+
+            var polygon_symbol = JSON.parse(localThis.data.PolygonSymbol ?? "{\"color\":\"#3D91DE\"}");
+            /*180 меридиан, убираю бордер*/
+            var orig = {
+                stroke: true,
+                color: polygon_symbol.color,
+                weight: 1.5,
+                opacity: 0.9,
+                fill: true,
+                fillColor: polygon_symbol.color,
+                fillOpacity: 0.3,
+                clickable: false,
+                interactive: false
+            };
+            var high = $.extend(true, {}, orig);
+            high.fillColor = '#d2cc0a';
+
+            $(".right-panel .scroll-container", window.requestHistoryModule.dialogWindow.selfelement).slimScroll({ scrollTo: realtop });
+            localThis.result.selfelement.addClass("bg-color-secondary");
+            if (localThis.data.Polygon !== null) {
+                localThis.data.Polygon.setStyle(high);
+            }
+            $.wait(function () {
+                localThis.result.selfelement.removeClass("bg-color-secondary");
+                if (localThis.data.Polygon !== null) {
+                    localThis.data.Polygon.setStyle(orig);
+                }
+                $.wait(function () {
+                    localThis.result.selfelement.addClass("bg-color-secondary");
+                    if (localThis.data.Polygon !== null) {
+                        localThis.data.Polygon.setStyle(high);
+                    }
+                    $.wait(function () {
+                        localThis.result.selfelement.removeClass("bg-color-secondary");
+                        if (localThis.data.Polygon !== null) {
+                            localThis.data.Polygon.setStyle(orig);
+                        }
+                        $.wait(function () {
+                            localThis.result.selfelement.addClass("bg-color-secondary");
+                            if (localThis.data.Polygon !== null) {
+                                localThis.data.Polygon.setStyle(high);
+                            }
+                            $.wait(function () {
+                                localThis.result.selfelement.removeClass("bg-color-secondary");
+                                if (localThis.data.Polygon !== null) {
+                                    var n = localThis.result.parent.data.ReportMetadata.ToolName;
+                                    if (n === "tool_info_point") {
+                                        localThis.data.Polygon.setStyle(emptyPolyStyle);
+                                    } else {
+                                        localThis.data.Polygon.setStyle(orig);
+                                    }
+                                }
+                            }, 200);
+                        }, 200);
+                    }, 200);
+                }, 200);
+            }, 200);
+        }
+    };
+
+    this.drawGraphics = function () {
+
+        var tt = localThis.result.parent.data.Tooltype;
+        
+        if (localThis.data.Polygon !== null) {
+            if (tt === "info-point") {
+                localThis.data.Polygon.setStyle(emptyPolyStyle);
+            } else if (tt === "info-multi-point") {
+                localThis.data.Polygons.forEach(function (elem) {
+                    elem.setStyle(emptyPolyStyle);
+                    elem.addTo(window.MAP);
+                });
+            }
+            else {
+
+                var _symbol = JSON.parse(localThis.data.PolygonSymbol);
+                /*180 меридиан, убираю бордер*/
+                localThis.data.Polygon.setStyle({
+                    stroke: true,
+                    color: _symbol.color,
+                    weight: 2,
+                    opacity: 0.9,
+                    fill: true,
+                    fillColor: _symbol.color,
+                    fillOpacity: 0.3,
+                    clickable: false,
+                    interactive: false
+                });
+            }
+
+            if (tt !== "info-multi-point") {
+                localThis.data.Polygon.addTo(window.MAP);
+            }
+
+        }
+
+        /*потом линии*/
+        if (localThis.data.Polyline) {
+            localThis.data.Polyline.addTo(window.MAP);
+        }
+
+        /*и потом точки*/
+        if (localThis.data.Points) {
+            localThis.data.Points.forEach(function (elem) {
+                elem.addTo(window.MAP);
+            });
+        }
+        else if (localThis.data.Point) {
+            localThis.data.Point.addTo(window.MAP);
+        }
+
+        localThis.zoomToGraphics();
+    };
+
+    var clearPoint = function () {
+        tryRemoveGeometry(localThis.data.Point);
+    };
+
+    var clearLine = function () {
+        tryRemoveGeometry(localThis.data.Polyline);
+    };
+
+    var clearPolygon = function () {
+        tryRemoveGeometry(localThis.data.Polygon);
+    };
+
+    var clearPoints = function () {
+        if (localThis.data.Points !== undefined && localThis.data.Points !== null) {
+            localThis.data.Points.forEach(function (elem) {
+                tryRemoveGeometry(elem);
+            });
+        }
+    };
+    
+    var clearPolygons = function () {
+        if (localThis.data.Polygons !== undefined && localThis.data.Polygons !== null) {
+            localThis.data.Polygons.forEach(function (elem) {
+                tryRemoveGeometry(elem);
+            });
+        }
+    };
+    
+    this.clearGraphics = function () {
+        clearPoint();
+        clearPolygon();
+        clearLine();
+        clearPoints();
+        clearPolygons
+        hideFeatures();
+    };
+
+    var itemSelected = function (e) {
+        /*вызывается при нажатии галочки*/
+        if (localThis.selected) {
+            localThis.unselect();
+        } else {
+            localThis.select();
+        }
+        localThis.parent.selectionChanged();
+    };
+
+    this.destroy = function () {
+        /*удаляет элемент отовсюду на клиенте*/
+        localThis.unselect();
+        localThis.listelement.remove();
+        localThis.result.remove();
+        localThis.resultelement.remove();
+        localThis.data = null;
+        localThis.parent.historyElements =
+            $.grep(localThis.parent.historyElements,
+                function (o, i) { return o.data === null; },
+                true);
+        var count = window.requestHistoryModule.historyElements.length;
+        window.requestHistoryModule.setRibbonValueFx(count);
+    };
+
+    var itemDeleted = function (e) {
+        /*вызывается при нажатии икса (удаление)*/
+        var hhttmmll = gl.text.rep_realy_delete_report.replace("{0}", localThis.data.Name);
+
+        var b = {
+            type: "ok",
+            action: function () {
+                var mydata = {
+                    login: window.UserModule.userData.Info.Login,
+                    "uid": localThis.data.Uid
+                };
+
+                itemSemiHide();
+                var query = DoWebApiAction("/RequestHistory/Delete", mydata);
+                query.done(function (r1) {
+                    if (r1.status === "success") {
+                        $.wait(function () {
+                            localThis.listelement.transit({ duration: 300, "margin-left": "300px", "height": "10px" }, function () {
+                                localThis.destroy();
+                            });
+                           
+                        }, 1000);
+                    } else {
+                        alert(gl.text.error_try_again_later);
+                    }
+                });
+            },
+            title: "",
+            text: "Ок",
+            icon: false,
+            "class": "btn_confirm"
+
+        };
+
+        var n = {
+            type: "skip",
+            action: function () {
+
+            },
+            title: "",
+            text: gl.text.cancel,
+            icon: false,
+            "class": "btn_confirm customAlertBtnCancel"
+        };
+
+        customConfirm(hhttmmll, null, [b, n], 400, 120);
+    };
+
+    var itemSemiHide = function () {
+        /*перед удалением наполовину прячет элемент, чтобы его нельзя было включить или повторно удалить*/
+        localThis.listelement.transit({ duration: 300, "margin-left": "100px" });
+        localThis.listelement.css({ "border-bottom": "1px none transparent" });
+        $('[data-elem="delete-item"]', localThis.listelement).remove();
+        $('[data-elem="select"]', localThis.listelement).unbind();
+        $('[data-elem="select"]', localThis.listelement).attr("data-active", "-1");
+    };
+
+    var bindEvents = function () {
+        /*привязываем к кнопкам разные события, типа кликов*
+
+        /*клик по галочке*/
+        $('[data-elem="select"]', localThis.listelement).click(function (e) {
+            itemSelected(e);
+        });
+
+        /*клик по диву*/
+        $(localThis.listelement).click(function (e) {
+            if (e.target.className.indexOf("select-item") === -1 && e.target.className.indexOf("delete-item") === -1) {
+                localThis.highlightResult();
+            }
+        });
+
+        /*клик по удалялке*/
+        $('[data-elem="delete-item"]', localThis.listelement).click(function (e) {
+            itemDeleted(e);
+        });
+    };
+
+    var checkDataIsFull = function (data) {
+        /*проверка данных на то, всё ли есть внутри объекта или только часть*/
+        /*у нас же два варианта есть*/
+        /*1 - малая часть данных (при загрузке списка с сервера в самом начале)*/
+        /*2 - полный комплект, со скриншотом, с геометриями и пр.*/
+        var result = true;
+
+        if (data.ScreenshotUid) result = false;
+        if (data.ScreenshotUid === "") result = false;
+        if (data.ScreenshotUid === null) result = false;
+        /*todo:потом можно ещё других проверок добавить*/
+        return result;
+    };
+
+    this.collapse = function () {
+        localThis.listelement.css({ display: "none" });
+        localThis.expanded = false;
+    };
+
+    this.expand = function () {
+        localThis.listelement.css({ display: "inline-block" });
+        localThis.expanded = true;
+    };
+
+    var init = function (data) {
+
+        localThis.listelement = localThis.parent.listItemTemplate.clone();
+        localThis.resultelement = localThis.parent.resultItemTemplate.clone();
+        localThis.result = new RightPanel(localThis);
+        localThis.data = data;
+
+        if ((localThis.data.is_shared && UserModule.userData.Info.Id != data.UserId) || (localThis.data.SharedToken !== null && localThis.data.SharedToken !== "" && UserModule.userData.Info.Id != data.UserId)) {
+            localThis.listelement.find(".data-delete").remove();
+            localThis.listelement[0].setAttribute("data-shared",true);
+        }
+
+        moment.locale("ru");
+        var a = moment.utc(localThis.data.Recdate).toDate();
+        localThis.data.RecdateStr = moment(a).local().format("LLL");
+
+        if (checkDataIsFull(data)) {
+            /*если данные полные, говорим, то с сервера грузить больше ничего не нужно*/
+            localThis.isLoaded = true;
+
+            if (localThis.data.Point !== undefined) {
+                localThis.data.Point = getLlObjectFromGeoJson(localThis.data.Point);
+                localThis.data.Point.options.Uid = localThis.data.Uid;
+            }
+            
+            if (localThis.data.Polygon !== undefined) {
+                localThis.data.Polygon = getLlObjectFromGeoJson(localThis.data.Polygon);
+                localThis.data.Polygon.options.Uid = localThis.data.Uid;
+            }            
+        }
+
+        /*TODO: вставил чек потому что падало. 11.10.23*/
+        if(localThis.data.PolygonSymbol) {
+            var polygon_symbol = JSON.parse(localThis.data.PolygonSymbol);
+    
+            if (polygon_symbol === null) {
+                polygon_symbol = { color: "#3d91de" };
+            }
+    
+            localThis.setColor(polygon_symbol.color);
+        }
+
+        fillListItem();
+        bindEvents();
+        addToArray();
+
+    };
+
+    init(_data);
+
+};
+
+function RightPanel(parent) {
+    var localThis = this;
+    this.parent = parent;
+    this.selfelement = this.parent.resultelement;
+    this.template = this.parent.parent.resultItemTemplate;
+    this.attributesPanel = null;
+ 
+    var maxLen = 250;
+
+    if (this.parent.selected) {
+        this.selfelement.css({ display: "inline-block" });
+    } else {
+        this.selfelement.css({ display: "none" });
+    }
+
+    /*добавляет ждалку в правую панель одного отчёта*/
+    this.setWaiter = function () {
+        localThis.selfelement.children().remove();
+        var spinner = $('<div class="spinner"><div class="bounce1 bg-color-primary"></div><div class="bounce2 bg-color-primary"></div><div class="bounce3 bg-color-primary"></div></div>', localThis.selfelement);
+        localThis.selfelement.append(spinner);
+    };
+
+    /*сгенерить метаданные из свойства ReportMetadata*/
+    var renderMetadata = function () {
+
+        var dt = localThis.parent.data;
+        var md = dt.ReportMetadata;
+
+        var content = $("<div/>").addClass("metadata-block");
+        var container = $("<div/>").addClass("container").append(
+            $("<span/>", { "class": "down" })
+        );
+
+        container.append(renderMetadataWideBlock(gl.text.rep_tool, isNull(gltxt(md.ToolName), gl.text.empty1)));
+
+        container.append(renderMetadataWideBlock(gl.text.location, isNull(md?.Location?.Caption, gl.text.empty1)));
+
+        if (typeof dt.Point !== "undefined" && dt.Tooltype !== "info-polygon") {
+            try {
+                var point = dt.Point._layers;
+
+                for (var pprop in point) {
+                    if (point[pprop].hasOwnProperty("_latlng")) {
+                        var coords = point[pprop]._latlng;
+                        var lon = coords.lng.toFixed(5);/*долгота*/
+                        var lat = coords.lat.toFixed(5);/*широта*/
+                        content.append(renderMetadataWideBlock(gl.text.coordinates, "" + lat + " " + lon));
+                    }
+                }
+            } catch (e) {
+                DoNothing();
+            }
+        }
+
+        content.append(container);
+
+        switch (dt.Tooltype) {
+            case "info-polygon":
+                localThis.convertArea(md.Area, content);
+                break;
+            case "info-radius":
+            case "info-radius-batch":
+                localThis.convertArea(md.Area, content);
+                content.append(renderMetadataWideBlock(gl.text.radius, md.Buffer.format(2, ".", " "), "(" + gl.text.meters_short + ")"));
+                break;
+            case "info-point":
+                DoNothing();
+                break;
+            case "info-multi-point":
+                DoNothing();
+                break;
+            case "info-transport-area":
+            case "info-transport-area-batch":
+            case "info-pesh-area":
+            case "info-pesh-area-batch":
+                localThis.convertArea(md.Area, content);
+                content.append(renderMetadataWideBlock(gl.text.zone_size, md.Buffer, "(" + gl.text.minutes1 + ")"));
+                break;
+            case "info-kvadratgikcell":
+            case "info-kvadratgimts":
+                content.append(renderMetadataWideBlock(gl.text.zone_size, md.Area.format(0, ".", " "), "(" + gl.text.minutes1 + ")"));
+                break;
+            case "info-kvadratgitoshkent":
+                content.append(renderMetadataWideBlock(gl.text.zone_size, md.Area.format(0, ".", " "), "(" + gl.text.minutes1 + ")"));
+                break;
+            case "kvadratmts_layers":
+                content.find("[action=refresh]").css({ display: "none" });
+                /*добавить детали*/
+                break;
+            default:
+                break;
+        }
+
+        content.append(renderMetadataWideBlock(gl.text.details, isNull(md.Details, gl.text.empty1)));
+
+        return content;
+    };
+
+    var renderMetadataBlock = function (caption, info, edizm) {
+        if (typeof edizm === "undefined") {
+            edizm = "";
+        }
+        return $("<span class='metadata-block'><b class=font-p1>" + caption + ":</b> " + info + " " + edizm + "</span>");
+    };
+
+    var renderMetadataWideBlock = function (caption, info, edizm) {
+        if (typeof edizm === "undefined") {
+            edizm = "";
+        }
+        return $("<span class='metadata-wide-block'><b class=font-p1>" + caption + ":</b> " + info + " " + edizm + "</span>");
+    };
+
+    /*генерит таблицу со статистикой*/
+    var renderStatistics = function () {
+        var content = $("<table/>").addClass("stat-table-block");
+        var st = localThis.parent.data.ReportContent.Stats;
+        if (st === null) {
+            content.html("<b class='font-error'>" + gl.text.rep_msg_no_stat_info + "</b>");
+            return content;
+        }
+
+        /*делаем шапку таблицы для стат записей*/
+        var th = $("<tr/>").addClass("trh");
+        th.append($("<td/>").addClass("bg-main").addClass("font-default").html("№"));
+        th.append($("<td/>").addClass("bg-main").addClass("font-default").html(gl.text.parameter));
+        th.append($("<td/>").addClass("bg-main").addClass("font-default").html(gl.text.value));
+        content.append(th);
+
+        /*бежим по всем стат.записям и добавляем их в таблицу*/
+        var i = 0;
+
+        st.forEach(function (o) {
+
+            var tr = $("<tr/>");
+
+            var ddd = {};
+            if (o.hasOwnProperty("data")) {
+                ddd = JSON.parse(o["data"]);
+            }
+
+            if (!ddd.hasOwnProperty("type")) {
+                ddd["type"] = "";
+            }
+
+            if (ddd["type"] !== "popd") {
+
+                i++;
+
+                var _value = o.Value.format(0, ".", " ");
+                var _units = gltxt(o.TextRepresentation, false);
+                if (_units != "") {
+                    _units = " (" + _units + ")";
+                }
+
+                if (o.Parameter === "POP_IN_ZONE") {
+                    tr.append($("<td/>").addClass("td1 font-error font-bold").html(i));
+                    tr.append($("<td/>").addClass("td2 font-error font-bold").html(gltxt(o.Parameter) + _units));
+                    tr.append($("<td/>").addClass("td3 font-error font-bold").html(_value));
+                }
+                else if (o.Parameter === "POP_FAMILY_INCOME") {
+                    tr.append($("<td/>").addClass("td1").html(i));
+                    tr.append($("<td/>").addClass("td2").html(gltxt(o.Parameter) + _units));
+                    tr.append($("<td/>").addClass("td3").html(_value + "<span class='helper' data-parameter='POP_FAMILY_INCOME' action='helper'></span>"));
+                }
+                else {
+                    if (Math.abs(o.Value) < 1) {
+                        _value = o.Value.format(2, ".", " ");
+                    }
+                    tr.append($("<td/>").addClass("td1").html(i));
+                    tr.append($("<td/>").addClass("td2").html(gltxt(o.Parameter) + _units));
+                    tr.append($("<td/>").addClass("td3").html(_value));
+                    /*
+                    tr.append($("<td/>").addClass("td1").html(i));
+                    tr.append($("<td/>").addClass("td2").html(gltxt(o.Parameter) + _units));
+                    tr.append($("<td/>").addClass("td3").html(o.Value != -1 ? _value : ""));
+                    */
+                }
+
+                content.append(tr);
+            }
+        });
+
+        content.find("[action=helper]").on("click", function () {
+            var param = $(this).attr("data-parameter");
+            var _html = "";
+            if (param == "POP_FAMILY_INCOME") {
+                _html = '<span style="text-align: left; display: block; "> <b>Расчет среднего дохода на семью из двух работающих по махаллям</b><br><br> Исходные данные:<br> А) Слой объявлений о сдаче квартир в аренду.<br> Б) Слой границ махалля<br> Алгоритм расчета среднего дохода на семью из двух работающих выглядит так: <br>  •  В базе данных объявлений о сдаче квартир в аренду рассчитывается стоимость аренды 1 кв.м. для каждого объявления<br> •  Для каждого объявления вычисляется махалля, в которую попало объявление<br> •  По каждой махалля вычисляется средняя стоимость аренды 1 кв.м и стандартное отклонение стоимости аренды 1 кв.м<br> •  Для каждого объявления определяется, является ли оно выбросом<br> •  Для каждой махалля вычисляется средняя стоимость аренды 1 кв.м. по объявлениям, которые не являются выбросами<br> •  По всему городу вычисляется средняя стоимость аренды 1 кв.м. по объявлениям, которые не являются выбросами <br> •  Для каждой махалля вычисляется средний доход семьи из двух работающих по следующей формуле<br></span>';
+            }
+            alert(_html);
+        });
+        if (st.length === 0) {
+            content.html("<b class='font-error'>" + gl.text.rep_msg_no_stat_info + "</b>");
+        }
+
+        return content;
+    };
+
+    var getDetailedPopData = function (stats) {
+
+        var data = [];
+        if (isArray(stats)) {
+            stats.forEach(function (item) {
+                if (item.hasOwnProperty("data")) {
+                    var ddd = JSON.parse(item["data"]);
+                    if (ddd.hasOwnProperty("type") && ddd["type"] === "popd") {
+                        data.push(ddd);
+                    }
+                }
+            });
+        } else {
+            return null;
+        }
+
+        if (data.length === 0) {
+            return null;
+        }
+
+        var maxp = data.reduce(function (a, b) { return Math.max(a, b.amount); }, 0);
+        var mdat = data.filter(function (d) { return d.sex === 0; }).sort(function (a, b) { return a.from - b.from; });
+        var fdat = data.filter(function (d) { return d.sex === 1; }).sort(function (a, b) { return a.from - b.from; });
+
+        var labels = [];
+        var mdata = [];
+        var fdata = [];
+
+        labels.push("x");
+        mdata.push("male");
+        fdata.push("female");
+
+        var idx_last = mdat.length - 1;
+
+        for (var idxx = 0; idxx <= idx_last; idxx++) {
+
+            var mitem = mdat[idxx];
+            var fitem = fdat[idxx];
+
+            mdata.push(mitem.amount);
+
+            fdata.push(fitem.amount);
+
+            var lbl = "";
+
+            if (idxx === 0) {
+                lbl = "до " + mitem.to;
+            }
+            else if (idxx === idx_last) {
+                lbl = "" + mitem.from + "+";
+            }
+            else {
+                lbl = "" + mitem.from + "-" + mitem.to;
+            }
+
+            labels.push(lbl);
+
+        }
+
+        var dresult = {
+            labels: labels,
+            mdata: mdata,
+            fdata: fdata
+        };
+
+        return dresult;
+    };
+
+    var getSexCharData = function (in_array) {
+        var out_array = [];
+        var uzhe_bilo = false;
+        in_array.forEach(function (item) {
+            if (item.key === gltxt("wemen")) {
+                out_array.push([item.key, item.value]);
+            }
+            else if (item.key === gltxt("men")) {
+                out_array.push([item.key, item.value]);
+            }
+            else if (item.key === gltxt("undefined") && uzhe_bilo === false && out_array.length > 0) {
+                uzhe_bilo = true;
+                out_array.push([item.key, item.value]);
+            }
+        });
+        return out_array;
+    };
+
+    var getTypeCharData = function (in_array) {
+        var out_array = [];
+        in_array.forEach(function (item) {
+            if (item.key === gltxt("workers")) {
+                out_array.push([item.key, item.value]);
+            }
+            else if (item.key.toLowerCase().indexOf("трафик") !== -1) {
+                out_array.push([item.key, item.value]);
+            }
+            else if (item.key === gltxt("residents")) {
+                out_array.push([item.key, item.value]);
+            }
+        });
+        return out_array;
+    };
+
+    var getIncomeCharData = function (in_array) {
+        var out_array = [];
+        var uzhe_bilo = false;
+        in_array.forEach(function (item) {
+            if (item.key.indexOf("рублей") !== -1) {
+                out_array.push([item.key, item.value]);
+                uzhe_bilo = true;
+            }
+            else if (uzhe_bilo === true) {
+                out_array.push([item.key, item.value]);
+            }
+        });
+        return out_array;
+    };
+
+    var getAgeCharData = function (in_array) {
+        var out_array = [];
+        var uzhe_bilo = false;
+        in_array.forEach(function (item) {
+            if (item.key.indexOf(gltxt("years")) !== -1) {
+                out_array.push([item.key, item.value]);
+                uzhe_bilo = true;
+            } else if (item.key.indexOf("рублей") !== -1) {
+                uzhe_bilo = false;
+            }
+            else if (uzhe_bilo === true) {
+                out_array.push([item.key, item.value]);
+            }
+        });
+        return out_array;
+    };
+
+    var renderKvadratMtsTotalCharts = function (div) {
+
+        var dt = localThis.parent.data;
+        var uuid = dt.Uid;
+        var md = dt.ReportMetadata;
+        var rc = dt.ReportContent;
+        var vals = rc.Values;
+
+        if (vals === null || vals.length <= 0) {
+            div.append($("<b class='font-error'>"+gltxt("no_data")+"</b>"));
+            return;
+        }
+
+        var type_data = getTypeCharData(vals[0].Values[0].total);
+        var sex_data = getSexCharData(vals[0].Values[0].total);
+        var income_data = getIncomeCharData(vals[0].Values[0].total);
+        var age_data = getAgeCharData(vals[0].Values[0].total);
+
+        if (type_data.length > 0) {
+
+            var divType = $("<div class='boo' style='display:inline-block;width:300px;height:300px' id='charttype" + uuid + "'/>");
+            div.append(divType);
+
+            setTimeout(function () {
+                var type_chart = c3.generate({
+                    bindto: "#charttype" + uuid,
+                    size: {
+                        height: 300,
+                        width: 300
+                    },
+                    data: {
+                        columns: type_data,
+                        type: 'donut',
+                        onclick: function (d, i) {  },
+                        onmouseover: function (d, i) {  },
+                        onmouseout: function (d, i) {  }
+                    },
+                    donut: {
+                        title: "Тип"
+                    }
+                });
+            }, 200);
+        }
+
+        if (sex_data.length > 0) {
+
+            var divSex = $("<div class='boo' style='display:inline-block;width:300px;height:300px' id='chartsex" + uuid + "'/>");
+            div.append(divSex);
+
+            setTimeout(function () {
+                var sex_chart = c3.generate({
+                    bindto: "#chartsex" + uuid,
+                    size: {
+                        height: 300,
+                        width: 300
+                    },
+                    data: {
+                        columns: sex_data,
+                        type: 'donut',
+                        onclick: function (d, i) {  },
+                        onmouseover: function (d, i) {  },
+                        onmouseout: function (d, i) {  }
+                    },
+                    donut: {
+                        title: "Пол"
+                    }
+                });
+            }, 200);
+        }
+
+        if (age_data.length > 0) {
+
+            var divAge = $("<div class='boo' style='display:inline-block;width:1000px;height:200px' id='chartage" + uuid + "'/>");
+            div.append(divAge);
+
+            setTimeout(function () {
+                var age_chart = c3.generate({
+                    bindto: "#chartage" + uuid,
+                    size: {
+                        height: 200,
+                        width: 600
+                    },
+                    data: {
+                        columns: age_data,
+                        type: 'bar',
+                        onclick: function (d, i) { },
+                        onmouseover: function (d, i) {  },
+                        onmouseout: function (d, i) {  }
+                    },
+                    axis: {
+                        rotated: true
+                    },
+                    donut: {
+                        title: "Возраст"
+                    }
+                });
+            }, 200);
+        }
+
+        if (income_data.length > 0) {
+
+            var divIncome = $("<div class='boo' style='display:inline-block;width:1000px;height:200px' id='chartincome" + uuid + "'/>");
+            div.append(divIncome);
+
+            setTimeout(function () {
+                var income_chart = c3.generate({
+                    bindto: "#chartincome" + uuid,
+                    size: {
+                        height: 200,
+                        width: 1000
+                    },
+                    data: {
+                        columns: income_data,
+                        type: 'bar',
+                        onclick: function (d, i) {  },
+                        onmouseover: function (d, i) {  },
+                        onmouseout: function (d, i) {  }
+                    },
+                    axis: {
+                        rotated: true
+                    },
+                    donut: {
+                        title: "Доход"
+                    }
+                });
+            }, 200);
+        }
+    };
+
+    var getColorFromMtsLegend = function (_legend, value) {
+        var result = "#FF1A1A";
+        _legend.forEach(function (item) {
+            if (value >= item.min && value <= item.max) {
+                result = item.color;
+            }
+        });
+        return result;
+    };
+
+    function renderDetailedPopCharts(div, demographic_year) {
+        var dt = localThis.parent.data;
+        var uuid = dt.Uid;
+        var rc = dt.ReportContent;
+        var vals;
+
+        
+        if(!demographic_year) {
+            if(rc.DemographicStats) {
+                var keys = Object.keys(rc.DemographicStats);
+                if(keys.length){
+                    demographic_year = Object.keys(rc.DemographicStats)[0];
+                }
+            }
+        }
+
+        if(demographic_year) {
+            vals = getDetailedPopData(rc.DemographicStats[demographic_year]);
+        }
+        
+        if (!vals) {
+            vals = getDetailedPopData(rc.Stats)
+        }
+
+        if (!vals) return;
+        
+        var divid = "popdtype" + uuid;
+        
+        var wrapper = $("<div style='display: flex;' />");
+        div.append(wrapper);
+
+        var divType = $("<div class='boo' style='display:inline-block;width:100%;height:300px' id='" + divid + "'/>");
+        wrapper.append(divType);
+
+        /*Вставим дропбокс с годами */
+        if (UserModule.userData.Info.Id == localThis.parent.data.UserId) {
+            if (localThis.parent.parent.renderPopulationCounterDetailedYearsElements.length > 0) {
+                localThis.parent.parent.renderPopulationCounterDetailedYearsElements.forEach(function (_element) {
+                    var DemographicStats = localThis.parent.data.ReportContent.DemographicStats;
+                    if(DemographicStats) {
+                        var a = Object.keys(DemographicStats);
+                        if(a.length){                            
+                            var clone = _element.element.cloneNode(true);
+                            _element.clear(clone);
+                            _element.setYears(a,clone);
+                            clone.addEventListener("change", function () {
+                                var descr = document.querySelector('[data-elem="row-description-list"]');
+                                renderDetailedPopCharts(descr, this.value);
+                            });
+                        
+                            wrapper.append($(clone));
+                        }
+                    }
+                });
+            }
+        }
+      
+
+        setTimeout(function () {
+            var popd_chart = c3.generate({
+                bindto: "#popdtype" + uuid,
+                 size: {
+                     height: 300,
+                     width: 700
+                 },
+                padding: {
+                    left: 50,
+                    right: 50,
+                },
+                data: {
+                    x: 'x',
+                    columns: [
+                        vals.labels,
+                        vals.mdata,
+                        vals.fdata
+                    ],
+                    names: {
+                        male: gl.text.sex_male,
+                        female: gl.text.sex_female
+                    },
+                    type: 'area-spline',
+                    colors: {
+                        male: '#1e9bf5',
+                        female: '#ff9595'
+                    },
+                    labels: false
+                },
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    text: gl.text.rep_title_pop_structure
+                },
+                axis: {
+                    x: {
+                        type: 'category',
+                        tick: {
+                            rotate: -45,
+                            multiline: false
+                        },
+                        height: 70
+                    }
+                }
+            });
+
+            if (window.detectMobile() == "mobile") {
+                popd_chart.destroy();
+                div.append(renderDetailedPopulationTable(vals));
+            }
+
+        }, 200);
+
+       
+    };
+
+    /*Генерим табличку с населением для мобайла за место графика */
+    var renderDetailedPopulationTable = function (_data) {
+        var arr = [];
+        var aMale = [];
+        var aFemale = [];
+        var table = $("<table/>").append(
+            $("<tr/>").append(
+                $("<th/>", { colspan:"2" }).text(gl.text.rep_title_pop_structure),
+            )
+        ).addClass("detailed-population-table");
+       _data.labels.forEach(function (val, key) {
+           if (key == 0) return;
+           var oMale = {};
+           var oFemale = {};
+
+           oMale.age = "Мужчины " + val;
+           aMale.push(oMale);
+           _data.mdata.forEach(function (valM, keyM) {
+               if (keyM == 0) return;
+
+               if (key == keyM) {
+                   oMale.value = valM;
+               }
+           });
+
+           oFemale.age = "Женщины " + val;
+           aFemale.push(oFemale);   
+           _data.fdata.forEach(function (valF, keyF) {
+               if (keyF == 0) return;
+
+               if (key == keyF) {
+                   oFemale.value = valF;
+               }
+           });
+        });
+
+        arr = aMale.concat(aFemale);
+
+        arr.forEach(function (val, key) {
+            table.append(
+                $("<tr/>").append(
+                    $("<td/>").text(val.age),
+                    $("<td/>").text(val.value),
+                )
+            );
+        });
+        return table;
+    };
+    /*генерит таблицу МТС квадрат*/
+    var renderKvadratMtsTable = function () {
+        var content = $("<table/>").addClass("stat-table-block");
+        var values = localThis.parent.data.ReportContent.Values;
+        if (values === null) {
+            content.html("<b class='font-error'>"+gltxt("no_data")+"</b>");
+            return content;
+        }
+
+        /*делаем шапку таблицы для стат записей*/
+
+        var th = $("<tr/>").addClass("trh");
+        th.append($("<th/>").addClass("bg-main").html("<div class='pA'><span>№</span></div>"));
+
+        var trs = [];
+
+        for (var i = 0; i < values.length; i++) {
+            var module = values[i];
+
+            if (module.Module === "KvadratGiMts" || module.Module === "KvadratGiToshkent" || module.Module === "KvadratGiKCell") {
+
+                for (var j = 0; j < module.Values.length; j++) {
+
+                    var modValues = module.Values[j];
+                    var total = modValues.total;
+                    var endRow = $("<tr/>");
+                    endRow.append($("<td/>").addClass("td1").html(gltxt("total") + ":"));
+
+                    for (var k = 0; k < total.length; k++) {
+                        th.append($("<th/>", { "class": "rotate" }).addClass("bg-main").html("<div><span>" + total[k].key + "</span></div>"));
+                        endRow.append($("<td/>", { style: "font-weight:bold" }).addClass("td1").html(parseInt(total[k].value)));
+                    }
+
+                    trs.push(endRow.clone());
+
+                    var kvdatas = modValues.kvdatas;
+
+                    for (var l = 0; l < kvdatas.length; l++) {
+
+                        var _vsego = parseInt(kvdatas[l].calc_data[0].value);
+                        var _color = getColorFromMtsLegend(modValues.legend, _vsego);
+
+                        var tr = $("<tr/>");
+
+                        tr.append($("<td/>").addClass("td1").css({ "background-color": _color }).html(l + 1));
+
+                        for (var h = 0; h < kvdatas[l].calc_data.length; h++) {
+                            if (h === 0) {
+                                tr.append($("<td/>", { style: "color:#e30611;font-weight:bold" }).addClass("td1").html(parseInt(kvdatas[l].calc_data[h].value)));
+                            }
+                            else {
+                                tr.append($("<td/>").addClass("td1").html(parseInt(kvdatas[l].calc_data[h].value)));
+                            }
+                        }
+
+                        trs.push(tr);
+                    }
+
+                    trs.push(endRow);
+                }
+            }
+        }
+
+        content.append(th);
+
+        $.each(trs, function (i, el) {
+            content.append(el);
+        });
+
+        if (values.length === 0) {
+            content.html("<b class='font-error'>"+gltxt("no_data")+"</b>");
+        }
+        return content;
+    };
+
+    /*генерит массивы слоёв с объектами*/
+    var renderLayerObjects = function () {
+        var content = $("<p/>").addClass("layers-block").addClass("bg-info-blocks").addClass("shadow-small");
+        var la = localThis.parent.data.ReportContent.Layers;
+        var errors = localThis.parent.data.ReportContent.ErrorMessages;
+        if (la == null) {
+            content.html("<b class='font-error'>" + gl.text.rep_msg_no_geodata + "</b>");
+            return content;
+        }
+        if (errors != null) {
+            for (var i = 0; i < errors.length; i++) {
+                content.html(
+                    $("<div/>", { "class": "pay-container flex-container" }).append(
+                        $("<span/>", { "class": "wallet-ico" }),
+                        $("<label/>").text(errors[i])
+                    )
+                );
+            }
+        }
+        var table = $("<table/>");
+        /*бежим по всем стат.записям и добавляем их в таблицу*/
+        la.forEach(function (o) {
+            if (o.Count > 0) {
+                var row = $("<tr/>");
+
+                var bt = $("<div/>");
+                bt.addClass("sqButton").addClass("font-default").addClass("bg-main-contrast");
+                bt.append($("<div/>").addClass("title").html(gl.text.rep_geodata_show_list));
+                if (o.Count > 999) {
+                    bt.append($("<div/>").addClass("counter").html(o.Count).css({ "font-size": "20px" }));
+                } else {
+                    bt.append($("<div/>").addClass("counter").html(o.Count));
+                }
+
+                bt.on("click", function () {
+                    localThis.attributesPanel.on(o);
+                });
+
+                row.append($("<td/>").append(bt).css({ "vertical-align": "top" }));
+                row.append($("<td/>").html(o.LayerName).css({ "min-width": "410px", "text-align": "left" }).addClass("name-layer"));
+
+                table.append(row);
+            }
+        });
+
+        content.append($("<h3/>").html(gl.text.geodata + ":").css({ "border-bottom": "1px solid #bbbbbb" }));
+        content.append(table);
+
+        if (la.length == 0) {
+            content.html("<b class='font-error'>" + gl.text.rep_msg_no_geodata + "</b>");
+        }
+        return content;
+    };
+
+    var check_charcount = function (element, max, e) {
+        if (e.which === 13) {
+            saveRenaming();
+            e.preventDefault();
+        } else if (e.which !== 8 && element.text().length > max) {
+            e.preventDefault();
+        }
+    };
+
+    var bindEvents = function () {
+
+    };
+
+    /*включить переименование отчёта*/
+    var enableRenaming = function () {
+        var thediv = localThis.selfelement.find("div[data-elem=row-title]");
+        thediv.prop('contenteditable', true).addClass("editable");
+        
+        localThis.selfelement.find("div[action=rename]").addClass("hidden-button");
+        localThis.selfelement.find("div[action=save]").removeClass("hidden-button");
+        localThis.selfelement.find("div[action=cancel]").removeClass("hidden-button");
+        thediv.keyup(function (e) { check_charcount(thediv, maxLen, e); });
+        thediv.keydown(function (e) { check_charcount(thediv, maxLen, e); });
+    };
+
+    /*отменить переименование отчёта*/
+    var cancelRenaming = function () {
+        var thediv = localThis.selfelement.find("div[data-elem=row-title]");
+        thediv.prop('contenteditable', false).removeClass("editable");
+        thediv.html(localThis.parent.data.Name);
+
+        localThis.selfelement.find("div[action=rename]").removeClass("hidden-button");
+        localThis.selfelement.find("div[action=save]").addClass("hidden-button");
+        localThis.selfelement.find("div[action=cancel]").addClass("hidden-button");
+        thediv.off("keyup");
+        thediv.keydown("keydown");
+    };
+
+    /*сохранить новое имя отчёта*/
+    var saveRenaming = function () {
+        var txt = "";
+        var chk = localThis.selfelement.find("div[data-elem=row-title]");
+        if (chk.children().length > 0) {
+            chk.children().each(function () {
+                txt += $(this).text() + " ";
+            });
+        } else {
+            txt += chk.text();
+        }
+        var newName = $.trim(txt);
+        var oldName = localThis.parent.data.Name;
+
+        if (newName === oldName) {
+            cancelRenaming();
+            return;
+        }
+
+        if (newName.length === 0) {
+            cancelRenaming();
+            return;
+        }
+
+        var mydata = {
+            login: window.UserModule.userData.Info.Login,
+            uid: localThis.parent.data.Uid,
+            oldname: oldName,
+            newname: newName
+        };
+
+        localThis.selfelement.find("div[data-elem=row-title]").prop('contenteditable', false).removeClass("editable");
+       /* localThis.selfelement.find("div[action=rename]").css({ display: "inline-block" });
+        localThis.selfelement.find("div[action=save]").css({ display: "none" });
+        localThis.selfelement.find("div[action=cancel]").css({ display: "none" });*/
+
+        localThis.selfelement.find("div[action=rename]").removeClass("hidden-button");
+        localThis.selfelement.find("div[action=save]").addClass("hidden-button");
+        localThis.selfelement.find("div[action=cancel]").addClass("hidden-button");
+
+        var query = DoWebApiAction("/RequestHistory/UpdateName", mydata);
+        query.done(function (r) {
+            if (r.success) {
+                localThis.selfelement.find("div[data-elem=row-title]").html(newName);
+                localThis.parent.data.Name = newName;
+                localThis.parent.listelement.find("[data-elem=name]").html(newName);
+            } else {
+                cancelRenaming();
+            }
+        });
+        query.fail(function (r) {
+            cancelRenaming();
+        });
+
+        chk.off("keyup");
+        chk.keydown("keydown");
+    };
+    
+    var onColorSelectedReady = false;
+
+    var onColorSelected = function (elem, color) {
+        if (elem) {
+            elem.style.backgroundColor = color;
+        }
+        if (onColorSelectedReady) {
+            localThis.uploadColor(color);
+        }
+    };
+
+    /*создаёт панель инструментов/кнопок вверху контейнера (кнопки: переименовать, повторить и т.д.)*/
+    var renderToolbox = function () {
+
+        onColorSelectedReady = false;
+
+        var d = localThis.parent.data;
+
+        var box = $("<div/>");
+
+        var rightContainer = $("<div/>").addClass("right rightContainer");
+
+        box.append(rightContainer);
+        
+        if (UserModule.userData.Info.Id == d.UserId) {
+            var item1 = $("<div/>", { action: "rename" }).addClass("toolbox-item").html(gl.text.rename_btn);
+            item1.on("click", function () {
+                enableRenaming();
+            });
+
+            box.append(item1);
+        }
+
+        var item2 = $("<div/>", { action: "save" }).addClass("toolbox-item success-button hidden-button").html(gl.text.save)/*.css({ display: "none", "color": "#007e5e" })*/;
+        item2.on("click", function () {
+            saveRenaming();
+        });
+
+        box.append(item2);
+
+        var item3 = $("<div/>", { action: "cancel" }).addClass("toolbox-item cancel-button hidden-button").html(gl.text.cancel)/*.css({ display: "none", "color": "#c70000" })*/;
+        item3.on("click", function () {
+            cancelRenaming();
+        });
+
+        box.append(item3);
+
+        if (UserModule.userData.Info.Id == d.UserId) {
+            var item4 = $("<div/>", { action: "selectColor", class: "pickerColor" });
+            var _polygon_symbol = JSON.parse(d.PolygonSymbol);
+
+            onColorSelected(item4[0], _polygon_symbol.color);
+
+            item4[0].addEventListener("click", function (e) {
+                console.log("click e = ", e);
+                new gColorPicker({
+                    target: item4[0],
+                    initialColor: "#1abc9c",
+                    palette: ["#1abc9c", "#16a085", "#2ecc71", "#27ae60", "#3498db", "#2980b9", "#9b59b6", "#8e44ad", "#565bb1", "#2c3e50", "#f1c40f", "#f39c12", "#e67e22", "#d35400", "#e74c3c", "#c0392b", "#ecf0f1"],
+                    onColorSelected: function (cc) {
+                        console.log("selected color = ", cc);
+                        onColorSelected(item4[0], cc);
+                    }
+                });
+                e.stopPropagation();
+            });
+
+            rightContainer.append(item4);
+
+            onColorSelectedReady = true;
+        }
+
+        if (["info-kvadratgikcell", "info-kvadratgimts", "kvadratmts_layers", "info-kvadratgitoshkent"].indexOf(localThis.parent.data.Tooltype) === -1) {
+            var item5 = $("<div/>", { action: "refresh" }).addClass("btn-item-container").attr("title", gl.text.rep_repeat_report_title);
+            item5.append("<div class='refresh-ico'></div><div class='title-container'>" + gl.text.rep_repeat_report + "</div>");
+            item5.on("click", function () {
+                /*если какой-то другой инструмент сейчас активен, то ничего не запускаем*/
+                if (window.mapModule01.infopanel.visible) {
+                    window.mapModule01.infopanel.blink();
+                    alert("<span style=\"font-weight:bolder;color:red;\">" + gl.text.error_unable_to_do + "</span><br/>" + gl.text.tool_close_current_to_continue);
+                    return;
+                }
+                window.requestHistoryModule.clearSelection();
+                $.wait(function () {
+                    localThis.parent.select();
+                    $.wait(function () {
+                        localThis.parent.repeat();
+                    }, 300);
+                }, 300);
+
+            });
+
+            rightContainer.append(item5);
+        }
+       
+
+        /*Будем вставлять кнопку сохранить как макет */
+        if (UserModule.userData.Info.Id == d.UserId) {
+            if (localThis.parent.parent.rendersLayotsElements.length > 0) {
+                localThis.parent.parent.rendersLayotsElements.forEach(function (_element) {
+                    var item6 = _element.element.clone();
+                    item6.on("click", function () {
+                        _element.action(null, null, d);
+                    });
+                    rightContainer.prepend(item6);
+                });
+            }
+        }
+       
+        /* ------------ */
+
+        if (UserModule.userData.Info.Id == d.UserId) {
+
+            /*новая кнопка share*/
+            rightContainer.append(
+                $("<div/>", { "data-container": "share-container" })
+            );
+            var options = {
+                id: "btn-share-report",
+                parentContainer: rightContainer.find("[data-container=share-container]"),
+                active: (d.is_shared || (d.SharedToken !== null && d.SharedToken !== "")),
+                pending: false,
+                onAllUsers: function () {
+                    var apiaction = DoWebApiAction("/RequestHistory/share", { uid: d.Uid });
+                    apiaction.done(function (response) {
+                        if (!response.success) {
+                            alert(response.message);
+                        } else {
+                            d.is_shared = true;
+                            var is_shared_token = d.SharedToken !== null && d.SharedToken !== "";
+                            ChangeSharedBtnTitle(d.is_shared, is_shared_token, rightContainer);
+                        }
+                    });
+                },
+                offAllUsers: function () {
+                    var apiaction = DoWebApiAction("/RequestHistory/unshare", { uid: d.Uid });
+                    apiaction.done(function (response) {
+                        if (!response.success) {
+                            alert(response.message);
+                        } else {
+                            d.is_shared = false;
+                            var is_shared_token = d.SharedToken !== null && d.SharedToken !== "";
+                            ChangeSharedBtnTitle(d.is_shared, is_shared_token, rightContainer);
+                        }
+                    });
+                },
+                onForlink: function () {
+                    var parameters = [];
+                    var operation = {
+                        clientid: window.UserModule.userData.Info.ClientId,
+                        report_uid: d.Uid,
+                        type: "report",
+                        zoom_on: true
+                    };
+                    parameters.push(operation);
+                    var apiaction = DoWebApiAction("/RequestHistory/share_by_token", { parameters: JSON.stringify(parameters), reportuid: d.Uid });
+                    apiaction.done(function (response) {
+                        if (response.success) {
+                            rightContainer.find("[data-container=share-container]").find("[data-field=link]").html(response.results);
+                            var url_parts = response.results.split("/");
+                            if (url_parts.length > 0) {
+                                d.SharedToken = url_parts[url_parts.length - 1];
+                                var is_shared_token = d.SharedToken !== null && d.SharedToken !== "";
+                                ChangeSharedBtnTitle(d.is_shared, is_shared_token, rightContainer);
+                            }
+                        }
+                    });
+                },
+                offForLink: function () {
+                    var apiaction = DoWebApiAction("/RequestHistory/unshare_by_token", { shared_token: d.SharedToken, reportuid: d.Uid });
+                    apiaction.done(function (response) {
+                        if (response.success) {
+                            rightContainer.find("[data-container=share-container]").find("[data-field=link]").html("");
+                            d.SharedToken = null;
+                            var is_shared_token = d.SharedToken !== null && d.SharedToken !== "";
+                            ChangeSharedBtnTitle(d.is_shared, is_shared_token, rightContainer);
+                        }
+                    });
+                },
+                copyLinkforAccess: function () {
+                    var apiaction = DoWebApiAction("/links/get_link_parameters", { link_token: d.SharedToken });
+                    apiaction.done(function (r) {
+                        if (r.success) {
+                            if (r.results?.results?.url) {
+                                copyToClipboard(r.results.results.url);
+                                blinkmsg(gltxt("copied"), 2000, "success");
+                                return;
+                            }
+                        }
+                        blinkmsg(gltxt("unable_to_comply_try_later"), 3000, "danger");
+                    });
+                },
+                copyLink: function () {
+                    var apiaction = DoWebApiAction("/links/get_link_parameters", { link_token: d.SharedToken });
+                    apiaction.done(function (response) {
+                        if (response.success) {
+                            var $temp = $("<input>");
+                            $("body").append($temp);
+                            $temp.val(response.results.url.replace("{token}", response.results.token)).select();
+                            document.execCommand("copy");
+                            $temp.remove();
+                            blinkmsg(gltxt("copied"));
+                        } else {
+                            blinkmsg(gltxt("unable_to_comply_try_later"));
+                        }
+                    });
+                }
+            };
+
+            var btnShare = new ShareBtn(options);
+            var add_container = btnShare.appendToContainer();
+
+            add_container.done(function () {
+                if (d.SharedToken !== null && d.SharedToken !== "" && d.SharedToken !== undefined) {
+                    var apiaction = DoWebApiAction("/links/get_link_parameters", { link_token: d.SharedToken });
+                    apiaction.done(function (response) {
+                        if (response.success) {
+                            rightContainer.find("[data-container=share-container]").find("[data-field=link]").html(response.results.url.replace("{token}", response.results.token));
+                            rightContainer.find("[data-container=share-container]").find("[data-item=accessForLink]").find("[data-action=changeCheckbox]").attr('data-active', "true");
+                        }
+                    });
+                }
+                if (d.is_shared) {
+                    rightContainer.find("[data-container=share-container]").find("[data-item=allAccess]").find("[data-action=changeCheckbox]").attr('data-active', "true");
+                }
+            });
+        }
+
+        return box;
+    };
+
+    var ChangeSharedBtnTitle = function (is_shared, is_shared_token, rightContainer) {
+        
+    };
+
+    this.setColor = function (_color) {
+        localThis.parent.setColor(_color);
+    };
+
+    this.uploadColor = function (_color) {
+
+        /*localThis.parent.data.PolygonSymbol.color = _color;*/
+        localThis.parent.data.PolygonSymbol = '{"color":"' + _color + '"}';
+
+        var mydata = {
+            uid: localThis.parent.data.Uid,
+            color: _color
+        };
+
+        var query = DoWebApiAction("/RequestHistory/UpdatePolygonColor", mydata);
+        query.done(function (r) {
+            if (r.success) {
+                localThis.setColor(_color);               
+            }
+            else {
+                blinkmsg(r.message);
+            }
+        });
+    };
+
+    this.renderData = function () {     
+        /*рендерит правую панель одного отчёта из данных*/
+        var d = localThis.parent.data;
+        
+        localThis.selfelement.children().remove();
+
+        var t = localThis.template.clone();
+        t.find("[data-elem=row-toolbox]").append(renderToolbox());
+        t.find("[data-elem=row-title]").html(d.Name);
+        t.find("[data-elem=row-title-date]").html(d.RecdateStr);
+        t.find("[data-elem=row-description]").append(renderMetadata());
+
+        var descr = t.find("[data-elem=row-description-list]");
+
+        if (d.Tooltype === "info-kvadratgikcell" || d.Tooltype === "info-kvadratgimts" || d.Tooltype === "info-kvadratgitoshkent") {
+            renderKvadratMtsTotalCharts(descr);
+            descr.append(renderKvadratMtsTable());
+        }
+        else {
+            t.find("[data-elem=row-content]").append(renderLayerObjects());
+            t.find("[data-elem=row-description-list]").append(renderStatistics());
+        }
+
+        renderDetailedPopCharts(descr);
+
+        localThis.selfelement.append(t.children(".row-toolbox"));
+        localThis.selfelement.append(t.children(".renderOperationData"));
+        localThis.selfelement.append(t.children(".row-content"));
+
+        localThis.attributesPanel = new window.AttributesTableDialog(localThis);
+        localThis.attributesPanel.createDialog();
+    };
+
+    /*Преобразуем площадь с кв. м в кв. км если площадь больше чем 100 000*/
+    this.convertArea = function (area, container) {
+        var converting;
+        if (area > 100000) {
+            converting = area / 1000000;
+            container.append("<span class='metadata-block'><b class=font-p1>" + gl.text.tool_area + ":</b> " + converting.format(2, ".", " ") + " " + gl.text.kilometers_short + " <sup>2</sup></span>");
+        } else {
+            converting = area;
+            container.append("<span class='metadata-block'><b class=font-p1>" + gl.text.tool_area + ":</b> " + converting.format(0, ".", " ") + " " + gl.text.meters_short + " <sup>2</sup></span>");
+        }
+    };
+
+    this.remove = function () {
+        /*удаляет содержимое правой панели одного отчёта и прячет его*/
+        localThis.selfelement.transit({
+            height: "1px",
+            margin: "-20px",
+            opacity: 0.0,
+            duration: 200
+        }, function () {
+            localThis.selfelement.children().remove();
+            localThis.selfelement.css({ display: "none", opacity: 1.0, margin: "10px", height: "auto" });
+
+            try {
+                localThis.attributesPanel.selfelement.remove();
+                localThis.attributesPanel = null;
+            } catch (e) {
+                DoNothing();
+            }
+
+        });
+    };
+
+    this.show = function () {
+        /*показывает правую панель одного отчёта*/
+        localThis.selfelement.css({ display: "inline-block" });
+    };
+
+    bindEvents();
+};
+
+function AttributesTableDialog(parent) {
+    var localThis = this;
+
+    this.selfelement = null;
+    this.visible = false;
+    this.parent = parent;
+    this.data = null;
+
+    this.createDialog = function () {
+        localThis.selfelement = $("<div/>").geodialog({
+            autoOpen: false,
+            width: 650,
+            minWidth: 300,
+            height: 400,
+            minHeight: 300,
+            /*open: localThis.on,*/
+            close: localThis.off,
+            resize: localThis.resize,
+            resizable: true,
+            draggable: true,
+            title: gltxt("attributes"),
+            isTitleLogo: true,
+            dialogClass: "request-history-attributes-dialog"
+        });
+        $(".request-history-attributes-dialog").draggable({ containment: false });
+
+        var $headerGeodialog = $('.request-history-attributes-dialog .dialog-header');
+        $headerGeodialog.append('<div class="logoHeader"></div>');
+    };
+
+    this.clearContent = function () {
+        localThis.data = null;
+        localThis.selfelement.children().remove();
+    };
+
+    this.on = function (o) {
+        /*открыть окно с атрибутами*/
+        if (localThis.visible && localThis.data != null) {
+            /*если уже открыто, то моргнуть и поменять данные*/
+
+            localThis.selfelement.parent(".geodialog").css({ opacity: 0.2, scale: 0.4 });
+            localThis.populate(o);
+            localThis.selfelement.parent(".geodialog").transit({ opacity: 1.0, duration: 200, scale: 1.0, easing: "snap" }, function () {
+
+            });
+            return;
+        } else {
+            localThis.populate(o);
+            localThis.visible = true;
+            localThis.selfelement.geodialog("open");
+        }
+
+        localThis.resize();
+    };
+
+    this.populate = function (o) {
+        localThis.clearContent();
+        localThis.data = o;
+        localThis.selfelement.append(localThis.renderContent(o));
+    };
+
+    this.renderContent = function (o) {
+
+        var content = $("<div>").addClass("attributes-content");
+
+        var contentTitle = $("<div>").addClass("attributes-content-title").html("&nbsp;&nbsp;<b>(" + o.Count + ")</b> : " + o.LayerName);
+        content.append(contentTitle);
+
+        var tableHolder = $("<div>").addClass("attributes-content-holder").addClass("bg-main-panel");
+        var table = $("<table/>").addClass("attributes-content-table");
+
+        var ignore = ["geom", "the_geom", "shape_area", "shape_length"];
+        var goods = [];
+        var dataSet = [];
+
+        var header = $("<tr/>");
+
+        o.LayerSchema.forEach(function (sobj) {
+            if (ignore.indexOf(sobj.name.toLowerCase()) == -1) {
+                /*hard:*/
+                goods.push(sobj.name);
+                var headerItem = $("<td/>", { "data-field": sobj.name }).html(sobj.aliases[0].alias);
+                header.append(headerItem);
+            }
+        });
+
+        if (o.Objects[0].Geom != null) {
+            var yHeaderItem = $("<td/>", { "data-field": "yHeaderItem" }).html(gl.text.coords_lat);
+            header.append(yHeaderItem);
+            var xHeaderItem = $("<td/>", { "data-field": "xHeaderItem" }).html(gl.text.coords_lon);
+            header.append(xHeaderItem);
+        }
+
+        table.append($("<thead/>").append(header));
+
+        var tbody = $("<tbody/>");
+
+        o.Objects.forEach(function (robj) {
+            var row = $("<tr/>");
+
+            goods.forEach(function (fname) {
+                var rowItem = $("<td/>", { "data-field": fname }).html(robj.Attributes[fname]);
+                row.append(rowItem);
+            });
+
+            if (robj.Geom != null) {
+                var point = JSON.parse(robj.Geom);
+                var coor = point.coordinates;
+                var geogCoor = transformPairCoordinatesTo4326(coor[0], coor[1]);
+                var y = $("<td/>", { "data-field": "y" }).html(geogCoor[1].toFixed(4));
+                var x = $("<td/>", { "data-field": "x" }).html(geogCoor[0].toFixed(4));
+                row.append(y);
+                row.append(x);
+            }
+            dataSet.push(robj.Attributes);
+
+            tbody.append(row);
+        });
+
+        table.append(tbody);
+
+        tableHolder.append(table);
+
+        content.append(tableHolder);
+
+        return content;
+    };
+
+    this.off = function () {
+        /*закрыть окно с отчётами*/
+        localThis.clearContent();
+        localThis.visible = false;
+        localThis.selfelement.geodialog("close");
+    };
+
+    this.resize = function () {
+        /*вызывается при изменении размера окна*/
+        var height = localThis.selfelement.height();
+
+        var leftHeigth = height;
+    };
+};
+(function ($) {
+    let _timer = null;
+    let _retry = 0;
+    _timer = setInterval(function () {
+
+        _retry++;
+        if (_retry > 15) {
+            clearInterval(_timer);
+            return;
+        }
+
+        let target = $("body").find("[data-elem=request-tool-panel] .container-tools[data-position=left]");
+        if (target.length > 0) {
+            clearInterval(_timer);
+            window.nalagator = null;
+
+            let tool = $("<div title=\"Настраиваемое наложение\" class=\"control-icon geo-icon icon-size-normal nalagator-ico\" style=\"float:left\" active=\"true\"></div>");
+            tool.on("click", function () {
+                if (window.nalagator !== null) return;
+                window.nalagator = new Nalagator();
+                window.nalagator.runCustom();
+                window.nalagator = null;
+            });
+            target.append(tool);
+        }
+    }, 200);
+})(jQuery);
+
+function Nalagator() {
+    var localThis = this;
+    this.geometries = [];
+    this.union = null;
+    this.divide = null;
+    this.result = null;
+
+    this.geoms = null;
+
+    this.geoData = null;
+
+    this.request = {};
+    this.request.Login = window.UserModule.userData.Info.Login;
+    this.request.Tooltype = "info-polygon";
+    this.request.Metadata = {
+        ToolName: "Информация в зоне",
+        Location: null,
+        Area: 0.0,
+        Perimeter: 0.0,
+        Buffer: 0.0
+    };
+    this.request.Address = "Без адреса";
+    this.request.Name = "Без названия";
+    this.request.Point = null;
+    this.request.Line = null;
+    this.request.Polygon = null;
+    this.request.GeointellectLayers = window.layerListPanel.getEnabledLayers();
+    this.request.UserLayers = window.layerListPanel.getEnabledUserLayers();
+    /*180 меридиан, убираю бордер*/
+    this.styles = [
+                    {
+                        stroke: true,
+                        color: "#FFFFFF",
+                        weight: 1,
+                        opacity: 0.4,
+                        fill: true,
+                        fillColor: "#3D91DE",
+                        fillOpacity: 0.6,
+                        clickable: true
+                    }, {
+                        stroke: true,
+                        color: "#FFFFFF",
+                        weight: 1,
+                        opacity: 0.4,
+                        fill: true,
+                        fillColor: "#FF0000",
+                        fillOpacity: 0.4,
+                        clickable: true
+                    }
+    ];
+
+    this.waitmarker = null;
+
+    var checkIsFreeToGo = function () {
+        if (window.mapModule01.infopanel.visible) {
+            window.mapModule01.infopanel.blink();
+            alert("<span style=\"font-weight:bolder;color:red;\">Сейчас нельзя запустить расчёт!</span><br/>Сначала завершите работу с активным инструментом");
+            return false;
+        };
+        return true;
+    };
+
+    /*проверяет геометрию на корректность*/
+    var checkGeometries = function () {
+        localThis.geometries = [];
+        localThis.geometries.length = 0;
+
+        var result = true;
+
+        window.requestHistoryModule.historyElements.forEach(function (item) {
+            if (item.selected) {
+                if (item.data.Polygon !== null) {
+                    var poly = item.data.Polygon.toGeoJSON();
+                    localThis.geometries.push(poly.features[0]);
+                }
+            }
+        });
+
+        if (localThis.geometries.length < 2) result = false;
+
+        return result;
+    };
+
+    /*проверяет, всё ли нужное есть в отчётах*/
+    var checkArray = function () {
+        
+        var selected = 0;
+        var overall = 0;
+        var maxzones = 21; /*тут менять максимальное количество зон*/
+
+        if (window.requestHistoryModule.historyElements.length === 0) {
+            alert("В результатах нет сохранённых зон для пересечения");
+            return false;
+        }
+
+        $.each(window.requestHistoryModule.historyElements, function (i, o) {
+            if (o.selected && o.data.Tooltype.indexOf("point") === -1) selected += 1;
+            if (o.data.Tooltype.indexOf("point") === -1) overall += 1;
+        });
+
+        if (overall === 1) {
+            alert("В результатах всего одна зона. Нужно минимум две зоны");
+            return false;
+        }
+
+        /*todo: убрать хардкодное значение ХХХ зон*/
+        if (selected < 2 || selected > maxzones) {
+            alert("Должно быть выбрано от 02 до " + maxzones + " зон для пересечения");
+            return false;
+        }
+        return true;
+    };
+
+    /*объединение массива полигонов*/
+    var unionArray = function(arr) {
+        var temp = null;
+        $.each(arr, function (i, o) {
+            if (temp === null) {
+                temp = o;
+            } else {
+                temp = turf.union(o,temp);
+            }
+        });
+        return temp;
+    };
+
+    /*пересечение массива полигонов*/
+    var intersectArray = function(arr) {
+
+        var intersections = [];
+        $.each(arr, function (i, o) {
+            $.each(arr, function (i0, o0) {
+                if (i !== i0) {
+                    var chk = turf.intersect(o, o0);
+                    if (chk !== null) {
+                        intersections.push(chk);
+                    }
+                }
+            });
+        });
+
+        var unionedIntersections = unionArray(intersections);
+        return unionedIntersections;
+    };
+
+    var divideArray = function (arr) {
+        /*
+        var divide = DoAction("Intersector/divide",
+            {
+                login: window.UserModule.userData.Info.Login,
+                features: JSON.stringify(arr)
+            });
+        */
+
+        var req_arr = [];
+
+        $.each(arr, function (i, ff) {
+            var new_ff = deepCopy(ff);
+            new_ff.geometry = convertLongitudesTo180(new_ff.geometry);
+            req_arr.push(new_ff);
+        });
+
+        var divide = DoWebApiAction("/intersector/divide",
+            {
+                features: JSON.stringify(req_arr)
+            });
+        return divide;
+    };
+
+    this.clearGeodata = function () {
+        if (localThis.geoData !== null) {
+            window.MAP.removeLayer(localThis.geoData);
+            localThis.geoData = null;
+        }
+    };
+
+    this.renderGeodata = function (withdelay) {
+
+        if (typeof withdelay === "undefined") {
+            withdelay = 0;
+        }
+
+        localThis.clearGeodata();
+
+        localThis.geoData = L.geoJSON();
+        localThis.geoData.addTo(window.MAP);
+
+        L.setOptions(localThis.geoData, {
+            pane: "specialFX",
+            interactive: true,
+            style: function (feature) {
+                return localThis.styles[feature.properties.selected];
+            },
+            onEachFeature: function (feature, layer) {
+                layer.on({
+                    click: function (e) {
+                        
+                        if (feature.properties.selected === 0) {
+                            feature.properties.selected = 1;
+                        } else {
+                            feature.properties.selected = 0;
+                        }
+                        localThis.renderGeodata();
+                    }
+                });
+            }
+        });
+
+        var delay = 0;
+
+        window.NalagatorResult.forEach(function (poly) {
+            delay += withdelay;
+            if (withdelay > 0) {
+                $.wait(function () {
+                    localThis.geoData.addData(poly);
+                }, delay);
+            } else {
+                localThis.geoData.addData(poly);
+            }
+        });
+
+        window.MAP.invalidateSize();
+    };
+
+    this.combineSelectedPolygon = function () {
+        var temp = [];
+        $.each(window.NalagatorResult, function (i, poly) {
+            if (poly.properties.selected === 1 && poly.geometry.type === "Polygon") {
+
+                var new_poly = deepCopy(poly);
+                new_poly.geometry = convertLongitudesTo180(new_poly.geometry);
+
+                temp.push(new_poly);
+            }
+        });
+        var result = unionArray(temp);
+        return result;
+    };
+
+    this.customDialogContent = function () {
+        var result = $("<div/>", { class:"nalagator-container"});
+
+        result.append($("<h1/>").html("Инструмент наложения зон"));
+
+        var leftHelp = $("<div/>",{ class: "gif-nalagator-help" }).css({
+            position: "absolute",
+            width: "300px",
+            height: "340px",
+            top: "60px",
+            left: "40px",
+            "background-image": "url(/resources/funcparts/request-history/help/nalagator_help.gif)"
+        });
+
+        var rightInfo = $("<div/>", {class:"tools-container"}).css({
+            position: "absolute",
+            top: "60px",
+            left: "380px",
+            right: "40px",
+            bottom: "40px"
+        });
+
+        var buttonDo = $("<div/>", { "class": "actionButton bg-main font-default run-request" }).html("Выполнить запрос");
+
+        buttonDo.on("click", function () {
+            localThis.doCustom();
+        });
+
+        var buttonCancel = $("<div/>", { "class": "actionButton bg-attention font-default cancel" }).html("Отменить");
+
+        buttonCancel.on("click", function () {
+            localThis.cancelCustom();
+        });
+
+        result.append(leftHelp);
+        result.append(rightInfo);
+
+        rightInfo.append($("<p/>", {"class":"l-info"}).html("Выберите нужные части зон на карте и нажмите кнопку «Выполнить запрос»"));
+        rightInfo.append($("<p/>").append(buttonDo, buttonCancel));
+
+        return result;
+    };
+
+    this.doCustom0 = function () {
+        var poly = localThis.combineSelectedPolygon();
+        if (poly !== null) {
+            localThis.clearGeodata();
+            localThis.result = poly;
+            var pos = turf.pointOnSurface(localThis.result);
+            var centroidPt = turf.flip(pos);
+            localThis.request.Metadata.Area = turf.area(localThis.result);
+
+            localThis.result = turf.flip(localThis.result);
+            var box = [];
+            $.each(localThis.result.geometry.coordinates, function (i, ar) {
+                box = $.merge(box, ar);
+            });
+            localThis.result.geometry.coordinates = box;
+            localThis.result.geometry.type = "Polygon";
+            localThis.result = L.polygon(localThis.result.geometry.coordinates, { pane: "overlayPane" });
+
+            localThis.waitmarker = $.extend({}, centroidPt.geometry);
+
+            localThis.result.setStyle(L.Draw.Circle.prototype.options.shapeOptions);
+            localThis.result.addTo(window.MAP);
+
+            var gc = localThis.geocode(centroidPt);
+
+            gc.done(function (r) {
+                if (r.status === "success") {
+                    localThis.request.Metadata.Location = r.results;
+                    localThis.request.Address = r.results.RegionName;
+                    localThis.request.Name = "Наложение - " + r.results.RegionName;
+                    localThis.request.Point = null;
+                    localThis.request.Line = null;
+                    localThis.request.Polygon = getPreparedGeoJsonAsObject(localThis.result);
+                    localThis.runRequest();
+                    localThis.clearGeodata();
+                    window.requestHistoryModule.dialogWindow.closeToolDialog();
+                    window.mapModule01.MapClickAllowed = true;
+                    window.mapModule01.guessMapClickAllowedOverride();
+                }
+            });
+
+        } else {
+            alert("Ни одна часть не выбрана на карте");
+        }
+    };
+
+    this.doCustom = function () {
+
+        var poly = localThis.combineSelectedPolygon();
+
+        if (poly !== null) {
+
+            localThis.clearGeodata();
+            localThis.result = poly;
+            var pos = turf.pointOnSurface(poly);
+            var centroidPt = turf.flip(pos);
+            localThis.request.Metadata.Area = turf.area(poly);
+
+            var feature = poly;
+
+            localThis.waitmarker = $.extend({}, centroidPt.geometry);
+
+            localThis.result = L.geoJSON(feature.geometry);
+            localThis.result.addTo(window.MAP);
+            localThis.result.setStyle(L.Draw.Circle.prototype.options.shapeOptions);
+            L.setOptions(localThis.result, {
+                pane: "overlayPane",
+                interactive: false
+            });
+
+            var gc = localThis.geocode(centroidPt);
+
+            gc.done(function (r) {
+                if (r.status === "success") {
+                    localThis.request.Metadata.Location = r.results;
+                    localThis.request.Address = r.results.RegionName;
+                    localThis.request.Name = "Наложение - " + r.results.RegionName;
+                    localThis.request.Point = null;
+                    localThis.request.Line = null;
+                    /*localThis.request.Polygon = getPreparedGeoJsonAsObject(localThis.result);*/
+                    localThis.request.Polygon = feature.geometry;
+                    localThis.runRequest();
+                    localThis.clearGeodata();
+                    window.requestHistoryModule.dialogWindow.closeToolDialog();
+                    window.mapModule01.MapClickAllowed = true;
+                    window.mapModule01.guessMapClickAllowedOverride();
+                }
+            });
+
+        } else {
+            alert("Ни одна часть не выбрана на карте");
+        }
+    };
+
+    this.cancelCustom = function () {
+        
+        var hhttmmll = "Вы действительно хотите завершить работу с инструментом?";
+
+        var b = {
+            type: "ok",
+            action: function () {
+                localThis.clearGeodata();
+                window.requestHistoryModule.dialogWindow.closeToolDialog();
+                window.mapModule01.MapClickAllowed = true;
+            },
+            title: "",
+            text: "Ок",
+            icon: false,
+            "class": "btn_confirm"
+
+        };
+
+        var n = {
+            type: "skip",
+            action: function () {
+
+            },
+            title: "",
+            text: "Отмена",
+            icon: false,
+            "class": "btn_confirm customAlertBtnCancel"
+        };
+
+        customConfirm(hhttmmll, null, [b, n], 400, 120);
+    };
+
+    /*===========*/
+    /*запускаторы*/
+    /*===========*/
+
+    /*запускает выбиратор*/
+    this.runCustom = function () {
+
+        if (!checkIsFreeToGo()) return;
+        if (!checkArray()) return;
+        if (!checkGeometries()) return;
+
+        window.requestHistoryModule.clearSelection();
+        window.requestHistoryModule.dialogWindow.showToolDialog();
+        window.requestHistoryModule.dialogWindow.setToolDialogContent(localThis.customDialogContent());
+
+        window.mapModule01.MapClickAllowed = false;
+        window.mapModule01.MapClickAllowedOverride = false;
+
+        var divide = divideArray(localThis.geometries);
+        divide.done(function (r) {
+            if (r.status === "success") {
+                $.each(r.results, function (i, poly) {
+                    poly.geometry = convertLongitudesTo360(poly.geometry);
+                });
+
+                localThis.geoms = r.results;
+                window.NalagatorResult = r.results;
+
+                localThis.renderGeodata(30);
+            } else {
+                alert(r.message);
+            }
+        });
+
+        
+
+        window.nalagator = null;
+    };
+
+    /*запускает объединятор*/
+    this.runUnion = function () {
+        
+        if (!checkIsFreeToGo()) return;
+        if (!checkArray()) return;
+        if (!checkGeometries()) return;
+
+        window.requestHistoryModule.clearSelection();
+
+        localThis.result = unionArray(localThis.geometries);
+        var centroidPt = turf.flip(turf.pointOnSurface(localThis.result));
+        localThis.request.Metadata.Area = turf.area(localThis.result);
+        localThis.result = turf.flip(localThis.result);
+
+        if (localThis.result.geometry.type == "MultiPolygon") {
+            var box = [];
+            $.each(localThis.result.geometry.coordinates, function(i, ar) {
+                box = $.merge(box, ar);
+            });
+            localThis.result.geometry.coordinates = box;
+            localThis.result.geometry.type = "Polygon";
+        }
+
+        localThis.result = L.polygon(localThis.result.geometry.coordinates, { pane: "overlayPane" });
+        localThis.waitmarker = $.extend({}, centroidPt.geometry);
+
+        localThis.result.setStyle(L.Draw.Circle.prototype.options.shapeOptions);
+        localThis.result.addTo(window.MAP);
+        
+        var gc = localThis.geocode(centroidPt);
+
+        gc.done(function (r) {
+            if (r.status == "success") {
+                localThis.request.Metadata.Location = r.results;
+                localThis.request.Address = r.results.Caption;
+                localThis.request.Name = "Объединение - " + r.results.Caption;
+                localThis.request.Point = null;
+                localThis.request.Line = null;
+                localThis.request.Polygon = getPreparedGeoJsonAsObject(localThis.result);
+                localThis.runRequest();
+            }
+        });
+
+    };
+
+    /*запускает пересекатор*/
+    this.runIntersect = function () {
+        
+        if (!checkIsFreeToGo()) return;
+        if (!checkArray()) return;
+        if (!checkGeometries()) return;
+
+        window.requestHistoryModule.clearSelection();
+
+        localThis.result = intersectArray(localThis.geometries);
+
+        if (localThis.result == null) {
+            alert("У выбранных полигонов пустая зона пересечения<br/>Выберите пересекающиеся полигоны и попробуйте снова");
+            return;
+        }
+
+        var centroidPt = turf.flip(turf.pointOnSurface(localThis.result));
+        localThis.request.Metadata.Area = turf.area(localThis.result);
+        localThis.result = turf.flip(localThis.result);
+
+        if (localThis.result.geometry.type == "MultiPolygon") {
+            var box = [];
+            $.each(localThis.result.geometry.coordinates, function (i, ar) {
+                box = $.merge(box, ar);
+            });
+            localThis.result.geometry.coordinates = box;
+            localThis.result.geometry.type = "Polygon";
+        }
+
+        localThis.result = L.polygon(localThis.result.geometry.coordinates, { pane: "overlayPane" });
+        localThis.waitmarker = $.extend({}, centroidPt.geometry);
+
+        localThis.result.setStyle(L.Draw.Circle.prototype.options.shapeOptions);
+        localThis.result.addTo(window.MAP);
+
+        var gc = localThis.geocode(centroidPt);
+
+        gc.done(function (r) {
+            if (r.status == "success") {
+                localThis.request.Metadata.Location = r.results;
+                localThis.request.Address = r.results.Caption;
+                localThis.request.Name = "Пересечение - " + r.results.Caption;
+                localThis.request.Point = null;
+                localThis.request.Line = null;
+                localThis.request.Polygon = getPreparedGeoJsonAsObject(localThis.result);
+                localThis.runRequest();
+            }
+        });
+    };
+
+    /*===========*/
+    /*запросяторы*/
+    /*===========*/
+
+    this.geocode = function (centroidPt) {
+        return DoWebApiAction("/geocoder/point2address", {
+            point: "" + centroidPt.geometry.coordinates[1] + "," + centroidPt.geometry.coordinates[0]
+        });
+    };
+
+    this.runRequest = function () {
+        window.MAP.invalidateSize();
+        if (!checkIsFreeToGo()) return;
+
+        localThis.request.GeointellectLayers = window.layerListPanel.getEnabledLayers();
+        localThis.request.UserLayers = window.layerListPanel.getEnabledUserLayers();
+
+        window.mapModule01.infopanel.setTitle(localThis.request.Metadata.ToolName);
+        var content = $("<div/>");
+        window.mapModule01.infopanel.setContent(content);
+        window.mapModule01.infopanel.show();
+        window.mapModule01.infopanel.setStatus("Подождите пока Геоинтеллект выполнит расчёт ...", false, true);
+
+        window.mapModule01.infopanel.onclose = [];
+        window.mapModule01.infopanel.onclose.length = 0;
+
+        window.mapModule01.infopanel.graphics = [];
+        window.mapModule01.infopanel.graphics.length = 0;
+
+        window.mapModule01.infopanel.wait();
+
+        var repeater = {};
+
+        repeater.waitmarker = L.marker([localThis.waitmarker.coordinates[0], localThis.waitmarker.coordinates[1]], {
+            icon: L.icon({
+                iconUrl: '/resources/styles/images/animan_shlyapa.gif',
+                iconSize: [50, 50],
+                iconAnchor: [25, 25],
+                popupAnchor: [25, 25]
+            }),
+            keyboard: false,
+            zIndexOffset: 10000,
+            opacity: 0.9,
+            pane: "markerPane"
+        }).addTo(window.MAP);
+
+        repeater.options = {
+            startPoint: undefined,
+            Polygon: localThis.result
+        };
+
+        doIndoRequestUniversal(repeater, localThis.request);
+    };
+};

@@ -1,0 +1,1950 @@
+/* балон при клике на карту */
+var MapInfoPopupModule = function() {
+    var localThis = this;
+    this.id = "map-info-popup";
+    var loadTemplateUrl = "/resources/funcparts/" + localThis.id + "/tmplt/map-info-popup.html";
+    this.mapInfoPopup = null;
+    this.initialized = false;
+    var init = function () {
+        appendHeadStyle("/resources/funcparts/" + localThis.id + "/style/map-info-popup.css");
+       /* appendHeadStyle("/resources/styles/funcparts/" + localThis.id + "/map-info-popup.css");*/
+        
+        var tmplt = $.get(loadTemplateUrl);
+        tmplt.done(function (response) {
+            localThis.mapInfoPopup = new MapInfoPopup($(localizeHtml(response)));           
+            localThis.initialized = true;
+        });
+    };
+    
+    init();
+};
+
+var MapInfoPopup = function(tmplt) {
+    var localThis = this;
+    this.template = tmplt.clone();
+    this.selfpopup = $("<div/>");
+
+    localThis.selfpopup = localThis.template.clone();
+    localThis.card_container = localThis.selfpopup.find(".cards-container");
+    localThis.tools_container = localThis.selfpopup.find(".tools-container");
+    localThis.paginator = localThis.selfpopup.find(".paginator");
+    localThis.paginator.css({"user-select":"none"});
+    localThis.annotation_container = localThis.selfpopup.find(".annotation-container");
+    localThis.annotation_content = localThis.annotation_container.find(".annotation");
+
+    this.round_doubles = true;
+    var _custom_format = {};
+
+    this.features = [];
+    this.selectionEnabled = false;
+    this.selectedLayer = null;
+    this.selectedLayerId = 0;
+    this.selectionChanged = [];
+
+    var _contextMenu = null;
+    this.popupMobile = null;
+
+    var options = {
+        "maxWidth": 500,
+        "minWidth": 400,
+        "maxHeight": 500,
+        "minHeight": 400,
+        "keepInView": false,
+        "popupAnchor": [0, 0],
+        "className": "mapInfoPopup"
+    };
+
+    var _editor = {
+        layerid: 0,
+        fatureid: 0
+    };
+
+    this.mobileEvents = function () {
+        closePopup:null
+    };
+
+    var init = function () {
+        var qround = getModuleParams("map-info-popup", "round_doubles");
+        qround.done(function (r) {
+            if (r.success && r.results !== null) {
+                localThis.round_doubles = (r.results.param_value == "true");
+            }
+        });
+        var cformat = getModuleParams("map-info-popup", "custom_format");
+        cformat.done(function (r) {
+            if (r.success && r.results !== null) {
+                _custom_format = JSON.parse(r.results.param_value);
+            }
+        });
+
+        appendSubmodules().done(function () {
+            localThis.timer = setInterval(function () {
+                if (window.layerListPanel && window.mapModule01) {
+                    window.layerListPanel.afterSelectionChanged.push(toggleButtonsVisibility);
+                    window.mapModule01.registerMapClickEvent(renderFeaturesPopup);
+                    window.clearActions.push(localThis.hide);
+                    clearInterval(localThis.timer);
+                }
+            }, 200);
+        });
+    };
+
+    this.popup = L.popup(options);
+
+    this.results = [];
+    this.selectedFeature = null;
+    this.selectedGeometry = null;
+    this.selectedIndex = 0;
+    this.buttons = [];
+    this.visible = false;
+    this.latlng = null;
+
+    this.getEditor = function () {
+        return _editor;
+    };
+
+    this.resetEditor = function () {
+        _editor = {
+            layerid: 0,
+            fatureid: 0,
+            layername: null,
+            type: null
+        }
+    };
+
+    this.showAnnotation = function(content, durationMs) {
+        localThis.annotation_content.html(content);
+        localThis.annotation_container.attr("data-state", "open");
+
+        if (durationMs == undefined || durationMs == null) return;
+
+        setTimeout(function() {
+            localThis.collapseAnnotation();
+        }, durationMs);
+    }
+
+    this.collapseAnnotation = function() {
+        localThis.annotation_content.empty();
+        localThis.annotation_container.attr("data-state", "collapsed");
+    }
+
+    this.clearContent = function() {
+        /* удаляет содержимое балона (объекты, титул, кнопки и всё остальное) */
+    };
+
+    this.onSelectionChange = [];
+
+    var appendSubmodules = function () {
+        var u = $.getScript("/resources/funcparts/map-info-popup/ULayerEditor.js");
+        var g = $.getScript("/resources/funcparts/map-info-popup/GiLayerEditor.js");
+        return $.when(u, g);
+    };
+
+    var bindPager = function() {
+        localThis.paginator.on("mouseup", ".container > .prev", function() {
+            var current = parseInt(localThis.paginator.attr("data-current"));
+            pagerSetPage(current - 1);
+        });
+
+        $(localThis.paginator.on("mouseup", ".container > .next", function() {
+            var current = parseInt(localThis.paginator.attr("data-current"));
+            pagerSetPage(current + 1);
+        }));
+    };
+
+    var bindButtons = function () {
+        localThis.selfpopup.children(".footer").on("click","[data-action]",function () {
+            var action = $(this).attr("data-action");
+            if (typeof _actions[action] === "function") {
+                _actions[action](localThis.latlng.lng, localThis.latlng.lat);
+            }
+        });
+
+        localThis.selfpopup.children(".coordinates").children(".buttons").on("click", "[data-action]", function () {
+            var action = $(this).attr("data-action");
+            if (typeof _actions[action] === "function") {
+                _actions[action](localThis.latlng.lng, localThis.latlng.lat);
+            }
+        });
+    };
+
+    var CheckModuleButtons = function () {
+        localThis.selfpopup.children(".footer").find("[data-check]").each(function (index, element) {
+            var action = $(element).attr("data-check");
+            if (typeof localThis[action] === "function") {
+                if (!localThis[action]()) {
+                    $(element).css("display", "none");
+                }
+            }
+        });
+    };
+
+    var _checksTIMEOUT = 3000;
+
+    var _debug_popups = false;
+
+    var _checks = {
+        "value_equals": function (fieldvalue) {
+            /*value_equals:sam=1*/
+
+            let operations = ["=", "!=", "<>", ">", "<"];
+            let current_operation = "";
+
+            operations.forEach(function (one) {
+                if (fieldvalue.indexOf(one) != -1) {
+                    current_operation = one;
+                }
+            });
+
+            var field = fieldvalue.split(current_operation)[0];
+            var value = fieldvalue.split(current_operation)[1];
+
+            if (value == "null") {
+                value = null;
+            }
+
+            var rule_options = {
+                
+            };
+
+
+            var value_check = false;
+
+            switch (current_operation) {
+                case "=": value_check = localThis.selectedFeature.properties[field] == value; break;
+                case "!=": value_check = localThis.selectedFeature.properties[field] != value; break;
+                case "<>": value_check = localThis.selectedFeature.properties[field] != value; break;
+                case ">": value_check = localThis.selectedFeature.properties[field] > value; break;
+                case "<": value_check = localThis.selectedFeature.properties[field] < value; break;
+                default: value_check = false;
+            }
+
+            rule_options.check = value_check;
+            rule_options.current_operation = current_operation;
+            rule_options.value_object = localThis.selectedFeature.properties[field];
+            rule_options.value_rule = value;
+
+            var rules = localThis.selectedFeature != null && localThis.selectedFeature.layer != null && localThis.selectedFeature.properties.hasOwnProperty(field) && value_check;
+            if (_debug_popups) (rules) ? blinkmsg("value_equals[" + field + "]" + current_operation + "[" + value + "]", _checksTIMEOUT, "success") : blinkmsg("value_equals[" + field + "]" + current_operation + "[" + value + "]", _checksTIMEOUT, "danger");
+
+            return rules;
+        },
+        "contains_field": function (field) {
+            var rules = localThis.selectedFeature != null && localThis.selectedFeature.layer != null && localThis.selectedFeature.properties.hasOwnProperty(field);
+            if (_debug_popups) (rules) ? blinkmsg("contains_field[" + field + "]", _checksTIMEOUT, "success") : blinkmsg("contains_field[" + field + "]", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "layer_id_in": function (_ids) {
+            var ids = _ids.split(/,|;|_/).map(function (item) {
+                return Number(item.trim());
+            });
+            var rules = localThis.selectedFeature != null && localThis.selectedFeature.layer != null && ids.indexOf(localThis.selectedFeature.layer.id) >= 0;
+            return rules;
+        },
+        "selection_enabled": function () {
+            var rules = localThis.selectionEnabled == true;
+            if (_debug_popups) (rules) ? blinkmsg("selection_enabled", _checksTIMEOUT, "success") : blinkmsg("selection_enabled", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "selection_disabled": function () {
+            var rules = _checks.selection_enabled() == false;
+            if (_debug_popups) (rules) ? blinkmsg("selection_disabled", _checksTIMEOUT, "success") : blinkmsg("selection_disabled", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "is_selected": function () {
+            var rules = false;
+            if (localThis.anyplace == false && localThis.selectedFeature == null) {
+                rules = false;
+            }
+            else if (localThis.anyplace == false && localThis.selectedFeature != null) {
+                var _key = "" + localThis.selectedFeature.layer.id + "|" + localThis.selectedFeature.layer.uid + "|" + localThis.selectedFeature.id;
+                rules = localThis.features?.some(function (item) {
+                    return item.id === _key;
+                });
+            }
+            else if (localThis.anyplace == true) {
+                var latx = ("" + localThis.latlng.lat).left(8);
+                var lngy = ("" + localThis.latlng.lng).left(8);
+                var _key = "000|" + latx + "|" + lngy;
+                rules = localThis.features?.some(function (item) {
+                    return item.id === _key;
+                });
+            }
+            if (_debug_popups) (rules) ? blinkmsg("is_selected", _checksTIMEOUT, "success") : blinkmsg("is_selected", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "is_not_selected": function () {
+            var rules = _checks.is_selected() == false;
+            if (_debug_popups) (rules) ? blinkmsg("is_not_selected", _checksTIMEOUT, "success") : blinkmsg("is_not_selected", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "is_editable": function () {
+            var rules = false;
+            if (_checks.is_mylayer()) {
+                rules = window.layerListPanel.findUserLayerByUid(localThis.selectedFeature.layer.uid)?.Editors.indexOf(UserModule.userData.Info.Login) > -1;
+            }
+            if (_checks.is_gilayer()) {
+                rules = updateAllowed(window.layerListPanel.findLayerById(localThis.selectedFeature.layer.id)?.id);
+            }
+            if (_debug_popups) (rules) ? blinkmsg("is_editable", _checksTIMEOUT, "success") : blinkmsg("is_editable", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "is_line_or_poly": function () {
+            var rules = false;
+            if (_checks.is_gilayer()) {
+                rules = typeHasBoundary(window.layerListPanel.findLayerById(localThis.selectedFeature.layer.id)?.id);
+            }
+            if (_debug_popups) (rules) ? blinkmsg("is_line_or_poly", _checksTIMEOUT, "success") : blinkmsg("is_line_or_poly", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "is_deletable": function () {
+            var rules = false;
+            if (_checks.is_mylayer()) {
+                rules = window.layerListPanel.findUserLayerByUid(localThis.selectedFeature.layer.uid)?.Editors.indexOf(UserModule.userData.Info.Login) > -1;
+            }
+            if (_checks.is_gilayer()) {
+                rules = deleteAllowed(window.layerListPanel.findLayerById(localThis.selectedFeature.layer.id)?.id);
+            }
+            if (_debug_popups) (rules) ? blinkmsg("is_deletable", _checksTIMEOUT, "success") : blinkmsg("is_deletable", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "is_mylayer": function () {
+            var rules = localThis.selectedFeature != null && localThis.selectedFeature.layer != null && localThis.selectedFeature.layer.uid != "00000000-0000-0000-0000-000000000000";
+            if (_debug_popups) (rules) ? blinkmsg("is_mylayer", _checksTIMEOUT, "success") : blinkmsg("is_mylayer", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "editable_mylayer_is_on": function () {
+            var rules = window.layerListPanel.getEnabledEditableUserLayers().length > 0;
+            if (_debug_popups) (rules) ? blinkmsg("editable_mylayer_is_on", _checksTIMEOUT, "success") : blinkmsg("editable_mylayer_is_on", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "is_gilayer": function () {
+            var rules = localThis.selectedFeature != null && localThis.selectedFeature.layer != null && localThis.selectedFeature.layer.uid == "00000000-0000-0000-0000-000000000000";
+            if (_debug_popups) (rules) ? blinkmsg("is_gilayer", _checksTIMEOUT, "success") : blinkmsg("is_gilayer", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "editable_gilayers_count": function () {
+            var _editable_count = 0;
+            var lyrs = window.layerListPanel.getEnabledLayers();
+            if (lyrs.length > 0) {                
+                lyrs.forEach(function (item) {
+                    if (createAllowed(item.Id)) {
+                        _editable_count += 1;
+                    }
+                });
+            }
+            return _editable_count;
+        },
+        "editable_gilayer_is_on": function () {
+            var rules = _checks.editable_gilayers_count() > 0;
+            if (_debug_popups) (rules) ? blinkmsg("editable_gilayer_is_on", _checksTIMEOUT, "success") : blinkmsg("editable_gilayer_is_on", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "any_editable_layer_is_on": function () {
+            var rules = _checks.editable_gilayer_is_on() || _checks.editable_mylayer_is_on();
+            if (_debug_popups) (rules) ? blinkmsg("any_editable_layer_is_on", _checksTIMEOUT, "success") : blinkmsg("any_editable_layer_is_on", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "no_features": function () {
+            var rules = localThis.selectedFeature == null;
+            if (_debug_popups) (rules) ? blinkmsg("no_features", _checksTIMEOUT, "success") : blinkmsg("no_features", _checksTIMEOUT, "danger");
+            return rules;
+        },
+        "is_any_layer": function () {
+            var rules = _checks.is_gilayer() || _checks.is_gilayer();
+            if (_debug_popups) (rules) ? blinkmsg("is_any_layer", _checksTIMEOUT, "success") : blinkmsg("is_any_layer", _checksTIMEOUT, "danger");
+            return rules;
+        }
+    };
+
+    this.findAction = function (name) {
+        return _actions[name];
+    };
+
+    var _actions = {
+        "selectobject": function () {
+            if (localThis.selectionEnabled === false) {
+                return;
+            }
+
+            var footer = localThis.selfpopup.find(".footer");
+            footer.find("[data-action=selectobject]").css({ display: "none" });
+            footer.find("[data-action=unselectobject]").css({ display: "block" });
+
+            var _key = "";
+            var f = {};
+
+            if (localThis.anyplace == true) {
+
+                var latx = ("" + localThis.latlng.lat).left(8);
+                var lngy = ("" + localThis.latlng.lng).left(8);
+
+                _key = "000|" + latx + "|" + lngy;
+
+                f = {
+                    id: _key,
+                    type: "Feature",
+                    layer: {},
+                    properties: { "empty": "true" },
+                    geometry: Object.assign({}, { "type": "Point", "coordinates": [localThis.latlng.lng, localThis.latlng.lat] })
+                };
+
+                f.properties.caption = "MapPin" + "(#" + _key + ")";
+
+            }
+            else {
+                _key = "" + localThis.selectedFeature.layer.id + "|" + localThis.selectedFeature.layer.uid + "|" + localThis.selectedFeature.id;
+
+                f = {
+                    id: _key,
+                    type: "Feature",
+                    layer: Object.assign({}, localThis.selectedFeature.layer),
+                    layer_id: localThis.selectedFeature.layer.id,
+                    properties: Object.assign({}, localThis.selectedFeature.properties),
+                    geometry: Object.assign({}, localThis.selectedFeature.geometry)
+                };
+
+                f.properties.caption = f.layer.name + "(#" + f.properties.id + ")";
+
+                if (f.properties.hasOwnProperty("address")) {
+                    f.properties.caption = f.layer.name + "(#" + f.properties.address + ")";
+                }
+
+                if (f.properties.hasOwnProperty("sitebk")) {
+                    f.properties.caption = "# " + f.properties.sitebk + " (" + f.layer.name + ")";
+                }
+
+            }
+
+            localThis.features.push(f);
+
+            enableSelectionLayer();
+
+            localThis.selectionChanged.forEach(function (item) {
+                if (typeof item === "function") {
+                    item();
+                }
+            });
+        },
+        "unselectobject": function () {
+            if (localThis.selectionEnabled === false) return;
+
+            var footer = localThis.selfpopup.find(".footer");
+            footer.find("[data-action=selectobject]").css({ display: "block" });
+            footer.find("[data-action=unselectobject]").css({ display: "none" });
+
+            var _key = "" + localThis.selectedFeature.layer.id + "|" + localThis.selectedFeature.layer.uid + "|" + localThis.selectedFeature.id;
+            localThis.features = localThis.features.filter(function (obj) {
+                return obj.id !== _key;
+            });
+
+            enableSelectionLayer();
+
+            localThis.selectionChanged.forEach(function (item) {
+                if (typeof item === "function") {
+                    item();
+                }
+            });
+        },
+        "myobjectfiles": function () {
+            var options = { latlng: localThis.latlng, feature: localThis.selectedFeature };
+            window.UlaFiles.files($("body"), options);
+        },
+        "panoramaYa": function () {
+            var c = localThis.latlng;
+            var url = "https" +
+                "://yandex.ru/maps?l=stv%2Csta&" +
+                "ll=" + c.lng + "%2C" + c.lat +
+                "&panorama%5Bdirection%5D=178.167772%2C7.490147" +
+                "&panorama%5Bpoint%5D=" + c.lng + "%2C" + c.lat +
+                "&panorama%5Bspan%5D=120.000000%2C66.588689&z=16";
+            clickLink(url, "_blank");
+        },
+        "copyCoordinates": function () {
+            var _uid = generateGUID();
+            var c = localThis.latlng;
+            var _temp = $("<input>", { id: _uid }).css({ display: "block", position: "absolute", opacity: 0.0, top: 0, left: 0 });
+            $("body").append(_temp);
+            _temp.val("" + c.lat + "," + c.lng).select();
+            var _ok = document.execCommand("copy");
+            _temp.remove();
+            if (_ok) {
+                blinkmsg(gltxt("copied") + " " + "" + c.lat.toFixed(6) + ", " + c.lng.toFixed(6));
+            }
+        },
+        "openOnGmaps": function () {
+            var c = localThis.latlng;
+            var _coords = c.lat + "," + c.lng;
+            var _url = "https" + "://maps.google.com/maps?q=" + _coords + "&ll=" + _coords + "&z=16";
+            clickLink(_url, "_blank");
+        },
+        "openOnYamaps": function () {
+            var c = localThis.latlng;
+            var _coords = "" + c.lng.toFixed(6) + "%2C" + c.lat.toFixed(6);
+            var _coords_weird = c.lat.toFixed(6) + "%2C" + c.lng.toFixed(6);
+            var _url = "https" + "://yandex.ru/maps/?ll=" + _coords + "&mode=search&sll=" + _coords + "&text=" + _coords_weird + "&z=16";
+            clickLink(_url, "_blank");
+        },
+        "addobject": function () {
+            var userLayerCount = window.layerListPanel.getEnabledEditableUserLayers().length;
+            var giLayerCount = _checks.editable_gilayers_count();
+
+            console.table({
+                userLayerCount,
+                giLayerCount
+            })
+            
+            if ((userLayerCount + giLayerCount) == 0) {
+                blinkmsg(gltxt("no_editable_layers"), 1000, "danger");
+
+                return;
+            }
+
+            if (userLayerCount > 0 && giLayerCount == 0) {
+                _actions.addmyobject();
+                
+                return;
+            }
+
+            if (userLayerCount == 0 && giLayerCount == 1) {
+                window.layerListPanel.getEnabledLayers().forEach(function (item) {
+                    var param_item = window.layerEditor?._params?.editor_settings?.find(function (lyr) {
+                        return (lyr.id == item.Id && lyr.allow_create === true);
+                    });
+                    if (param_item) {
+                        var _name = window.layerListPanel.findLayerById(item.Id).name;
+                        localThis.getEditor().layerid = item.Id;
+                        localThis.getEditor().layername = _name;
+                        localThis.getEditor().fatureid = 0;
+                        localThis.getEditor().type = param_item.type;
+
+                        window.layerEditor.run_new_feature(_name, param_item.type, InsertOnSave, localThis.resetEditor, null, null, {
+                            save: true,
+                            cancel: true,
+                            history: true,
+                            coordinates: false,
+                            geojson: false
+                        });
+
+                        window.mapInfoPopupModule?.mapInfoPopup?.hide();
+
+                        return;
+                    }
+                });
+
+                return;
+            }
+
+            if (userLayerCount == 0 && giLayerCount > 1) {
+                _contextMenu = new ContextMenuForOld([],
+                    {
+                        attachTo: document.querySelector(".mapInfoPopup").querySelector(".cards-container"),
+                        hasButton: false,
+                        which_btn: 1,
+                        width_px: 390
+                    });
+                var layers = window.layerListPanel.getEnabledLayers();
+                var idx = 0;
+                layers.forEach(function (item) {
+                    if (createAllowed(item.Id)) {
+                        idx++;
+                        if (idx < 6) {
+                            var _name = window.layerListPanel.findLayerById(item.Id).name;
+                            _contextMenu.addItem({
+                                type: "button",
+                                group: 1,
+                                icon_classes: ["gr-layers", "filter-primary"],
+                                text: _name,
+                                onClick: function () {
+                                    var param_item = window.layerEditor?._params?.editor_settings?.find(function (lyr) {
+                                        return (lyr.id == item.Id && lyr.allow_create === true);
+                                    });
+                                    if (param_item) {
+                                        localThis.getEditor().layerid = item.Id;
+                                        localThis.getEditor().layername = _name;
+                                        localThis.getEditor().fatureid = 0;
+                                        localThis.getEditor().type = param_item.type;
+
+                                        if (param_item.type == "Point") {
+                                            var _feature = {
+                                                "type": "Feature",
+                                                "properties": {
+                                                    "name": _name,
+                                                },
+                                                "geometry": {
+                                                    "type": "Point",
+                                                    "coordinates": [localThis.latlng.lng, localThis.latlng.lat]
+                                                }
+                                            };
+                                            InsertOnSave(_feature);
+
+                                            window.mapInfoPopupModule?.mapInfoPopup?.hide();
+                                        }
+                                        else {
+                                            window.layerEditor.run_new_feature(_name, param_item.type, InsertOnSave, localThis.resetEditor, null, null, {
+                                                save: true,
+                                                cancel: true,
+                                                history: true,
+                                                coordinates: false,
+                                                geojson: false
+                                            });
+
+                                            window.mapInfoPopupModule?.mapInfoPopup?.hide();
+                                        }
+                                    }
+                                },
+                                onClose: function () {
+                                    _contextMenu = null;
+                                }
+                            });
+                        }
+                    }
+                });                
+                _contextMenu.showAt(document.querySelector(".mapInfoPopup"));
+                return;
+            }
+
+            if (userLayerCount > 0 && giLayerCount > 0) {
+                _contextMenu = new ContextMenuForOld([],
+                    {
+                        attachTo: document.querySelector(".mapInfoPopup"),
+                        hasButton: false,
+                        which_btn: 1,
+                        width_px: 390
+                    });
+                var layers = window.layerListPanel.getEnabledLayers();                
+                var idx = 0;
+                layers.forEach(function (item) {
+                    if (createAllowed(item.Id)) {
+                        idx++;
+                        if (idx < 5) {
+                            var _name = window.layerListPanel.findLayerById(item.Id).name;
+                            _contextMenu.addItem({
+                                type: "button",
+                                group: 1,
+                                icon_classes: ["gr-layers", "filter-primary"],
+                                text: _name,
+                                onClick: function () {
+                                    var param_item = window.layerEditor?._params?.editor_settings?.find(function (lyr) {
+                                        return (lyr.id == item.Id && lyr.allow_create === true);
+                                    });
+                                    if (param_item) {
+                                        localThis.getEditor().layerid = item.Id;
+                                        localThis.getEditor().layername = _name;
+                                        localThis.getEditor().fatureid = 0;
+                                        localThis.getEditor().type = param_item.type;
+
+                                        if (param_item.type == "Point") {
+                                            var _feature = {
+                                                "type": "Feature",
+                                                "properties": {
+                                                    "name": _name,
+                                                },
+                                                "geometry": {
+                                                    "type": "Point",
+                                                    "coordinates": [localThis.latlng.lng, localThis.latlng.lat]
+                                                }
+                                            };
+                                            InsertOnSave(_feature);
+
+                                            window.mapInfoPopupModule?.mapInfoPopup?.hide();
+                                        }
+                                        else {
+                                            window.layerEditor.run_new_feature(_name, param_item.type, InsertOnSave, localThis.resetEditor, null, null, {
+                                                save: true,
+                                                cancel: true,
+                                                history: true,
+                                                coordinates: false,
+                                                geojson: false
+                                            });
+
+                                            window.mapInfoPopupModule?.mapInfoPopup?.hide();
+                                        }
+                                    }
+                                },
+                                onClose: function () {
+                                    _contextMenu = null;
+                                }
+                            });
+                        }
+                    }
+                });
+
+                _contextMenu.addItem({
+                    type: "button",
+                    group: 2,
+                    icon_classes: ["gr-person-3", "filter-danger"],
+                    text: gltxt("my_layers"),
+                    onClick: function () {
+                        _actions.addmyobject();
+                    },
+                    onClose: function () {
+                        _contextMenu = null;
+                    }
+                });
+
+                _contextMenu.showAt(document.querySelector(".mapInfoPopup"));
+                return;
+            }
+        },
+        "editgeom": function () {
+            if (_checks.is_mylayer()) {
+                _actions.editmyobject();
+                return;
+            }
+            if (_checks.is_gilayer()) {
+                localThis.layerEditor();
+                return;
+            }
+        },
+        "delete_giobject": function () {
+            if (confirm(gltxt("delete_q"))) {
+                var _data = {
+                    layerid: localThis.selectedFeature.layer.id,
+                    objectid: localThis.selectedFeature.id
+                };
+
+                var query = DoWebApiAction("/layer_update/delete", _data);
+
+                query.done(function (r) {
+                    if (r.success) {
+                        blinkmsg(gltxt("deleted"), 200, "success");
+                        var _layer = window.layerListPanel.findLayerById(localThis.selectedFeature.layer.id).mapLayerObject;
+                        var _params = _layer.wmsParams;
+                        _params.uid = generateGUID().replace(/-/g, "");
+                        window.layerListPanel.findLayerById(localThis.selectedFeature.layer.id).mapLayerObject.setParams(_params);
+                        window.MAP.invalidateSize();
+
+                        var _lyr = window.layerListPanel.findLayerById(localThis.selectedFeature.layer.id);
+                        
+                        if (_lyr && _lyr?.type == "vector-point-multi-cluster") {
+                            _lyr?.fetchFeatures();
+                        }
+                    }
+                    else {
+                        blinkmsg(gltxt("unable_to_delete") + ". " + r.message, 1000, "danger");
+                    }
+                    localThis.hide();
+                });
+
+                query.fail(function (r) {
+                    blinkmsg(gltxt("unable_to_delete"), 1000, "danger");
+                    localThis.hide();
+                });
+            }
+        },
+    };
+
+    this.addButtonCheck = function (name, func) {
+        if (localThis.button_checks[name]) {
+            blinkmsg("addButtonCheck: " + name + " already exists", 5000, "danger");
+            return;
+        }
+        _checks[name] = func;
+    };
+
+    this.addButton = function (button) {
+        var footer = localThis.selfpopup.find(".footer");
+        footer.append(button);
+    };
+
+    this.addActionButton = function (action, button, callback) {
+        var footerEl;
+        var selfpopup = localThis.selfpopup;
+
+        if (typeof jQuery !== 'undefined' && selfpopup instanceof jQuery) {
+            footerEl = selfpopup.find(".footer")[0];
+        } else {
+            footerEl = selfpopup.querySelector(".footer");
+        }
+
+        if (typeof jQuery !== 'undefined' && (button instanceof jQuery || button.jquery)) {
+            $(footerEl).append(button);
+        } else {
+            footerEl.appendChild(button);
+        }
+
+        if (typeof action === "string" && typeof callback === "function") {
+            _actions[action] = callback;
+        }
+    };
+
+    this.addAction = function (action, callback) {
+        if (typeof action === "string" && typeof callback === "function") {
+            _actions[action] = callback;
+        }
+    };
+
+    function pagerSetPage(page) {
+        /*--------*/
+        localThis.collapseAnnotation();
+        var min = parseInt(localThis.paginator.attr("data-min"));
+        var max = parseInt(localThis.paginator.attr("data-max"));
+        var current = parseInt(localThis.paginator.attr("data-current"));
+        var valdiv = localThis.paginator.find(".index-val");
+
+        if (page >= min && page <= max && page) {
+            valdiv.html("" + page + "<span style='font-size:9px;' class='font-primary' title='" + gltxt("found_objects")+": " + max + "'>/" + max + "</span>");
+            localThis.paginator.attr("data-current", page);
+            localThis.renderPage(page);
+        } else if (min > max) {
+            localThis.renderPage(page);
+        }
+    };
+
+    function setCount (countObj) {
+        /*--------*/
+        var title = gltxt("found_objects") + ": " + countObj;
+        $(".title > .titletext", localThis.selfpopup).html(title);
+        localThis.paginator.attr("data-min", "1");
+        localThis.paginator.attr("data-max", countObj);
+        localThis.paginator.attr("data-current", "1");
+        if (countObj === 0) {
+            localThis.paginator.css({ display: "none" });
+        } else {
+            localThis.paginator.css({ display: "block" });
+        }
+        pagerSetPage(1);
+    };
+
+    function hideFooterButtons() {
+        /*спрятать все кнопки кроме постоянных*/
+        var tmp = localThis.selfpopup[0];
+        tmp.querySelectorAll(".footer [data-action]").forEach(function (item) {
+            item.setAttribute("style", "display:none !important");
+        });
+
+        tmp.querySelectorAll(".footer .alwayson").forEach(function (item) {
+            item.setAttribute("style", "display:block");
+        });
+    };
+
+    function checkShowOnProperty(element) {
+        var showOnAttribute = element.getAttribute('show-on');
+
+        if (!showOnAttribute) return true;
+
+        var parts = showOnAttribute.split(',');
+
+        for (var i = 0; i < parts.length; i++) {
+            var functionNameAndParam = parts[i].trim().split(':');
+            var functionName = functionNameAndParam[0];
+            var parameter = functionNameAndParam[1];
+
+            if (typeof _checks[functionName] === 'function') {
+                if (parameter) {
+                    if (!_checks[functionName](parameter)) {
+                        return false;
+                    }
+                } else {
+                    if (!_checks[functionName]()) {
+                        return false;
+                    }
+                }
+            } else {
+                return false;
+            }
+        }
+
+        if (element?.getAttribute("data-action") == "showEcoEvents") {
+            window.MapInfoPopupEcoEvents.openWindow();
+        }
+
+        return true;
+    };
+
+    function toggleButtonsVisibility() {
+        hideFooterButtons();
+
+        var tmp = localThis.selfpopup[0];
+        tmp.querySelectorAll(".footer [data-action]").forEach(function (btn_div) {
+
+            var showOn = checkShowOnProperty(btn_div);
+
+            if (showOn) {
+                if (btn_div.classList.contains("toolleft")) {
+                    btn_div.style.display = "inline-block";
+                }
+                if (btn_div.classList.contains("toolright")) {
+                    btn_div.setAttribute("style", "display:flex !important");
+                }
+            }
+        });
+    };
+
+    var renderFeaturesPopup = function (latLng) {
+        if (!window.mapModule01.MapClickAllowed) return;
+        /* xxxxx */
+        localThis.latlng = latLng;
+        localThis.wait(latLng);
+
+        tryRemoveGeometry(localThis.waitmarker);
+
+        if (typeof localThis.selfpopup !== "undefined") localThis.selfpopup.remove();
+
+        bindPager();
+        bindButtons();
+        localThis.waitmarker = L.marker(latLng, {
+            icon: L.icon({
+                iconUrl: '/resources/styles/images/animan_shlyapa.gif',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10],
+                popupAnchor: [10, 10]
+            }),
+            keyboard: false,
+            zIndexOffset: 10000,
+            opacity: 0.9,
+            pane: "markerPane"
+        }).addTo(window.MAP);
+
+        window.G.DynamicArray.setValue("last_doidentify_coords", [localThis.latlng.lng, localThis.latlng.lat])
+
+        var query1 = DoWebApiCall("/glayer/do_identify", {
+            zoom: window.MAP.getZoom(),
+            xlon: localThis.latlng.lng,
+            ylat: localThis.latlng.lat,
+            aswgs: "true",
+            gilayers: JSON.stringify(window.layerListPanel.getEnabledLayers())
+        });
+
+        var query2 = DoWebApiCall("/ulayers/do_identify", {
+            zoom: window.MAP.getZoom(),
+            xlon: localThis.latlng.lng,
+            ylat: localThis.latlng.lat,
+            aswgs: "true",
+            ulayers: JSON.stringify(window.layerListPanel.getEnabledUserLayers())
+        });
+
+        var queries_array = [query1, query2];
+        (window.doIdentifyFunctions ?? []).forEach(function (f) {
+            queries_array.push(f.getCall());
+        });
+
+        localThis.results = [];
+        localThis.results.length = 0;
+
+        var allPromise = Promise.all(queries_array);
+
+        allPromise.then(function (values) {
+            var counter = 0;
+            values.forEach(function (r) {
+                if (r.success && r.results) {
+                    r.results.forEach(function (item) {
+                        localThis.results.push(item);
+                        counter += item.count;
+                    });
+                }
+            });
+
+            if (counter > 0) {
+                try { setCount(counter); } catch (e) { console.log(e) }
+                localThis.show(latLng);
+            }
+            else {
+                try { setCount(0); } catch (e) { console.log(e) }
+                localThis.show(latLng);
+            }
+
+            tryRemoveGeometry(localThis.waitmarker);
+
+            CheckModuleButtons();
+        }).catch(function(error) {
+            tryRemoveGeometry(localThis.waitmarker);
+
+            CheckModuleButtons();
+        });
+
+    };
+
+    var typeHasBoundary = function (layer_id) {
+        var result = window.layerEditor?._params?.editor_settings?.some(function (item) {
+            return (layer_id == item.id && ["Polygon", "MultiPolygon", "LineString", "MultiLineString"].indexOf(item.type) != -1);
+        });
+        return result ?? false;
+    };
+
+    var updateAllowed = function (layer_id) {
+        var result = window.layerEditor?._params?.editor_settings?.some(function (item) {
+            return (item.id == layer_id);
+        });
+        return result ?? false;
+    };
+
+    var createAllowed = function (layer_id) {
+        var result = window.layerEditor?._params?.editor_settings?.some(function (item) {
+            return (item.id == layer_id && item.allow_create === true);
+        });
+        return result ?? false;
+    };
+
+    var deleteAllowed = function (layer_id) {
+        var result = window.layerEditor?._params?.editor_settings?.some(function (item) {
+            return (item.id == layer_id);
+        });
+        return result ?? false;
+    };
+
+    var getEditingColumnParams = function (layer_id, column) {
+        var result = null;
+        window.layerEditor?._params?.editor_settings?.forEach(function (item) {
+            if (layer_id === item.id) {
+                item.columns.forEach(function (col) {
+                    if (col.name === column) {
+                        result = col;
+                    }
+                });
+            }
+        });
+        return result;
+    };
+
+    var openAttributeChange = function (row, layer_id, name, _old_value, params) {
+
+        var old_value = localThis.selectedFeature.properties[name];
+
+        var trimmed_val = trim11("" + old_value);
+        
+        if (isISODateTime(trimmed_val)) {
+            var _vals = old_value.replace("T", " ").split(" ")[0].split("-");
+            var _dt = new Date(parseInt(_vals[0]), parseInt(_vals[1]) - 1, parseInt(_vals[2]));
+
+            old_value = moment(_dt).format('L');
+        }
+        else if (isAMPMDate(trimmed_val)) {
+            var _vals = old_value.split(" ")[0].split("-");
+            var _dt;
+            if (_vals[2].length == 4) {
+                _dt = new Date(parseInt(_vals[2]), parseInt(_vals[0]) - 1, parseInt(_vals[1]));
+            }
+            else {
+                _dt = new Date(parseInt(_vals[0]), parseInt(_vals[1]) - 1, parseInt(_vals[2]));
+            }
+            old_value = moment(_dt).format('L');
+        }
+
+        var _id = 0;
+        if (localThis.selectedFeature.properties.hasOwnProperty("id")) {
+            _id = localThis.selectedFeature.properties["id"];
+        }
+
+        var caption = row.find(".attr-col").html();
+
+        var hhttmmll = caption + "<br><br>";
+        hhttmmll += caption + ": <b>" + old_value + "</b><br><br>";
+        hhttmmll += gltxt("enter_new_value") + ":<br><br>";
+
+        switch (params.type) {
+            case "number":
+                if (params.control === "checkbox") {
+                    hhttmmll += "<span>tut checkbox</span>";
+                }
+                else if (params.control === "select") {
+                    hhttmmll += "<select id='attribute_editing_control' class='popupConfrimInput'>";
+                    params.values.forEach(function (item) {
+                        var _selected = "";
+                        var _parts = item.split("|");
+                        var _value, _text;
+                        if (_parts.length === 1) {
+                            _value = item;
+                            _text = item;
+                        } else {
+                            _value = _parts[0];
+                            _text = _parts[1];
+                        }
+                        if (_value === old_value) {
+                            _selected = "selected=selected";
+                        }
+                        hhttmmll += "<option value='" + _value + "' " + _selected + ">" + _text + "</option>";
+                    });
+                    hhttmmll += "</select>";
+                }
+                else if (params.control === "input") {
+                    hhttmmll += "<input type='number' id='attribute_editing_control' class='popupConfrimInput' value='" + old_value + "'/>";
+                }
+                break;
+            case "string":
+            case "text":
+                if (params.control === "select") {
+                    hhttmmll += "<select id='attribute_editing_control' class='popupConfrimInput'>";
+                    params.values.forEach(function (item) {
+                        var _selected = "";
+                        if (item === old_value) {
+                            _selected = "selected=selected";
+                        }
+                        hhttmmll += "<option value='" + item + "' " + _selected + ">" + item + "</option>";
+                    });
+                    hhttmmll += "</select>";
+                }
+                else if (params.control === "input") {
+                    hhttmmll += "<input type='text' id='attribute_editing_control' class='popupConfrimInput' value='" + old_value + "'/>";
+                }
+                else if (params.control === "calendar") {
+                    hhttmmll += "<input type='date' id='attribute_editing_control' class='popupConfrimInput' value='" + old_value + "'/>";
+                }
+                break;
+            case "date":
+               if (params.control === "calendar") {
+                    hhttmmll += "<input type='date' id='attribute_editing_control' class='popupConfrimInput' value='" + old_value + "'/>";
+                }
+                break;
+            default:
+                hhttmmll += "<span>ne sovpalo [" + params.type + "]</span>";
+                break;
+        }
+
+        var b = {
+            type: "ok",
+            action: function () {
+                var _row = row;
+                var _layer_id = layer_id;
+                var _name = name;
+                var _old_value = old_value;
+                var _params = params;
+                var _new_value = null;
+                var _new_text = null;
+
+                switch (_params.type) {
+                    case "number":
+                        {
+                            switch (_params.control) {
+                                case "select":
+                                    _new_value = parseFloat($("#attribute_editing_control").val());
+                                    _new_text = $("#attribute_editing_control option:selected").text();
+                                    break;
+                                case "checkbox":
+                                    _new_value = $("#attribute_editing_control").prop("checked") ? 1 : 0;
+                                    _new_text = _new_value === 1 ? gltxt("yes") : gltxt("no");
+                                    break;
+                                default:
+                                    _new_value = parseFloat($("#attribute_editing_control").val());
+                                    _new_text = $("#attribute_editing_control").val();
+                                    if (_new_text === "") {
+                                        _new_text = "0";
+                                        _new_value = 0;
+                                    }
+                                    break;
+                            }
+                        }
+                        break;
+                    case "string":
+                    case "date":
+                    case "text":
+                        {
+                            switch (_params.control) {
+                                default:
+                                    _new_value = $("#attribute_editing_control").val();
+                                    _new_text = $("#attribute_editing_control").val();
+                                    if (_new_text === "") {
+                                        _new_text = "---";
+                                    }
+
+                                    if (isISODateTime(_new_text)) {
+                                        var _vals = _new_text.replace("T", " ").split(" ")[0].split("-");
+                                        var _dt = new Date(parseInt(_vals[0]), parseInt(_vals[1]) - 1, parseInt(_vals[2]));
+
+                                        _new_text = moment(_dt).format('L');
+                                    }
+                                    else if (isAMPMDate(_new_text)) {
+                                        var _vals = _new_text.split(" ")[0].split("-");
+                                        var _dt;
+                                        if (_vals[2].length == 4) {
+                                            _dt = new Date(parseInt(_vals[2]), parseInt(_vals[0]) - 1, parseInt(_vals[1]));
+                                        }
+                                        else {
+                                            _dt = new Date(parseInt(_vals[0]), parseInt(_vals[1]) - 1, parseInt(_vals[2]));
+                                        }
+                                        _new_text = moment(_dt).format('L');
+                                    }
+                                    
+                                    break;
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }              
+
+                
+                if (_old_value == _new_value) {
+                    return;
+                }
+
+
+
+                var query = DoWebApiAction("/layer_update/update_attribute", {
+                    layerid: _layer_id,
+                    id: _id,
+                    field: _name,
+                    value: _new_value
+                });
+
+                query.done(function (r) {
+                    if (r.success) {
+                        localThis.selectedFeature.properties[_name] = _new_value;
+                        _row.children(".attr-col2").children("span[data-editable]").html(_new_text);
+                    }
+                    else {
+                        alert(r.message);
+                    }
+                });
+
+            },
+            title: "",
+            text: gltxt("save"),
+            icon: false,
+            "class": "btn_confirm"
+        };
+
+        var n = {
+            type: "skip",
+            action: function () {
+
+            },
+            title: "",
+            text: gltxt("dont_save"),
+            icon: false,
+            "class": "btn_confirm customAlertBtnCancel"
+        };
+
+        customConfirm(hhttmmll, null, [b, n], 400, 220);
+    };
+
+    var renderSimple = function (layer_id, feature_id, name, alias, value) {
+
+        var trimmed_val = trim11("" + value);
+
+        if (trimmed_val === "" || trimmed_val === "0" || trimmed_val === "0.0") {
+            return $();
+        }
+
+        var tr = $("<div/>", { "data-layer-id": layer_id, "data-feature-id": feature_id, "data-field-name": name }).addClass("attr-row");
+
+        var qqq = "0";
+
+        tr.append($("<div/>").addClass("attr-col").html(alias));
+
+        var _custom_format_used = false;
+        for (var key in _custom_format) {
+            if (_custom_format[key].indexOf(name) > -1) {
+                if (typeof format[key] === "function") {
+                    value = format[key](value);
+                    qqq = "format." + key;
+                    tr.append($("<div/>").addClass("attr-col2").html(value));
+                    _custom_format_used = true;
+                    tr.attr("j", qqq);
+                }
+            }
+        }
+
+        if (!_custom_format_used) {
+            if (isISODateTime(value)) {
+                qqq = "iso";
+                var _vals = value.replace("T", " ").split(" ")[0].split("-");
+                var _dt = new Date(parseInt(_vals[0]), parseInt(_vals[1]) - 1, parseInt(_vals[2]));
+                tr.append($("<div/>").addClass("attr-col2").html(moment(_dt).format('L')));
+            }
+            else if (isAMPMDate(value)) {
+                qqq = "ampm";
+                var _vals = value.split(" ")[0].split("-");
+                var _dt;
+                if (_vals[2].length == 4) {
+                    _dt = new Date(parseInt(_vals[2]), parseInt(_vals[0]) - 1, parseInt(_vals[1]));
+                }
+                else {
+                    _dt = new Date(parseInt(_vals[0]), parseInt(_vals[1]) - 1, parseInt(_vals[2]));
+                }
+                tr.append($("<div/>").addClass("attr-col2").html(moment(_dt).format('L')));
+            }
+            else if (isInt(value) && name.containsOneOf("index,zip,post,number", true)) {
+                qqq = "int_filtered";
+                tr.append($("<div/>").addClass("attr-col2").html(value));
+            }
+            else if (isInt(value)) {
+                qqq = "int";
+                tr.append($("<div/>").addClass("attr-col2").html(number_format(value, "0", ".", "&nbsp;")));
+            }
+            else if (isDouble(value)) {
+                qqq = "double";
+                if (localThis.round_doubles) {
+                    if (["lat", "latitude", "lon", "lng", "longitude"].indexOf(name) !== -1) {
+                        tr.append($("<div/>").addClass("attr-col2").html(number_format(value, "6", ".", "&nbsp;")));
+                    }
+                    else {
+                        tr.append($("<div/>").addClass("attr-col2").html(number_format(value, "2", ".", "&nbsp;")));
+                    }
+                }
+                else {
+                    tr.append($("<div/>").addClass("attr-col2").html(value));
+                }
+            }
+            else if (isValidURL(value)) {
+                qqq = "url";
+                tr.append($("<div/>").addClass("attr-col2").html("<a href='" + value + "' target='_blank' title='" + gltxt("open_in_new_window") + "'>" + (value.length > 20 ? (value.left(20) + "...") : value) + "</a>"));
+            }
+            else {
+                qqq = "string";
+                tr.append($("<div/>").addClass("attr-col2").html(value));
+            }
+
+            tr.attr("j", qqq);
+        }
+
+        return tr;
+    };
+
+    var renderEditable = function (layer_id, feature_id, name, alias, _value, editing_params) {
+
+        var value = localThis.selectedFeature.properties[name];
+
+        var trimmed_val = trim11("" + value);
+
+        if (trimmed_val === "") trimmed_val = "---";
+
+        var tr = $("<div/>", { "data-layer-id": layer_id, "data-feature-id": feature_id, "data-field-name": name, "boo":"editable" }).addClass("attr-row");
+
+        tr.append($("<div/>").addClass("attr-col").html(alias));
+
+        if (isInt(trimmed_val) && name.containsOneOf("index,zip,post,number", true)) {
+            var editable_span = $("<span/>", { "data-editable": "true", "title": gltxt("edit") }).html(trimmed_val);
+            editable_span.on("click", function () {
+                openAttributeChange($(this).parent().parent(), layer_id, name, value, editing_params);
+            });
+            tr.append($("<div/>").addClass("attr-col2").append(editable_span));
+        }
+        else if (isInt(trimmed_val)) {
+            var editable_span = $("<span/>", { "data-editable": "true", "title": gltxt("edit") }).html(number_format(trimmed_val, "0", ".", "&nbsp;"));
+            editable_span.on("click", function () {
+                openAttributeChange($(this).parent().parent(), layer_id, name, value, editing_params);
+            });
+            tr.append($("<div/>").addClass("attr-col2").append(editable_span));
+        }
+        else if (isDouble(trimmed_val)) {
+            var editable_span = $("<span/>", { "data-editable": "true", "title": gltxt("edit") }).html(number_format(trimmed_val, "2", ".", "&nbsp;"));
+            editable_span.on("click", function () {
+                openAttributeChange($(this).parent().parent(), layer_id, name, value, editing_params);
+            });
+            tr.append($("<div/>").addClass("attr-col2").append(editable_span));
+        }
+        else if (isValidURL(trimmed_val)) {
+            tr.append($("<div/>").addClass("attr-col2").html("<a href='" + value + "' target='_blank' title='" + gltxt("open_in_new_window") + "'>" + (trimmed_val.length > 20 ? (trimmed_val.left(20) + "...") : trimmed_val) + "</a>"));
+        }
+        else if (isISODateTime(trimmed_val)) {
+            var _vals = value.replace("T", " ").split(" ")[0].split("-");
+            var _dt = new Date(parseInt(_vals[0]), parseInt(_vals[1]) - 1, parseInt(_vals[2]));
+
+            var editable_span = $("<span/>", { "data-editable": "true", "title": gltxt("edit") }).html(moment(_dt).format('L'));
+            
+            editable_span.on("click", function () {
+                openAttributeChange($(this).parent().parent(), layer_id, name, value, editing_params);
+            });
+                        
+            tr.append($("<div/>").addClass("attr-col2").html(editable_span));
+        }
+        else if (isAMPMDate(trimmed_val)) {
+            var _vals = value.split(" ")[0].split("-");
+            var _dt;
+            if (_vals[2].length == 4) {
+                _dt = new Date(parseInt(_vals[2]), parseInt(_vals[0]) - 1, parseInt(_vals[1]));
+            }
+            else {
+                _dt = new Date(parseInt(_vals[0]), parseInt(_vals[1]) - 1, parseInt(_vals[2]));
+            }
+
+            var editable_span = $("<span/>", { "data-editable": "true", "title": gltxt("edit") }).html(moment(_dt).format('L'));
+            
+            editable_span.on("click", function () {
+                openAttributeChange($(this).parent().parent(), layer_id, name, value, editing_params);
+            });
+            
+            tr.append($("<div/>").addClass("attr-col2").html(editable_span));
+        }
+        else if (/^(\d{4})-0?(\d+)-0?(\d+)[T ]0?(\d+):0?(\d+):0?(\d+)$/.test(trimmed_val)) {
+            var tt = trimmed_val.split("T")[0].split("-");
+            
+            tr.append($("<div/>").addClass("attr-col2").html(tt[2] + "." + tt[1] + "." + tt[0]));
+        }
+        else {
+            var editable_span = $("<span/>", { "data-editable": "true", "title": gltxt("edit") }).html(trimmed_val);
+            editable_span.on("click", function () {
+                openAttributeChange($(this).parent().parent(), layer_id, name, value, editing_params);
+            });
+            tr.append($("<div/>").addClass("attr-col2").append(editable_span));
+        }
+
+        return tr;
+    };
+
+    var featureToHtml = function (feature) {
+        /* xxxx */
+        var htm = $("<div/>", { id: "id" + feature.id }).addClass("card");
+
+        var layer = window.layerListPanel.findLayerById(feature.layer.id);
+        var ulayer = window.layerListPanel.findUserLayerByUid(feature.layer.uid);
+
+        if (layer === null && feature.layer.id == 0 && feature.layer.schema) {
+            layer = {
+                schema: feature.layer.schema
+            };
+        }
+        else if (layer === null && ulayer === null) {
+            return featureToEmptyHtml(gltxt_f("layer_n_not_found", feature.layer.name));
+        }
+
+        localThis.paginator.children(".layer").html(feature.layer.name);
+        localThis.paginator.children("button[data-balloon]").attr("data-balloon", feature.layer.name);
+
+        var schema;
+
+        if (layer) { // FIXME "layer !== null" падал когда layer был равен undefined
+            schema = layer.schema;
+
+            schema.forEach(function (o1) {
+
+                var name = o1.name;
+
+                if (name.indexOf("picture_url") != -1) {
+                    if (feature.properties.hasOwnProperty(name)) {
+
+                        var value = feature.properties[name];
+                        if (isValidURL(value)) {
+                            var img_block = $('<div data-layer-id="' + feature.layer.id + '" data-feature-id="' + feature.id + '" data-field-name="' + name + '" class="attr-row" j="6"><div class="attr-col"></div></div>');
+                            img_block.find(".attr-col").css({
+                                width: "100%",
+                                height: "250px",
+                                "background-image": "url(" + value + ")",
+                                "background-repeat": "no-repeat",
+                                "background-size": "250px",
+                                "background-position": "center"
+                            });
+                            htm.append(img_block);
+                        }
+                    }
+                }
+            });
+
+            schema.forEach(function (o1) {
+
+                var name = o1.name;
+                var alias = o1.aliases[0].alias; /*todo: выбрать по локали*/
+
+                if (name.indexOf("lidx") == -1) {
+                    if (feature.properties.hasOwnProperty(name)) {
+
+                        var value = feature.properties[name];
+
+                        if ((window.userModule ?? window.UserModule).userData.Info.Roles.containsAny(["superadministrator", "supermanager", "clientadmin", "clientmoderator", "clienteditor"])) {
+                            var editing_params = getEditingColumnParams(feature.layer.id, name);
+
+                            if (updateAllowed(feature.layer.id) && editing_params !== null) {
+                                var _ed_field = renderEditable(feature.layer.id, feature.id, name, alias, value, editing_params);
+                                htm.append(_ed_field);
+                            }
+                            else {
+                                if (name.indexOf("picture_url") == -1) {
+                                    var _rd_field = renderSimple(feature.layer.id, feature.id, name, alias, value);
+                                    htm.append(_rd_field);
+                                }
+                            }
+                        }
+                        else {
+                            if (name.indexOf("picture_url") == -1) {
+                                var _rd_field = renderSimple(feature.layer.id, feature.id, name, alias, value);
+                                htm.append(_rd_field);
+                            }
+                        }
+                    }
+                }
+            });
+
+        }
+        else if (ulayer !== null) {
+            schema = ulayer.Schema;
+
+            schema.forEach(function (o1) {
+
+                var name = o1.Name;
+
+                var alias = o1.Caption;
+
+                if (feature.properties.hasOwnProperty(name)) {
+
+                    var value = feature.properties[name];
+                    var trimmed_val = trim11("" + value);
+
+                    /*если значение есть, то выводим этот атрибут*/
+                    if (true || (trimmed_val !== "" && trimmed_val !== "0" && trimmed_val !== "0.0")) {
+
+                        var tr = $("<div/>").addClass("attr-row");
+
+                        tr.append($("<div/>").addClass("attr-col").html(alias));
+
+                        if (isInt(value) && (name.indexOf("index") !== -1 || name.indexOf("zip") !== -1 || name.indexOf("post") !== -1)) {
+                            tr.append($("<div/>").addClass("attr-col2").html(value));
+                        }
+                        else if (isInt(value)) {
+                            tr.append($("<div/>").addClass("attr-col2").html(number_format(value, "0", ".", "&nbsp;")));
+                        }
+                        else if (isDouble(value)) {
+                            tr.append($("<div/>").addClass("attr-col2").html(number_format(value, "2", ".", "&nbsp;")));
+                        }
+                        else if (isValidURL(value)) {
+                            tr.append($("<div/>").addClass("attr-col2").html("<a href='" + value + "' target='_blank' title='"+gltxt("open_in_new_window")+"'>" + (value.length > 20 ? (value.left(20) + "...") : value) + "</a>"));
+                        }
+                        else if (/^(\d{4})-0?(\d+)-0?(\d+)[T ]0?(\d+):0?(\d+):0?(\d+)$/.test(value)) {
+                            var tt = value.split("T")[0].split("-");
+                            tr.append($("<div/>").addClass("attr-col2").html(tt[2] + "." + tt[1] + "." + tt[0]));
+                        }
+                        else {
+                            tr.append($("<div/>").addClass("attr-col2").html(value));
+                        }
+
+                        htm.append(tr);
+                    }
+
+                }
+
+            });
+        }
+
+        return htm;
+    };
+
+    var featureToEmptyHtml = function (additionalText) {
+        /* xxxx */
+        var htm = $("<div/>", { id: "id000" }).addClass("card");
+        htm.append($("<div/>").addClass("empty").html(gltxt("nothing_found_in_visible_layers") + "<br/>" + additionalText));
+
+        var _enabled = window.layerListPanel.getEnabledLayers();
+
+        if (_enabled.length > 0) {
+
+            var _editable_count = 0;
+            _enabled.forEach(function (item) {
+                if (createAllowed(item.Id)) {
+                    _editable_count += 1;
+                }
+            });
+
+            if (_editable_count > 0) {
+                localThis.selfpopup.children(".footer").children(".plus-ico").css({ display: "block" });
+            } else {
+                localThis.selfpopup.children(".footer").children(".plus-ico").css({ display: "none" });
+            }
+
+        }
+
+        return htm;
+    };
+
+    var featureToPayHtml = function (index, layer) {
+        /* xxxx */
+        var pay = $("<div/>", { "class": "pay-container flex-container" }).append(
+            $("<span/>", {"class":"wallet-ico"}),
+            $("<label/>").text(gltxt("paid_data"))
+        );
+        localThis.paginator.children(".layer").html(layer);
+        var htm = $("<div/>", { id: "id000" + index }).addClass("card");
+        htm.append(pay);
+        return htm;
+    };
+
+    this.renderGeometry = function (json) {
+
+        tryRemoveGeometry(localThis.selectedGeometry);
+
+        localThis.selectedGeometry = L.circleMarker([json.geometry.coordinates[1], json.geometry.coordinates[0]], {
+            radius: 10,
+            fillColor: "#3d91de",
+            fillOpacity: 0.0,
+            color: "#3d91de",
+            weight: 1,
+            opacity: 1.0,
+            zIndexOffset: 1000500,
+            pane: "specialFX",
+            clickable: false,
+            interactive: false
+        });
+
+        localThis.selectedGeometry.addTo(window.MAP);
+
+    };
+
+    this.renderPage = function(n) {       
+        /* xxxxx */
+        var f = localThis.results;
+        var counter = 0;
+        localThis.selectedLayerId = 0;
+
+        localThis.results.forEach(function (item) {
+            counter += item.count;
+        });
+
+        if (counter === 0 || n === 0) {
+            $(".cards-container", localThis.selfpopup).children().remove();
+
+            var query = DoWebApiAction("/geocoder/point2address", {
+                point: "" + localThis.latlng.lng + "," + localThis.latlng.lat,
+                zoom: window.MAP.getZoom()
+            });
+
+            query.done(function (r) {
+                if (r.success) {
+                    $(".cards-container", localThis.selfpopup).empty().append(featureToEmptyHtml("<br/>" + gltxt("address") + ": " + r.results.Caption));
+                 
+                } else {
+                    $(".cards-container", localThis.selfpopup).empty().append(featureToEmptyHtml());
+                }
+            });
+
+            query.fail(function () {
+                $(".cards-container", localThis.selfpopup).empty().append(featureToEmptyHtml());
+            });
+
+            window.mapInfoPopupModule.mapInfoPopup.selectedFeature = null;
+            window.mapInfoPopupModule.mapInfoPopup.selectedIndex = -1;
+
+            tryRemoveGeometry(window.mapInfoPopupModule.mapInfoPopup.selectedGeometry);
+
+            toggleButtonsVisibility();
+
+        } else {
+
+            var counter = 0;
+            
+            f.forEach(function (identified_layer) {
+                if (identified_layer.is_pay === true) {
+                    for (var i = 0; i < identified_layer.count; i++) {
+                        counter += 1;
+                        if (counter === n) {
+                            localThis.selectedFeature = Object.assign({}, identified_layer);
+                            toggleButtonsVisibility();
+                            localThis.card_container.children().remove();
+                            localThis.card_container.empty().append(featureToPayHtml(i + 1, identified_layer.name));
+                        }
+                    }
+                } else {
+                    identified_layer.features.forEach(function (o2) {
+                        counter += 1;
+                        if (counter === n) {
+                            localThis.selectedFeature = Object.assign({}, o2);
+                            localThis.selectedFeature = Object.assign(localThis.selectedFeature, {
+                                layer: {
+                                    name: identified_layer.name,
+                                    id: identified_layer.id,
+                                    uid: identified_layer.uid,
+                                    editable: identified_layer.editable,
+                                    schema: identified_layer.schema
+                                }
+                            });
+                            localThis.selectedLayerId = identified_layer.id;
+                            window.G.DynamicFlat.setValue('get_selected_layer_object', { selectedFeature: localThis.selectedFeature });
+                           
+                            localThis.renderGeometry(localThis.selectedFeature);
+
+                            toggleButtonsVisibility();
+                            //localThis.toggleEditButtons();
+                            localThis.card_container.children().remove();
+                            localThis.card_container.empty().append(featureToHtml(localThis.selectedFeature));
+                        }
+                    });
+                }
+            });
+        }
+
+        localThis.onSelectionChange.forEach(function (f) {
+            if (typeof f === "function") {
+                f(localThis.selectedFeature);
+            }
+        });
+    };
+
+    this.renderHtmlPopup = function(html, latLng, width, height) {
+        /* xxxxx */
+    };
+
+    this.show = function(latLng) {
+        /* xxxxx */
+        localThis.popup.setLatLng(latLng);
+        localThis.popup.addTo(window.MAP);
+        localThis.popup.on("remove", function () {
+            window.mapModule01?.clearSelectedFeature();
+        });
+        
+        
+        $(".mapInfoPopup .leaflet-popup-content").empty().append(localThis.selfpopup);
+        $(".mapInfoPopup .leaflet-popup-close-button").empty();
+        $(".mapInfoPopup").find(".value_coordinates").text("" + localThis.latlng.lat.toFixed(6) + " " + localThis.latlng.lng.toFixed(6));
+        localThis.visible = true;
+        /*mobile*/
+        if (window.detectMobile() == "mobile") {
+            if (localThis.popupMobile !== null) {
+                localThis.popupMobile.remove();
+            }
+
+            localThis.popup._container.remove();
+            var contentPopup = localThis.selfpopup[0];
+            var e = contentPopup.querySelectorAll(".title")[0];
+            var btnClosePopup = document.createElement("div");
+            btnClosePopup.classList.add("btn-close-popup-mobile");
+            
+            e.append(btnClosePopup);
+            localThis.popupMobile = document.createElement("div");
+            localThis.popupMobile.classList.add("popup-mobile");
+            localThis.popupMobile.append(contentPopup);
+
+            localThis.mobileEvents.PopupTransitionend = function (_func) {
+                if (typeof _func === "function") {
+                    _func();
+                }
+            };
+
+            /*Прячем попап */
+            localThis.mobileEvents.hidePopup = function () {
+                localThis.popupMobile.classList.add("deactivate");
+
+            };
+
+            /* показываем попап */
+            localThis.mobileEvents.showPopup = function () {
+                localThis.popupMobile.classList.remove("deactivate");
+            };
+
+            /*удаляем  попап */
+            localThis.mobileEvents.closePopup = function () {
+                localThis.popupMobile.classList.add("deactivate");
+
+                const handleTransitionEnd = (event) => {
+                    event.target.removeEventListener('transitionend', handleTransitionEnd); 
+                    localThis.mobileEvents.PopupTransitionend(() => localThis.popupMobile.remove);
+                };
+
+                localThis.popupMobile.addEventListener('transitionend', handleTransitionEnd);
+            };
+
+            btnClosePopup.addEventListener("click", localThis.mobileEvents.closePopup);
+            document.body.append(localThis.popupMobile);
+
+        }
+    };
+
+    this.hide = function() {
+        /* xxxxx */
+        var _closebtn = $("a.leaflet-popup-close-button")[0];
+        if (_closebtn && typeof _closebtn.click == "function") {
+            _closebtn.click();
+        }
+
+        $(".mapInfoPopup").remove();
+        window.mapInfoPopupModule.mapInfoPopup.selectedFeature = null;
+        window.mapInfoPopupModule.mapInfoPopup.selectedIndex = -1;
+        tryRemoveGeometry(window.mapInfoPopupModule.mapInfoPopup.selectedGeometry);
+        window.mapModule01?.clearSelectedFeature();
+        localThis.visible = false;
+    };
+
+    this.wait = function() {
+        /* xxxxx */
+        $(".mapInfoPopup .leaflet-popup-content").empty();
+        $(".mapInfoPopup .leaflet-popup-close-button").empty();
+    };
+
+    this.distroy = function() {
+    /* xxxxx */
+        localThis.visible = false;
+    };
+
+    this.enableSelection = function (anyplace) {
+
+        localThis.anyplace = (anyplace === true);
+
+        var footer = localThis.selfpopup.find(".footer");
+        footer.find("[data-action=selectobject]").css({ display: "none" });
+        footer.find("[data-action=unselectobject]").css({ display: "none" });
+        localThis.selectionEnabled = true;
+        
+        localThis.features = [];
+        localThis.features.length = [];
+
+        enableSelectionLayer();
+    };
+
+    this.disableSelection = function () {
+        var footer = localThis.selfpopup.find(".footer");
+        footer.find("[data-action=selectobject]").css({ display: "none" });
+        footer.find("[data-action=unselectobject]").css({ display: "none" });
+        localThis.selectionEnabled = false;
+        localThis.features = [];
+        localThis.features.length = [];
+        disableSelectionLayer();
+
+        localThis.anyplace = false;
+    };
+
+/*knopki*/
+
+    var enableSelectionLayer = function () {
+        
+        if (localThis.selectedLayer !== null) {
+            tryRemoveGeometry(localThis.selectedLayer);
+            localThis.selectedLayer = null;
+        }
+
+        localThis.selectedLayer = L.geoJson(localThis.features, {
+            pointToLayer: function (feature, latlng) {
+                return L.circleMarker(latlng, {
+                    radius: 20,
+                    fillColor: "#ffffff",
+                    fillOpacity: 0.0,
+                    color: "#f5ff78",
+                    weight: 3,
+                    opacity: 0.9
+                });
+            },
+            pane: "specialFX",
+            clickable: false,
+            interactive: false
+        }).addTo(window.MAP);
+
+        window.MAP.invalidateSize();
+    };
+
+    var disableSelectionLayer = function () {
+
+        if (localThis.selectedLayer !== null) {
+            tryRemoveGeometry(localThis.selectedLayer);
+            localThis.selectedLayer = null;
+        }
+
+        window.MAP.invalidateSize();
+    };
+
+    this.bookmark = function () {
+    };
+
+    this.error = function () {
+        var options = { latlng: localThis.latlng, feature: localThis.selectedFeature };
+        window.LyrEditObject.open($("body"), options);
+    };
+
+    /* ======= */
+    /*gi-editor*/
+    /* ======= */
+
+    this.addobject = function () {
+        window.GiLyrObject.open($("body"), { latlng: localThis.latlng });
+        localThis.hide();
+    };
+
+    var layerEditorOnCancel = function () {
+        DoNothing();
+    };
+
+    var UpdateOnSave = function (_feature) {
+        var _layerid = localThis.getEditor().layerid;
+        var _fatureid = localThis.getEditor().fatureid;
+
+        var qqq = DoWebApiAction("/layer_update/update_geom", {
+            layer_id: _layerid,
+            object_id: _fatureid,
+            feature: JSON.stringify(_feature)
+        });
+
+        qqq.done(function (r) {
+            if (r.success == true && r.results == true) {
+                blinkmsg(gltxt("saved"));
+                localThis.resetEditor();
+            }
+            else {
+                alert(r.message);
+            }
+        });
+
+        return qqq;
+    };
+
+    var InsertOnSave = function (_feature) {
+        var _layerid = localThis.getEditor().layerid;
+
+        if (_feature.geometry.type == "Polygon" && localThis.getEditor().type == "MultiPolygon") {
+            _feature.geometry.type = "MultiPolygon";
+            _feature.geometry.coordinates = [_feature.geometry.coordinates];
+        }
+        if (_feature.geometry.type == "LineString" && localThis.getEditor().type == "MultiLineString") {
+            _feature.geometry.type = "MultiLineString";
+            _feature.geometry.coordinates = [_feature.geometry.coordinates];
+        }
+
+        var qqq = DoWebApiAction("/layer_update/insert", {
+            layer_id: _layerid,
+            feature: JSON.stringify(_feature)
+        });
+
+        qqq.done(function (r) {
+            if (r.success == true && r.results > 0) {
+                blinkmsg(gltxt("saved"));
+                localThis.resetEditor();
+                var _layer = window.layerListPanel.findLayerById(_layerid).mapLayerObject;
+                var _params = _layer.wmsParams;
+                _params.uid = generateGUID().replace(/-/g, "");
+                window.layerListPanel.findLayerById(_layerid).mapLayerObject.setParams(_params);
+                window.MAP.invalidateSize();
+
+                var _lyr = window.layerListPanel.findLayerById(_layerid);
+                
+                if (_lyr && _lyr?.type == "vector-point-multi-cluster") {
+                    _lyr?.fetchFeatures();
+                }
+            }
+            else {
+                alert(r.message);
+            }
+        });
+
+        return qqq;
+    };
+
+    this.layerEditor = function () {
+
+        if (!localThis.selectedFeature?.layer?.id) return;
+
+        var _layerid = localThis.selectedFeature.layer.id;
+        var _layername = localThis.selectedFeature.layer.name;
+        var _fatureid = localThis.selectedFeature.id;
+        var _feature = null;
+
+        var qqq = DoWebApiAction("/layer_update/get_feature", {
+            layer_id: _layerid,
+            object_id: _fatureid
+        });
+
+        qqq.done(function (r) {
+            if (r.success) {
+                if (r.results.length > 0) {
+                    _feature = r.results[0];
+                    var _flip = true;
+                    window.layerEditor.run_lyr_editor(_layername, _layerid, _feature, _flip, UpdateOnSave, layerEditorOnCancel);
+                    localThis.getEditor().layerid = localThis.selectedFeature.layer.id;
+                    localThis.getEditor().fatureid = localThis.selectedFeature.id;
+
+                    window.mapInfoPopupModule?.mapInfoPopup?.hide();
+                }
+                else {
+                    alert("empty array!");
+                }
+            }
+            else {
+                alert(r.message);
+            }
+        });
+    };
+
+    /* ======= */
+    /*gi-editor*/
+    /* ======= */
+
+    init();
+};
+
+$(document).ready(function() {
+    window.mapInfoPopupModule = new MapInfoPopupModule();
+});

@@ -1,0 +1,544 @@
+/**
+ * @param {{
+ *   [id: string]: {
+ *     color?: string,
+ *     timeout?: number,
+ *   },
+ *   "default":
+ * }} params
+ */
+function TerrasPanel(params) {
+    let activeTerra = null;
+    let terras = [];
+    let oTerras = [];
+    let onSelectedCityChanged = [];
+    let lastSelectTerritory = null;
+    let buttonCloseList = null;
+    let cityListRibbon = null;
+    let searchBox = null;
+    let prevFeatureTerra = [];
+
+    function SearchBox() {
+        function init() {
+            var inputSearch = document.querySelector("#searchBox input");
+
+            inputSearch.addEventListener("keyup", function (e) {
+                if (e.keyCode === 13) {
+                    this.select();
+                    filterContentByNameContains(this.value);
+                }
+            });
+        }
+
+        function filterContentByNameContains(val) {
+            let emptyEls = document.querySelectorAll(
+                "[data-terras-item-container] [data-filter-empty]",
+            );
+            emptyEls.forEach(function (el) {
+                el.style.display = "none";
+            });
+
+            if (!val || val.length === 0) {
+                returnStateBeforeFilterContentByNameContains(val);
+            } else {
+                doFilterContentByNameContains(val);
+            }
+        }
+
+        function doFilterContentByNameContains(val) {
+            let count = 0;
+            let items = document.querySelectorAll(
+                "[data-terras-item-container] .item",
+            );
+            let search = val.toLowerCase();
+
+            items.forEach(function (el) {
+                let text = el.textContent.toLowerCase();
+                let parentId = el.getAttribute("data-parent-id");
+
+                if (text.indexOf(search) !== -1) {
+                    el.setAttribute("data-filter", "true");
+                    if (el.hasAttribute("data-group-opened")) {
+                        el.setAttribute("data-group-opened", "2");
+                    }
+                    el.style.display = "";
+                    el.setAttribute("data-visible-group-item", "1");
+
+                    let parent = document.querySelector(
+                        `#theCitiesList .item[data-id='${parentId}']`,
+                    );
+                    if (parent) {
+                        parent.setAttribute("data-group-opened", "1");
+                        parent.style.display = "";
+                        parent.setAttribute("data-visible-group-item", "1");
+                    }
+                    count++;
+                } else {
+                    el.style.display = "none";
+                    el.setAttribute("data-visible-group-item", "0");
+                }
+            });
+
+            if (count === 0) {
+                let emptyEls = document.querySelectorAll(
+                    "[data-terras-item-container] [data-filter-empty]",
+                );
+                emptyEls.forEach(function (el) {
+                    el.style.display = "";
+                    el.setAttribute("data-visible-group-item", "1");
+                });
+            }
+        }
+
+        function returnStateBeforeFilterContentByNameContains() {
+            var items = document.querySelectorAll(
+                "[data-terras-item-container] .item",
+            );
+
+            items.forEach(function (el) {
+                el.setAttribute("data-filter", "false");
+
+                if (el.hasAttribute("data-group-opened")) {
+                    el.setAttribute("data-group-opened", "0");
+                }
+
+                el.style.display = "none";
+            });
+
+            var levelZeroItems = document.querySelectorAll(
+                '[data-terras-item-container] .item[data-level="0"]',
+            );
+            levelZeroItems.forEach(function (el) {
+                el.style.display = "";
+                el.setAttribute("data-visible-group-item", "1");
+            });
+        }
+
+        init();
+    }
+
+    function bindEvents() {
+        document.getElementById("leftPanelCityListRibbon").style.opacity = 1;
+
+        document
+            .getElementById("leftPanelCityListRibbon")
+            .addEventListener("click", function () {
+                show();
+            });
+
+        document
+            .getElementById("btnListClose")
+            .addEventListener("click", function () {
+                hide();
+            });
+    }
+
+    function loadTerras() {
+        let terrasvc = DoWebApiAction("/terras/list_prepared", { magic: "" });
+        terrasvc.done(function (r) {
+            if (r.success) {
+                let result = [];
+
+                let listSelect = r.results;
+
+                let i = 0;
+
+                for (i = 0; i < listSelect.length; i++) {
+                    if (listSelect[i].Level === 2) {
+                        result.push(listSelect[i]);
+                    }
+                }
+
+                for (i = 0; i < listSelect.length; i++) {
+                    let terraPositionInList = findTerraParentInList(
+                        listSelect,
+                        listSelect[i],
+                    );
+
+                    if (terraPositionInList !== null) {
+                        if (!terraPositionInList.Terras) {
+                            terraPositionInList.Terras = [];
+                        }
+
+                        terraPositionInList.Terras.push(listSelect[i]);
+                    }
+                }
+
+                terras = result;
+
+                renderTerras();
+            }
+        });
+
+        return terrasvc;
+    }
+
+    function selectCity() {
+        lastSelectTerritory = Cookies.get("gi_city");
+        let _linkdata = window.G.Dynamic.getValue("zoom_in_link");
+        if (_linkdata) {
+            _linkdata = JSON.parse(_linkdata);
+            if (_linkdata && _linkdata.properties?.cityid) {
+                let _t = findById(parseInt(_linkdata.properties.cityid));
+                if (_t) {
+                    lastSelectTerritory = _linkdata.properties.cityid;
+                } else {
+                    blinkmsg(
+                        `Нет доступа к территории [${_linkdata.properties.cityid}]`,
+                        10000,
+                        "danger",
+                    );
+                }
+            }
+        }
+
+        if (!lastSelectTerritory) {
+            if (findById(28) != null) {
+                lastSelectTerritory = 28;
+                findById(28).showTerra(false);
+            } else {
+                if (oTerras.length > 0) {
+                    oTerras[0].showTerra(false);
+                } else {
+                    alert(gltxt("terra_no_accessible_terras"));
+                }
+            }
+        } else {
+            let foundLastTerraInList = findById(parseInt(lastSelectTerritory));
+            if (foundLastTerraInList) {
+                foundLastTerraInList.showTerra(false);
+            } else {
+                if (oTerras.length > 0) {
+                    oTerras[0].showTerra(false);
+                } else {
+                    alert(gltxt("terra_no_accessible_terras"));
+                }
+            }
+        }
+    }
+
+    function init() {
+        loadTerras().done(function () {
+            searchBox = new SearchBox();
+
+            bindEvents();
+
+            setSityRibbonText(gltxt("terra_select_one"));
+
+            selectCity();
+
+            document.getElementById("leftPanelCityListRibbon").style.opacity =
+                1;
+            document
+                .querySelector(".gr-arrow-left-thin")
+                .setAttribute("title", gltxt("close"));
+            document
+                .querySelector(".blaPlec")
+                .setAttribute("placeholder", gltxt("search_enter_search_text"));
+
+            window.addEventListener("terras.set", (e) => {
+                if (window.debug === true) {
+                    blinkmsg(`setTerras(${e.detail.id})`);
+                }
+                findById(parseInt(e.detail.id))?.showTerra(false, e);
+            });
+        });
+    }
+
+    function show() {
+        var el = document.getElementById("leftPanelTheCities");
+        if (!el) return;
+        el.style.transition = "transform 300ms ease";
+        el.style.transform = "translate(0px, 48px)";
+    }
+
+    function hide() {
+        var el = document.getElementById("leftPanelTheCities");
+        if (!el) return;
+        el.style.transition = "transform 300ms ease";
+        el.style.transform = "translate(-1000px, 48px)";
+    }
+
+    function setSityRibbonText(text) {
+        document.getElementById("leftPanelCityListRibbon").innerHTML = text;
+        onSelectedCityChanged.forEach(function (o) {
+            o(text);
+        });
+    }
+
+    function loadCurentTerras() {
+        try {
+            findById(parseInt(lastSelectTerritory)).showTerra(false);
+        } catch (e) {
+            DoNothing();
+        }
+    }
+
+    function findTerraParentInList(listSelect, target) {
+        for (let i = 0; i < listSelect.length; i++) {
+            let entity = listSelect[i];
+            if (target.ParentId == entity.Id) {
+                return entity;
+            }
+            if (entity.Terras != null) {
+                let terraEntity = findTerraParentInList(entity.Terras, target);
+                if (terraEntity != null) {
+                    return terraEntity;
+                }
+            }
+        }
+        return null;
+    }
+
+    function renderTerras() {
+        var container = document.querySelector("[data-terras-item-container]");
+        var template =
+            document.getElementById("terraItemTemplate").content
+                .firstElementChild;
+        renderTerrasRec(container, template, terras, 0);
+    }
+
+    function renderTerrasRec(container, template, list, level) {
+        if (!list) return;
+        list.forEach(function (terra) {
+            var item = TerraItem(container, template, terra, level);
+            item.init();
+            oTerras.push(item);
+            renderTerrasRec(container, template, terra.Terras, level + 1);
+        });
+    }
+
+    function findById(id) {
+        for (var i = 0; i < oTerras.length; i++) {
+            if (oTerras[i].data.Id == id) return oTerras[i];
+        }
+        return null;
+    }
+
+    function TerraItem(container, template, src, level) {
+        var data = Object.assign({ Id: null }, src);
+        var el = template.cloneNode(true);
+        var llObj = null;
+
+        var init = function () {
+            el.dataset.level = level;
+            el.dataset.id = data.Id;
+            el.dataset.parentId = data.ParentId;
+
+            var text = el.querySelector(".text");
+            if (data.Level == 3) {
+                text.textContent = data.Name;
+            } else {
+                text.textContent = data.Region;
+            }
+            text.dataset.name = data.Name;
+            text.dataset.region = data.Region;
+
+            if (Array.isArray(data.Terras) && data.Terras.length) {
+                el.dataset.groupOpened = "0";
+            } else {
+                [].slice.call(el.children).forEach(function (n) {
+                    if (n.classList.contains("group_icon")) {
+                        n.addEventListener("click", function () {
+                            n.classList.remove("group_icon");
+                        });
+                    }
+                });
+            }
+
+            el.addEventListener("click", clickHandler);
+            /* el.addEventListener('click', () => {
+                const event = new CustomEvent('citySelected', {
+                    detail: data
+                });
+                document.dispatchEvent(event);
+                
+            });*/
+            container.appendChild(el);
+        };
+
+        function clickHandler(evt) {
+            if (evt.target.classList.contains("group_icon")) {
+                if (document.querySelector("#searchBox input").value !== "")
+                    return;
+                toggleGroup();
+            } else {
+                showTerra(false);
+            }
+        }
+
+        function toggleGroup() {
+            if (el.dataset.filter === "true") return;
+
+            let kids = document.querySelectorAll(
+                '#theCitiesList .item[data-parent-id="' + el.dataset.id + '"]',
+            );
+            let opened = el.dataset.groupOpened === "1";
+
+            el.dataset.groupOpened = opened ? "0" : "1";
+            kids.forEach(function (k) {
+                k.dataset.visibleGroupItem = opened ? "0" : "1";
+                k.style.display = opened ? "none" : "";
+            });
+        }
+
+        function showTerra(isDirect, _event) {
+            /* console.log("!!showTerra", data);*/
+            activeTerra = data;
+            activeTerra.event = _event;
+
+            const event = new CustomEvent("terraSelected", {
+                detail: activeTerra,
+            });
+            document.dispatchEvent(event);
+
+            window.G.DynamicFlat.setValue(GiEvents.TerraInfo, data);
+            window.G.Dynamic.setValue(GiEvents.TerraId, data.Id);
+
+            if (!data.Terras) {
+                DoNothing();
+            }
+
+            document
+                .querySelectorAll(
+                    '[data-terras-item-container] .item[data-active="1"]',
+                )
+                .forEach(function (n) {
+                    n.dataset.active = "0";
+                });
+
+            el.dataset.active = "1";
+
+            setSityRibbonText(data.Name);
+
+            Cookies.set("gi_city", data.Id, {
+                expires: 365,
+                domain: "." + removeFirstSubdomain(location.hostname),
+            });
+
+            if (buttonCloseList) {
+                buttonCloseList.dispatchEvent(
+                    new MouseEvent("click", { bubbles: true }),
+                );
+            }
+
+            if (!isDirect) {
+                if (!llObj) {
+                    if (prevFeatureTerra[0]) {
+                        tryRemoveGeometry(prevFeatureTerra[0]);
+                    }
+
+                    var new_geom = convertLongitudesTo360(
+                        JSON.parse(data.GeomGeojson),
+                    );
+                    const terrasBuiltinParams = {
+                        color: "#FF0000",
+                        timeout: 5,
+                    };
+
+                    const terrasDefaultParams = params["default"] ?? {};
+                    const terrasCustomParams = params[data.Id] ?? {};
+                    const terrasParams = {
+                        ...terrasBuiltinParams,
+                        ...terrasDefaultParams,
+                        ...terrasCustomParams,
+                    };
+
+                    let geomLayer = L.geoJson(new_geom, {
+                        style: function () {
+                            return {
+                                color: terrasParams.color,
+                                weight: 6.66,
+                                opacity: 0.6,
+                                fillColor: "#FFFFFF",
+                                fillOpacity: 0,
+                            };
+                        },
+                        pane: "specialFX",
+                        clickable: false,
+                        interactive: false,
+                    }).addTo(window.MAP);
+
+                    if (window.detectMobile() !== "mobile") {
+                        if (terrasParams.timeout != -1) {
+                            setTimeout(function () {
+                                tryRemoveGeometry(geomLayer);
+                            }, terrasParams.timeout * 1000);
+                        }
+                    }
+
+                    prevFeatureTerra[0] = geomLayer;
+
+                    var extent = convertLongitudesTo360Mercator(
+                        JSON.parse(data.ExtentGeomGeojson),
+                    );
+
+                    llObj = getLlObjectFromGeoJson(extent);
+
+                    if (
+                        IsCrossing180Meridian(
+                            JSON.parse(data.GeomGeojson)?.coordinates,
+                        )
+                    ) {
+                        window.MAP.fitBounds(geomLayer.getBounds());
+                        window.MAP.invalidateSize();
+                    } else {
+                        window.MAP.fitBounds(llObj.getBounds());
+                    }
+
+                    llObj = null;
+                } else {
+                    window.MAP.fitBounds(llObj.getBounds());
+                }
+            }
+        }
+
+        /* public */
+        return { init: init, data: data, showTerra: showTerra };
+    }
+
+    function getTerras() {
+        return terras;
+    }
+
+    function getActiveTerra() {
+        return activeTerra;
+    }
+
+    init();
+
+    return {
+        init: init,
+        getActiveTerra: getActiveTerra,
+        onSelectedCityChanged: onSelectedCityChanged, // not used
+        loadCurentTerras: loadCurentTerras, // used only in old layer-list
+        findById: findById, // need to wrap - { data: terra }
+        show: show, // not used
+        hide: hide, // not used
+        getTerras: getTerras,
+    };
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    if (typeof System !== "undefined") {
+        return System.import(scramble("/resources/~build/terras-panel.system.js"));
+    }
+
+    getModuleParams("layer-list-panel", "terras_settings").done(function (r) {
+        let params = {};
+
+        if (r.success && r.results !== null) {
+            try {
+                params = JSON.parse(r.results.param_value);
+            } catch (e) {
+                blinkmsg(
+                    "Ошибка парсинга параметра layer-list-panel/terras_settings",
+                    10000,
+                    "danger",
+                );
+            }
+        }
+
+        window.terrasPanel = new TerrasPanel(params);
+    });
+});

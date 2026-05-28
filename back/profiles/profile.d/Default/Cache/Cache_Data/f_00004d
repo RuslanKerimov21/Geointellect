@@ -1,0 +1,1161 @@
+function LayerListPanelNewlayerPlugin() {
+    var _parent = window.layerListPanel;
+    this.id = "layer-list-panel-new-layer-plugin";
+
+    var add2 = $("<div/>", { "class": "context-menu-item gr-plus icon-item" }).text(gltxt("menu_create_layer"));
+    var xlsx2 = $("<div/>", { "class": "context-menu-item icon-item gr-import" }).text(gltxt("menu_create_layer_from_file"));
+
+    let max_count = 10000;
+
+    const init = () => {
+
+        let qqq = getModuleParams(this.id, "max-rows-count");
+        qqq.done(function (res) {
+            max_count = parseInt(res.results.param_value);
+        });
+
+        qqq.always(function () {
+            add2[0].addEventListener("click", function () {
+                const wizard = UlaNewWindow(window.layerListPanel, max_count);
+            });
+            _parent.contextMenu.append(add2);
+
+            xlsx2[0].addEventListener("click", function () {
+                const wizard = UlaXlsxWindow(window.layerListPanel, max_count);
+            });
+            _parent.contextMenu.append(xlsx2);
+
+            _parent.showHideBtnContextMenu();
+        });
+    };
+
+    init();
+};
+
+document.addEventListener("DOMContentLoaded", function () {
+    WaitFor("layer-list-new", 100, function () {
+        return typeof window["layerListPanel"] != "undefined";
+    }).then(function () {
+        window.layerListPanelNewlayerPlugin = new LayerListPanelNewlayerPlugin();
+    });
+});
+function UlaXlsxWindow(_parent, _max_count) {
+    let steps = [Ula0Welcome, UlaStep1SelectFile, UlaStep2AnalyzeSheetFile, UlaStep3Props, UlaStep4Icons, UlaStep5Rights, UlaStep6Summary];
+    let currentIndex = 0;
+    let win = null;
+    let stepData = {
+        max_rows: _max_count
+    };
+
+    stepData.videoLink = "/resources/funcparts/layer-list-panel-new-layer-plugin/help/importlayer_example.mp4";
+
+    function initializeWizard() {
+        win = new LeftWindow({
+            target: _parent.layersWindow[0],
+            title: gltxt("menu_create_layer_from_file"),
+            subtitle: `XLSX, CSV`,
+            icon: "gr-import"
+        });
+
+        win.Show();
+
+        loadStep(currentIndex);
+    }
+
+    function loadStep(index) {
+        if (index < 0 || index >= steps.length) return;
+
+        const stepFunction = steps[index];
+        const stepContent = stepFunction(stepData, navigateStep, win);
+    }
+
+    function navigateStep(direction, data = {}) {
+        /*stepData = Object.assign({}, stepData, data);*/
+        stepData = { ...stepData, ...data };
+
+        if (direction === 'next') {
+            if (currentIndex < steps.length - 1) {
+                currentIndex++;
+                loadStep(currentIndex);
+            } else {
+                completeWizard();
+            }
+        } else if (direction === 'previous') {
+            if (currentIndex > 0) {
+                currentIndex--;
+                loadStep(currentIndex);
+            }
+        }
+    }
+
+    function completeWizard() {
+        console.log("Wizard completed with data:", stepData);
+        win.Close();
+    }
+
+    initializeWizard();
+
+    return {
+        close: () => win?.Close(),
+        getCurrentStep: () => currentIndex,
+        getData: () => stepData
+    };
+};
+
+function UlaNewWindow(_parent, _max_count) {
+    let steps = [Ula0Welcome, UlaStep3NewProps, UlaStep4Icons, UlaStep5Rights, UlaStep6Summary];
+    let currentIndex = 0;
+    let win = null;
+    let stepData = {
+        max_rows: _max_count
+    };
+
+    stepData.videoLink = "/resources/funcparts/layer-list-panel-new-layer-plugin/help/newlayer_example.mp4";
+
+    function initializeWizard() {
+        win = new LeftWindow({
+            target: _parent.layersWindow[0],
+            title: gltxt("menu_create_layer"),
+            subtitle: gltxt("my_layers"),
+            icon: "gr-plus"
+        });
+
+        win.Show();
+
+        loadStep(currentIndex);
+    }
+
+    function loadStep(index) {
+        if (index < 0 || index >= steps.length) return;
+
+        const stepFunction = steps[index];
+        const stepContent = stepFunction(stepData, navigateStep, win);
+    }
+
+    function navigateStep(direction, data = {}) {
+        /*stepData = Object.assign({}, stepData, data);*/
+        stepData = { ...stepData, ...data };
+
+        if (direction === 'next') {
+            if (currentIndex < steps.length - 1) {
+                currentIndex++;
+                loadStep(currentIndex);
+            } else {
+                completeWizard();
+            }
+        } else if (direction === 'previous') {
+            if (currentIndex > 0) {
+                currentIndex--;
+                loadStep(currentIndex);
+            }
+        }
+    }
+
+    function completeWizard() {
+        console.log("Wizard completed with data:", stepData);
+        win.Close();
+    }
+
+    initializeWizard();
+
+    return {
+        close: () => win?.Close(),
+        getCurrentStep: () => currentIndex,
+        getData: () => stepData
+    };
+};
+function Ula0Welcome(stepData, navigate, win) {
+    let note_md = `${gltxt("check_the_xx")} [${gltxt("check_video_hint")}](${stepData.videoLink})`;
+
+    let main_content = document.createElement('div');
+    main_content.className = 'wizard-step';
+
+    const nameInput = new gFieldInput({
+        name: "layer_name",
+        title: gltxt("layer_new_layer_ph"),
+        type: "text",
+        value: stepData.layer_name || ""
+    });
+    main_content.appendChild(nameInput.getElement());
+
+    let left_buttons = [];
+    let right_buttons = [];
+
+    /*wrong: [ "boo" ]*/
+
+    right_buttons.push(new gButton({
+        iconClass: "gr-arrow-right-bold",
+        text: gltxt("next"),
+        className: "default",
+        onClick: function () {
+            if (nameInput.getValue().trim()) {
+                navigate('next', { layer_name: nameInput.getValue().trim() });
+            } else {
+                alert(gltxt("layer_new_msg_set_layer_name"));
+            }
+        }
+    }));
+
+    win.SetContent(
+        [main_content],
+        left_buttons,
+        right_buttons,
+        note_md
+    );
+};
+function UlaStep1SelectFile(stepData, navigate, win) {
+    let note_md = `### Выберите файл для импорта
+
+
+Очень важно, чтобы файл был сформирован без ошибок
+
+
+• данные о географических координатах должны быть в разных полях
+• первая строка должна содержать названия столбцов
+• должен быть всего один лист
+• не должно быть пустых столбцов
+• кодировка должна быть UTF-8 (не cp1251)
+
+
+Пример правильного файла: [xlsx](/resources/funcparts/layer-list-panel-new-layer-plugin/help/ulaexample.xlsx), [csv](/resources/funcparts/layer-list-panel-new-layer-plugin/help/ulaexample.csv)`;
+
+    let main_content = document.createElement('div');
+    main_content.className = 'wizard-step';
+
+    const fileInput = new gFieldFileInput({
+        name: "import_file",
+        title: gltxt("layer_new_msg_set_file"),
+        accept: ".xlsx,.csv",
+        browseText: gltxt("browse"),
+        noFileText: gltxt("not_selected"),
+        value: stepData.selectedFile || null,
+        onChange: function (file) {
+            stepData.selectedFile = file;
+        }
+    });
+
+    main_content.appendChild(fileInput.getElement());
+
+    let left_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-left-bold",
+            text: gltxt("back"),
+            className: "info",
+            onClick: function () {
+                navigate('previous', {
+                    selectedFile: fileInput.getValue()
+                });
+            }
+        })
+    ];
+
+    let right_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-right-bold",
+            text: gltxt("next"),
+            className: "default",
+            onClick: function () {
+                const selectedFile = fileInput.getValue();
+                if (selectedFile) {
+                    navigate('next', { selectedFile: selectedFile });
+                } else {
+                    alert(gltxt("layer_new_select_file"));
+                }
+            }
+        })
+    ];
+
+    win.SetContent(
+        [main_content],
+        left_buttons,
+        right_buttons,
+        note_md
+    );
+}
+function UlaStep2AnalyzeSheetFile(stepData, navigate, win) {
+    let note_md = `${gltxt("layer_new_select_lonlat_columns")}`;
+
+    win.ShowLoading(gltxt("analyzing") + "...");
+
+    let fileType = stepData.selectedFile.name.split('.').pop().toLowerCase();
+
+    console.log("stepData.selectedFile", stepData.selectedFile);
+
+    let geomLayer = null;
+
+    let main_content = document.createElement('div');
+    main_content.className = 'wizard-step';
+
+    let delimiter = stepData.delimiter || ";";
+    let selectedXLon = stepData.selectedXLon || null;
+    let selectedYLat = stepData.selectedYLat || null;
+
+    let previewing = false;
+
+    const n = `
+`;
+
+    const left_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-left-bold",
+            text: gltxt("back"),
+            className: "info",
+            onClick: function () {
+                tryRemoveGeometry(geomLayer);
+                previewing = false;
+                navigate('previous', {
+                    fileType: null,
+                    selectedXLon: selectedXLon,
+                    selectedYLat: selectedYLat,
+                    delimiter: delimiter
+                });
+            }
+        })
+    ];
+
+    function previewOnMap(objects, schema) {
+        if (previewing) return;
+        if (!(selectedXLon && selectedYLat)) {
+            blinkmsg(gltxt("not_selected"));
+            return;
+        }
+        previewing = true;
+        const fc = new FeatureCollection();
+        fc.load(objects, null, selectedXLon, selectedYLat);
+        fc.buildSchema(schema);
+
+        geomLayer = window.mapModule01.CreatePixiLayer(fc);
+        geomLayer.addTo(window.MAP);
+
+        window.MAP.fitBounds(fc.extentToBounds());
+    };
+
+    ping("before xlsxFileToObjects");
+    xlsxFileToObjects(stepData.selectedFile)
+        .then((r) => {
+            let data = r.objects;
+            let schema = r.schema;
+            let errors = r.errors;
+
+            const _duplicatenames = HasDuplicateKeys(schema);
+            if (_duplicatenames.length > 0) {
+                errors.push(gltxt("has_duplicate_keys") + ` [${_duplicatenames.join(",")}]`);
+            }
+
+            const _wrongnames = GetForbiddenKeys(schema);
+            if (_wrongnames.length > 0) {
+                errors.push(gltxt("has_forbidden_keys") + ` [${_wrongnames.join(",")}]`);
+            }
+
+            ping("guessing");
+
+            let pre_data = data.slice(0, 50);
+
+            for (var i = 0; i < schema.length; i++) {                
+                schema[i].type = guessDataType(pre_data.map(d => d[schema[i].key]), true);
+                if (schema[i].type == "int") {
+                    schema[i].type = "double";
+                }
+            }
+
+            ping("guessing - done");
+
+            ping("before FindGeoColumns");
+            let geocolumns = FindGeoColumns(schema, data);
+
+            if (geocolumns.length == 0) {
+                errors.push(gltxt("columns_with_coordinates_not_found"));
+            }
+
+            const _max = stepData.max_rows || 10000;
+            if (data.length > _max) {
+                errors.push(gltxt_f("too_many_n_max", `${_max}`));
+            }
+
+            if (errors.length > 0) {
+                errors.forEach(e => {
+                    note_md = `${e}${n}`;
+                });
+                win.SetContent(
+                    [],
+                    left_buttons,
+                    [],
+                    note_md
+                );
+                return;
+            }
+
+            ping("gTable - 1");
+            const table = new gTable({
+                title: `${gltxt("check_your_data")} (${gltxt("partial_data") })`,
+                data: data.slice(0, 20),
+                maxHeight: "400px",
+                autoWidth: true,
+                fixedFirstColumn: false,
+                compact: true,
+                striped: true,
+                columns: schema
+            });
+            ping("gTable - 2");
+
+            main_content.appendChild(table.getElement());
+
+            let xy_content = document.createElement('div');
+            xy_content.className = 'wizard-step-double';
+
+            selectedXLon = selectedXLon || geocolumns[0][0];
+            selectedYLat = selectedYLat || geocolumns[0][1];
+
+            const optionSelect1 = new gFieldSelect({
+                name: "longitude",
+                title: gltxt("lon"),
+                placeholder: "--",
+                required: true,
+                value: selectedXLon,
+                options: schema.filter((f) => { return f.type == "double" }).map((sch) => ({ value: sch.key, text: sch.title })),
+                onChange: function (value) {
+                    tryRemoveGeometry(geomLayer);
+                    previewing = false;
+                    selectedXLon = value;
+                }
+            });
+            xy_content.appendChild(optionSelect1.getElement());
+
+            const optionSelect2 = new gFieldSelect({
+                name: "latitude",
+                title: gltxt("lat"),
+                placeholder: "---",
+                required: true,
+                value: selectedYLat,
+                options: schema.filter((f) => { return f.type == "double" }).map((sch) => ({ value: sch.key, text: sch.title })),
+                onChange: function (value) {
+                    tryRemoveGeometry(geomLayer);
+                    previewing = false;
+                    selectedYLat = value;
+                }
+            });            
+            xy_content.appendChild(optionSelect2.getElement());
+
+            if (fileType == "csv") {
+                xy_content.className = 'wizard-step-threeble';
+                const optionSelect3 = new gFieldSelect({
+                    name: "delimiter",
+                    title: "Разделитель",
+                    placeholder: "---",
+                    required: false,
+                    value: delimiter,
+                    options: [{ value: "", text: "автоматически" }, { value: ";", text: " ; " }, { value: ",", text: " , " }, { value: "\t", text: " TAB " }],
+                    onChange: function (value) {
+                        tryRemoveGeometry(geomLayer);
+                        previewing = false;
+                        delimiter = value;
+                    }
+                });
+                xy_content.appendChild(optionSelect3.getElement());
+            }
+
+            let right_buttons = [
+                new gButton({
+                    iconClass: "gr-eye",
+                    text: gltxt("show_on_map"),
+                    className: "success",
+                    onClick: function () {
+                        previewOnMap(data, schema);
+                    }
+                }),
+                new gButton({
+                    iconClass: "gr-arrow-right-bold",
+                    text: gltxt("next"),
+                    className: "default",
+                    onClick: function () {
+                        tryRemoveGeometry(geomLayer);
+                        previewing = false;
+                        const field1 = optionSelect1.getValue();
+                        const field2 = optionSelect2.getValue();
+                        if (field1 && field2) {
+                            navigate('next', {
+                                selectedXLon: field1,
+                                selectedYLat: field2,
+                                objects: data,
+                                schema: schema,
+                                fileType: fileType,
+                                delimiter: delimiter
+                            });
+                        } else {
+                            alert(gltxt("not_selected"));
+                        }
+                    }
+                })
+            ];
+
+            win.SetContent(
+                [xy_content, main_content],
+                left_buttons,
+                right_buttons,
+                note_md
+            );
+        })
+        .catch(err => {
+            note_md = err.message;
+            win.SetContent(
+                null,
+                left_buttons,
+                [],
+                note_md
+            );
+        });
+
+    function xlsxFileToObjects(file) {
+        ping("inside xlsxFileToObjects - 1");
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                ping("inside xlsxFileToObjects - 2");
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    if (workbook.SheetNames.length !== 1) {
+                        return resolve({
+                            objects: [],
+                            schema: [],
+                            errors: ['must have only one sheet']
+                        });
+                    }
+                    ping("inside xlsxFileToObjects - 3");
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    ping("inside xlsxFileToObjects - 4");
+
+                    if (!rows.length)
+                        return resolve({
+                            objects: [],
+                            schema: [],
+                            errors: ['does not have rows']
+                        });
+
+                    let schema = rows[0].map(rw => ({ title: rw, key: null, type: "string", width: "50px" }));
+                    ping("inside xlsxFileToObjects - 5");
+
+                    /*
+                    for (var i = 0; i < schema.length; i++) {
+                        if (detectEncoding(schema[i].title) == "cp1251") {
+                            schema[i].title = convert1251ToUTF8(schema[i].title);
+                        }
+                    }
+                    */
+
+                    const headers = schema.map(s => s.title).map(ToUrlSlug);
+                    ping("inside xlsxFileToObjects - 6");
+
+                    const objects = rows.slice(1).map(row => {
+                        const obj = {};
+                        headers.forEach((h, i) => {
+                            obj[h] = row[i] ?? "";
+                        });
+                        return obj;
+                    });
+                    ping("inside xlsxFileToObjects - 7");
+
+                    for (var i = 0; i < headers.length; i++) {
+                        schema[i].key = headers[i];
+                    }
+                    ping("inside xlsxFileToObjects - 8");
+
+                    resolve({
+                        objects: objects,
+                        schema: schema,
+                        errors: []
+                    });
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    };
+
+    function detectEncoding(buffer) {
+        const view = new Uint8Array(buffer);
+        let win1251Score = 0;
+        let utf8Score = 0;
+
+        for (let i = 0; i < view.length; i++) {
+            const byte = view[i];
+
+            if (byte >= 0xC0 && byte <= 0xFF) {
+                win1251Score++;
+            }
+
+            if (byte >= 0xC0 && byte <= 0xDF && i + 1 < view.length) {
+                const nextByte = view[i + 1];
+                if (nextByte >= 0x80 && nextByte <= 0xBF) {
+                    utf8Score++;
+                    i++;
+                }
+            }
+        }
+
+        return win1251Score > utf8Score ? 'cp1251' : 'utf-8';
+    };
+
+    function convert1251ToUTF8(input) {
+        let buffer;
+        if (typeof input === 'string') {
+            const encoder = new TextEncoder();
+            buffer = encoder.encode(input).buffer;
+        } else if (input instanceof ArrayBuffer) {
+            buffer = input;
+        } else {
+            throw new Error('Input must be string or ArrayBuffer');
+        }
+
+        const decoder = new TextDecoder('windows-1251');
+        return decoder.decode(buffer);
+    };
+
+    function convert1251ToUTF8BOM(input) {
+        let buffer;
+        if (typeof input === 'string') {
+            const encoder = new TextEncoder();
+            buffer = encoder.encode(input).buffer;
+        } else if (input instanceof ArrayBuffer) {
+            buffer = input;
+        } else {
+            throw new Error('Input must be string or ArrayBuffer');
+        }
+
+        const decoder = new TextDecoder('windows-1251');
+        const decodedText = decoder.decode(buffer);
+
+        return decodedText;
+    };
+
+    function GetForbiddenKeys(schema) {
+        const names = schema.map(ob => ob.key.trim().toLowerCase());
+        const uniqueNames = new Set(names);
+        const forbiddenKeys = ["id", "geom", "uniqueid", "login", "recdate"];
+        return forbiddenKeys.filter(item => uniqueNames.has(item));
+    };
+
+    function HasDuplicateKeys(schema) {
+        console.log("schema", schema);
+        const names = schema.map(ob => ob.key.trim().toLowerCase());
+        return names.filter((item, index) => names.indexOf(item) !== index);
+    };
+
+    function FindGeoColumns(schema, objects) {
+        ping("inside FindGeoColumns - 1");
+        let complete = [["x", "y"]];
+        let partial = [["lng", "lat"], ["lon", "lat"], ["dol", "shir"]];
+        let names = schema.map(ob => ob.key.toLowerCase());
+
+        let found = [];
+
+        complete.forEach((i) => {
+            let f0 = names.indexOf(i[0]);
+            let f1 = names.indexOf(i[1]);
+            if ((f0 >= 0 && f1 >= 0) && (schema[f0].type == "double" && schema[f1].type == "double")) {
+                found.push([schema[f0].key, schema[f1].key]);
+            }
+        });
+
+        partial.forEach((i) => {
+            let fi0 = names.find((n) => n.indexOf(i[0]) >= 0);
+            let fi1 = names.find((n) => n.indexOf(i[1]) >= 0);
+            if (fi0 && fi1) {
+                let f0 = names.indexOf(fi0);
+                let f1 = names.indexOf(fi1);
+                if ((schema[f0].type == "double" && schema[f1].type == "double")) {
+                    found.push([schema[f0].key, schema[f1].key]);
+                }
+            }
+        });
+
+        ping("inside FindGeoColumns - 2");
+        return found;
+    };
+
+};
+
+function UlaStep3Props(stepData, navigate, win) {
+    let note_md = `${gltxt("layer_new_msg_after_create_cant_change")}`;
+
+    let main_content = document.createElement('div');
+    main_content.className = 'wizard-step';
+
+    const params = stepData.schema;
+
+    let selectedKeys = stepData.selectedProps || params.map((p) => p.key);
+
+    const paramsTable = new gParamsTable({
+        title: gltxt("layer_new_objects_properties"),
+        params: params,
+        selectedKeys: selectedKeys,
+        maxHeight: "350px",
+        onSelectionChange: function (keys) {
+            selectedKeys = keys;
+        }
+    });
+
+    main_content.appendChild(paramsTable.getElement());
+
+    let left_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-left-bold",
+            text: gltxt("back"),
+            className: "info",
+            onClick: function () {
+                navigate('previous', {
+                    selectedProps: selectedKeys
+                });
+            }
+        })
+    ];
+
+    let right_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-right-bold",
+            text: gltxt("next"),
+            className: "default",
+            onClick: function () {
+                if (selectedKeys.length > 0) {
+                    let fc = prepareFeatureCollection();
+                    navigate('next', { selectedProps: selectedKeys, featureCollection: fc });
+                } else {
+                    alert(gltxt("not_selected"));
+                }
+            }
+        })
+    ];
+
+    win.SetContent(
+        [main_content],
+        left_buttons,
+        right_buttons,
+        note_md
+    );
+
+    function prepareFeatureCollection() {
+        const fc = new FeatureCollection();
+        fc.load(stepData.objects, null, stepData.selectedXLon, stepData.selectedYLat);
+        fc.buildSchema(stepData.schema);
+        return fc;
+    };
+};
+
+function UlaStep3NewProps(stepData, navigate, win) {
+    let note_md = `${gltxt("layer_new_msg_after_create_cant_change")}`;
+
+    let main_content = document.createElement('div');
+    main_content.className = 'wizard-step';
+
+    let initialProps = stepData.schema || [{ key: "name", title: gltxt("name"), type: "string" }];
+
+    const createProps = new gCreateProps({
+        initialData: initialProps
+    });
+
+    main_content.appendChild(createProps.getElement());
+
+    let left_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-left-bold",
+            text: gltxt("back"),
+            className: "info",
+            onClick: function () {
+                navigate('previous', {
+                    schema: createProps.getValue()
+                });
+            }
+        })
+    ];
+
+    let right_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-right-bold",
+            text: gltxt("next"),
+            className: "default",
+            onClick: function () {
+                let _check = createProps.checkValue();
+                if (_check.isValid) {
+                    navigate('next', {
+                        schema: createProps.getValue()
+                    });
+                } else {
+                    alert(_check.errors.map((s) => `<div style="color:red">${s}</div>`).join(""));
+                }
+            }
+        })
+    ];
+
+    win.SetContent(
+        [main_content],
+        left_buttons,
+        right_buttons,
+        note_md
+    );
+};
+
+function UlaStep4Icons(stepData, navigate, win) {
+    let note_md = null;
+
+    win.ShowLoading(gltxt("please_wait_for_operation_to_complete") + "...");
+
+    let main_content = document.createElement('div');
+    main_content.className = 'wizard-step';
+
+    const requestOptions = {
+        method: "GET",
+        redirect: "follow"
+    };
+
+    let selectedIcon = stepData.selectedIcon || null;
+
+    let left_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-left-bold",
+            text: gltxt("back"),
+            className: "info",
+            onClick: function () {
+                navigate('previous', {
+                    selectedIcon: selectedIcon
+                });
+            }
+        })
+    ];
+
+    fetch(getNextImagesHost() + "/icons", requestOptions)
+        .then((response) => response.json())
+        .then(data => {
+            win.HideLoading();
+            let r = data;
+            if (r.success && r.results.length > 0) {
+                const iconsLibrary = new gIconsLibrary({
+                    title: gltxt("layer_new_select_symbol"),
+                    icons: r.results,
+                    baseUrl: getNextImagesHost() + "/icon/",
+                    value: selectedIcon,
+                    size: 24,
+                    columns: 8,
+                    maxHeight: "350px",
+                    searchPlaceholder: gltxt("search") + "...",
+                    onIconSelect: function (iconName) {
+                        selectedIcon = iconName;
+                        console.log("Selected icon", selectedIcon);
+                    }
+                });
+
+                main_content.appendChild(iconsLibrary.getElement());
+
+                let right_buttons = [
+                    new gButton({
+                        iconClass: "gr-arrow-right-bold",
+                        text: gltxt("next"),
+                        className: "default",
+                        onClick: function () {
+                            if (selectedIcon != null) {
+                                navigate('next', {
+                                    selectedIcon: selectedIcon
+                                });
+                            } else {
+                                alert(gltxt("not_selected"));
+                            }
+                        }
+                    })
+                ];
+
+                win.SetContent(
+                    [main_content],
+                    left_buttons,
+                    right_buttons,
+                    note_md
+                );
+            }
+            else {
+                note_md = `${gltxt("error getting icons")}`;
+                win.SetContent(
+                    [],
+                    left_buttons,
+                    [],
+                    note_md
+                );
+            }
+        })
+        .catch((error) => console.error(error));
+};
+
+function UlaStep5Rights(stepData, navigate, win) {
+    let note_md = `${gltxt("layer_new_who_will_have_access")}`;
+
+    win.ShowLoading(gltxt("please_wait_for_operation_to_complete") + "...");
+
+    let main_content = document.createElement('div');
+    main_content.className = 'wizard-step';
+
+    let data_loaded = false;
+
+    let _userRights = {
+        editors: stepData.userRights?.editors || [],
+        viewers: stepData.userRights?.viewers || []
+    };
+
+    let left_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-left-bold",
+            text: gltxt("back"),
+            className: "info",
+            onClick: function () {
+                navigate('previous', {
+                    userRights: _userRights
+                });
+            }
+        })
+    ];
+
+    var priv = DoWebApiAction("/user/getlogins", { content: "{}" });
+    priv.done(function (e) {
+        if (e.success) {
+            data_loaded = true;
+
+            const _me = UserModule?.userData?.login ?? "me_unknown";
+
+            const users = [...[_me], ...e.results.filter(s => s != _me)];
+
+            const userRights = new gUsersRights({
+                title: gltxt("access_control"),
+                owner: _me,
+                users: users,
+                editors: _userRights.editors || [],
+                viewers: _userRights.viewers || [],
+                maxHeight: "350px",
+                onRightsChange: function (rights) {
+                    _userRights = rights;
+                }
+            });
+
+            main_content.appendChild(userRights.getElement());
+
+            let right_buttons = [
+                new gButton({
+                    iconClass: "gr-arrow-right-bold",
+                    text: gltxt("next"),
+                    className: "default",
+                    onClick: function () {
+                        navigate('next', { me: _me, userRights: _userRights });
+                    }
+                })
+            ];
+
+            win.SetContent(
+                [main_content],
+                left_buttons,
+                right_buttons,
+                note_md
+            );
+        }
+    });
+
+    priv.always(function () {
+        win.HideLoading();
+        if (data_loaded == false) {
+            win.SetContent(
+                [],
+                left_buttons,
+                [],
+                `${gltxt("unable to load logins")}`
+            );
+        }
+    });
+};
+
+function UlaStep6Summary(stepData, navigate, win) {
+    let note_md = null;
+
+    let main_content = document.createElement('div');
+    main_content.className = 'wizard-step';
+
+    let filtered_schema = stepData.schema.filter(o => stepData.selectedProps?.indexOf(o.key) != -1);
+
+    if (!stepData.featureCollection) {
+        stepData.featureCollection = new FeatureCollection();
+        stepData.featureCollection.buildSchema(filtered_schema);
+    }
+    
+    function _getFCType() {
+        if (stepData.featureCollection.features.length == 0) {
+            return gltxt("collection_points");
+        }
+        switch (stepData.featureCollection.features[0].geometry.type) {
+            case "Point":
+                return gltxt("collection_points");
+            default:
+                return gltxt("NO_DATA");
+        }
+    };
+
+    function _getGeomType() {
+        if (stepData.featureCollection.features.length == 0) {
+            return "point";
+        }
+        switch (stepData.featureCollection.features[0].geometry.type) {
+            case "Point":
+                return "point";
+            default:
+                return "point";
+        }
+    };
+
+    let _stats = {};
+    _stats[gltxt("features_1")] = number_format(stepData.featureCollection?.features?.length || 0, 0, ".", " ");
+    _stats[gltxt("columns_1")] = String(filtered_schema.length);
+
+    if (stepData.wrong && stepData.wrong.length > 0) {
+        _stats[gltxt("error")] = String(stepData.wrong.length);        
+    }
+
+    let left_buttons = [
+        new gButton({
+            iconClass: "gr-arrow-left-bold",
+            text: gltxt("back"),
+            className: "info",
+            onClick: function () {
+                navigate('previous', {});
+            }
+        })
+    ];
+
+    let right_buttons = [
+        new gButton({
+            iconClass: "gr-play",
+            text: gltxt("layer_new_create"),
+            className: "success",
+            onClick: function () {
+
+                win.ShowLoading(gltxt("please_wait_for_operation_to_complete") + "...");
+
+                ping("FC analysis - before");
+
+                let _newfc = new FeatureCollection();
+                _newfc.buildSchema(filtered_schema);
+
+                for (var i = 0; i < stepData.featureCollection.features.length; i++) {
+                    let _newprops = {};
+                    stepData.selectedProps.forEach((key) => {
+                        _newprops[key] = stepData.featureCollection.features[i].properties[key];
+                    });
+                    _newfc.add({
+                        type: "Feature",
+                        geometry: stepData.featureCollection.features[i].geometry,
+                        properties: _newprops
+                    });
+                }
+
+                ping("FC analysis - new props");
+
+                for (var i = 0; i < filtered_schema.length; i++) {
+                    let the_key = filtered_schema[i].key;
+                    if (filtered_schema[i].type == "double") {
+                        for (var fi = 0; fi < _newfc.features.length; fi++) {
+                            let the_value = _newfc.features[fi].properties[the_key];
+                            _newfc.features[fi].properties[the_key] = mustBeDouble(the_value);
+                        }
+                    }
+                    else if (filtered_schema[i].type == "int") {
+                        for (var fi = 0; fi < _newfc.features.length; fi++) {
+                            let the_value = _newfc.features[fi].properties[the_key];
+                            _newfc.features[fi].properties[the_key] = mustBeInteger(the_value);
+                        }
+                    }
+                    else if (filtered_schema[i].type == "string") {
+                        for (var fi = 0; fi < _newfc.features.length; fi++) {
+                            let the_value = _newfc.features[fi].properties[the_key];
+                            if (!the_value) {
+                                _newfc.features[fi].properties[the_key] = "";
+                            }
+                        }
+                    }
+                }
+
+                ping("FC analysis - after");
+                
+                //uuid
+                let _data = {
+                    name: stepData.layer_name,
+                    collection: JSON.stringify(_newfc),
+                    geomtype: _getGeomType(),
+                    viewers: JSON.stringify(stepData.userRights.viewers || []),
+                    editors: JSON.stringify(stepData.userRights.editors || []),
+                    icon: stepData.selectedIcon.split(".")[0]
+                };
+
+                /*
+                console.log("create", {
+                    name: stepData.layer_name,
+                    collection: _newfc,
+                    geomtype: _getGeomType(),
+                    viewers: stepData.userRights.viewers || [],
+                    editors: stepData.userRights.editors || [],
+                    icon: stepData.selectedIcon.split(".")[0]
+                });
+                */
+
+                let svc = DoWebApiAction("/ulayers/create", _data);
+
+                svc.done((r) => {
+                    if (r.success) {
+                        let svc_info = DoWebApiAction("/ulayers/info", { layer_uid: r.results });
+
+                        svc_info.done((uid) => {
+                            if (uid.success) {
+                                alert(gltxt("layer_new_msg_created"));
+
+                                var ul = new UserLayer(uid.results, window.layerListPanel);
+
+                                if (ul.initialized) {
+                                    window.layerListPanel.addUserLayer(ul);
+                                    ul.on();
+                                    window.layerListPanel.toggleGroupsVisibility();
+                                }
+
+                                navigate('next', {});
+                            }
+                            else {
+                                alert(`${uid.message} => ${uid.details}`);
+                            }
+                        });
+                    }
+                    else {
+                        alert(`${svc.message} => ${svc.details}`);
+                    }
+                });
+
+                svc.always(() => {
+                    win.HideLoading();
+                });
+                
+            }
+        })
+    ];
+
+
+    const summaryCard = new layerSummaryCard({
+        layerName: stepData.layer_name,
+        layerType: _getFCType(),
+        iconUrl: getNextImagesHost() + "/icon/" + stepData.selectedIcon,
+        statistics: _stats,
+        owner: stepData.me,
+        editors: stepData.userRights.editors || [],
+        viewers: stepData.userRights.viewers || []
+    });
+
+    main_content.appendChild(summaryCard.getElement());
+
+    win.SetContent(
+        [main_content],
+        left_buttons,
+        right_buttons,
+        note_md
+    );
+};

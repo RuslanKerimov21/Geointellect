@@ -1,0 +1,675 @@
+window.ToolPanelModule = (function () {
+    var panelButtons = [];
+    var arrayBtn = [];
+    var $smallLeftPanelButtons = null;
+    var $smallRightPanelButtons = null;
+    var $smallMapPanelButtons = null;
+    var $smallCentrPanelButtons = null;
+    var $infoTitleButtons = null;
+    var $smallButtonContextMenuContainer = null;
+    var loadTemplateUrl = "/resources/engine/tool-panel-template.html";
+    var activeDropDown = false;
+    var activeContextMenu = false;
+    var arrContextMenuTools = [];
+    var index = 0;
+    var $elemButtonContainer;
+    var h_infoInstrument;
+    var init = function () {
+        $smallLeftPanelButtons = $(".left-group > div[data-placement=smallButton-container]");
+        $smallRightPanelButtons = $("#subPanelTools [data-placement='right']");
+        $smallCentrPanelButtons = $("#sub-tools-center");
+        $smallButtonContextMenuContainer = $("[data-placement=smallButton-contextMenu-container]");
+        $smallMapPanelButtons = $("#sub-tools-panel").addClass("bg-main");
+        $infoTitleButtons = $("#info-instrument");
+        $toolsUnit = $("[data-placement=toolsInfo-container]");
+        /*Блок для инструментов "Информация в...."*/
+        createDefaultElemDropBoxInstrument();
+        showHideContextMenu();
+        hideContextMenuOnClickOutSideElement();
+
+        /*TUT*/
+        if (window.G && window.G.Dynamic) {
+            window.G.Dynamic.addListener("right-window-open", function (e) {
+                if (window.G.Dynamic.getValue("right-window-initialized") === 1) {
+                    return;
+                }
+                if (e.value === true) {
+                    var position = "39.1rem";
+                    $("#sub-tools-panel").transit({ "right": position, duration: 100, easing: window.easing.type });
+                    $("#sub-tools-panel").addClass("detached");
+                }
+                else if (e.value === false) {
+                    var position = "0px";
+                    $("#sub-tools-panel").transit({ "right": position, duration: 100, easing: window.easing.type });
+                    $("#sub-tools-panel").removeClass("detached");
+                }
+            });
+        }
+    };
+
+    /*Создание выпадающего списка инструментов*/
+    var loadTemplate = function () {
+        $.ajax({
+            method: "GET",
+            dataType: "html",
+            url: loadTemplateUrl,
+            success: function (response) {
+                dropDownMenu(response);
+            },
+            fail: function (response) {
+                ShowInfoMessage(gl.text.ATTENTION, response.message, 500);
+            }
+        });
+
+    };
+    var createDefaultElemDropBoxInstrument = function () {
+        var defaultElem = window.ToolPanelModule.getNewPanelButton({
+            "type": "big",
+            "float": "info_instrument",
+            "order": 1,
+            "title": gltxt("select_tool"),
+            "text": gltxt("select_tool"),
+            "class": "removeHover",
+            "onClick": function () {
+
+            }
+        });
+        defaultElem.addDropDownMenu();
+    };
+
+    /*Закрыть окно с тремя точками и окно инструментов при клике на любое место */
+    var hideContextMenuOnClickOutSideElement = function () {
+        $(document).mouseup(function (e) {
+            var _element = $smallButtonContextMenuContainer.find(".btn-contextMenu-smallButton");
+            var _btnArrow = $("[data-placement=toolsInfo-container]").find("#arrow-down");
+            if (!_element.is(e.target)) {
+                contextMenuHide();
+            }
+            if (!_btnArrow.is(e.target)) {
+                window.ToolPanelModule.collapse();
+            }
+
+        });
+    };
+    var showHideContextMenu = function () {
+        $smallButtonContextMenuContainer.find(".btn-contextMenu-smallButton")
+            .on("click", function () {
+                if (!activeContextMenu) {
+                    contextMenuShow();
+                } else {
+                    contextMenuHide();
+                }
+            });
+    };
+
+    var contextMenuShow = function () {
+        var a = $(".list-contextMenu-smallButton").get(0).scrollHeight;
+        activeContextMenu = true;
+        $smallButtonContextMenuContainer.find(".list-contextMenu-smallButton").transit({ "height": a, duration: 200, easing: "snap" });
+    };
+
+    var contextMenuHide = function () {
+        activeContextMenu = false;
+        $smallButtonContextMenuContainer.find(".list-contextMenu-smallButton").transit({ "height": 0, duration: 200, easing: "snap" });
+    };
+
+    var expand = function () {
+        activeDropDown = true;
+        $("#info-instrument").find("[data-tool=removeHover]").remove();
+        h_infoInstrument = $("#info-instrument").get(0).scrollHeight;
+        $("#info-instrument").transit({ "height": h_infoInstrument, duration: 200, easing: "snap" });
+        $("[data-placement=toolsInfo-container]").attr("data-active", true);
+    };
+
+    var collapse = function () {
+        activeDropDown = false;
+        $("#info-instrument").transit({ "height": 0, duration: 200, easing: "snap" });
+        $("[data-placement=toolsInfo-container]").attr("data-active", false);
+    };
+
+    var dropDownMenu = function ($template) {
+        var oneElem = arrayBtn[index].$elemButton[0];
+
+        var img = $(oneElem).children().css("background-image");
+
+        $("#IcoTools").css("background-image", img);
+
+        $("#titleTools div").html($(oneElem).attr("title"));
+
+        var $container = $('.tools-unit');
+        $toolsUnit = $container;
+
+        /*Проверим массив на кол-во инстументов в дропбоксе */
+        if (arrayBtn.length > 1) {
+            $("[data-placement=toolsInfo-container]").show();
+        } else {
+            $("[data-placement=toolsInfo-container]").hide();
+        }
+        if ($container.length > 0) {
+            DoNothing();
+        } else {
+            $("div[data-placement=toolsInfo-container]").append($template);
+
+            /*Функция активирует инструмент*/
+            $(".tools-unit > div:not(#arrow-down)").click(function () {
+                arrayBtn[index].onClick();
+            });
+
+            /*Функция показывает список инструментов*/
+            $("#arrow-down").click(function () {
+                if (!activeDropDown) {
+                    expand();
+                } else {
+                    collapse();
+                }
+            });
+        }
+    };
+
+    var getNewPanelButton = function (_options) {
+        switch (_options.type) {
+            case "large":
+                break;
+            case "small-toggle":
+                var tmp1 = new SmallToggleButton(_options);
+                return tmp1;
+            case "context-menu-btn":
+                var contextMenuBtn = TopSmallButton(_options);
+                arrContextMenuTools.push(contextMenuBtn);
+                return contextMenuBtn;
+            case "big":
+                var tmp2 = new TopBigButton(_options);
+                arrayBtn.push(tmp2);
+                loadTemplate();
+
+                return tmp2;
+
+            default:
+                var tmp3 = new TopSmallButton(_options);
+                panelButtons.push(tmp3);
+                return tmp3;
+        }
+    };
+
+    var TopSmallButton = function (_options) {
+
+        var options = {
+            "title": null,
+            "class": null,
+            "onClick": null,
+            "order": 0,
+            "type": "small",
+            "group": null,
+            "float": "left",
+            "priority": null,
+            "mapContainer": null
+        };
+
+        $.extend(options, _options);
+        var guid = generateGUID();
+        var _disabled = false;
+        var $elemButton;
+        var $elemButtonContainer;
+
+        $elemButton = $("<div/>").addClass("smallButton block-transition bg-main-button border-main-button").append($("<div/>"));
+
+        if (options.id) {
+            $elemButton.attr("id", options.id);
+        }
+
+        if (options.mapContainer === "mapPanel") {
+            $elemButton = $("<div/>").addClass("mapButton pipka-form ").append($("<div/>"));
+        }
+
+        var findPositionAndAppend = function () {
+            var $elems = $("> div", $elemButtonContainer);
+            if (options.type === "context-menu-btn" && options.float === "left-group") {
+                if (options.priority) {
+                    /*Если в шапки(левый контейнер) есть кнопки, перемещаем их в котекст меню*/
+                    $("> div", $smallLeftPanelButtons).each(function (i, v) {
+                        var _elem = $(v);
+                        _elem.detach().prependTo($elemButtonContainer);
+                    });
+                    $smallLeftPanelButtons.append($elemButton);
+                    return;
+                }
+            }
+
+            if ($elems.length === 0) {
+                $elemButtonContainer.append($elemButton);
+            } else {
+                $("> div", $elemButtonContainer).each(function (index, elem) {
+                    var $tmp = $(elem);
+                    if (parseInt($tmp.attr("data-order")) >= options.order) {
+                        $elemButton.insertBefore($tmp);
+                        return false;
+                    }
+                    if (index == ($elems.length - 1)) {
+                        $elemButtonContainer.append($elemButton);
+                    }
+                });
+            }
+
+        };
+
+        var addToTopPanel = function () {
+            $elemButton.attr("title", options.title);
+            $elemButton.attr("data-order", options.order);
+            $("div", $elemButton).addClass(options.class);
+
+            $elemButton.click(function () {
+                onClick();
+                contextMenuHide();
+            });
+
+            /*Mobile */
+            /*Проверим модуль */
+            if (!options.mobile || typeof options.mobile == "undefined") {
+                /*Проверим экран юзера */
+                if (window.detectMobile() == "mobile") {
+                    return false;
+                }
+            }
+
+            if (arrContextMenuTools.length > 1) {
+                $smallButtonContextMenuContainer.show();
+                $elemButtonContainer = $smallButtonContextMenuContainer.find(".list-contextMenu-smallButton > .wrap-container-list");
+            } else {
+                $smallButtonContextMenuContainer.hide();
+                $elemButtonContainer = $smallLeftPanelButtons;
+            }
+
+            if (options.type == "small" && options.float == "left-group") {
+                $elemButtonContainer = $smallLeftPanelButtons;
+            } else
+                if (options.type == "small" && options.float == "center") {
+                    $elemButtonContainer = $smallCentrPanelButtons;
+                } else
+                    if (options.type == "small" && options.float == "rightPanelTop" && options.mapContainer == "mapPanel") {
+                        $elemButtonContainer = $smallMapPanelButtons.find("[data-position=top]");
+                    } else
+                        if (options.type == "small" && options.float == "rightPanelCenter" && options.mapContainer == "mapPanel") {
+                            $elemButtonContainer = $smallMapPanelButtons.find("[data-position=center]");
+                        } else
+                            if (options.type == "small" && options.float == "rightPanelBottom" && options.mapContainer == "mapPanel") {
+                                $elemButtonContainer = $smallMapPanelButtons.find("[data-position=bottom]");
+                            }
+
+            findPositionAndAppend();
+
+        };
+
+        var off = function () {
+            if (options.mapContainer == null) {
+                $elemButton.removeClass("headerButtonactive");
+            }
+            $elemButton.attr("data-active", '0');
+            disable = false;
+        };
+
+        var on = function () {
+            if (options.mapContainer == null) {
+                $elemButton.addClass("headerButtonactive");
+            }
+            $elemButton.attr("data-active", '1');
+            disable = true;
+        };
+
+        var onClick = function () {
+
+            if (_disabled) {
+                return;
+            }
+
+            $elemButton.attr("data-active", '1');
+            if (typeof options.onClick == "function") {
+                options.onClick();
+            }
+        };
+
+        var onEnd = function () {
+            $elemButton.attr("data-active", '0');
+        };
+
+        var triggerClick = function () {
+            if (!$elemButton.attr("data-active") == '1') {
+                onClick();
+
+            }
+        };
+
+        var disableButton = function () {
+            _disabled = true;
+            $elemButton.attr("data-disabled", "1");
+        };
+
+        var enableButton = function () {
+            _disabled = false;
+            $elemButton.attr("data-disabled", "0");
+        };
+
+        return {
+            "guid": guid,
+            "type": options.type,
+            "$elemButton": $elemButton,
+            "addToTopPanel": addToTopPanel,
+            "triggerClick": triggerClick,
+            "onEnd": onEnd,
+            "disableButton": disableButton,
+            "enableButton": enableButton,
+            "on": on,
+            "off": off
+        };
+    };
+
+    /* Добавление маленьких тагл кнопок*/
+    window.SmallToggleButton = function ($option) {
+        var options = {
+            "title": null,
+            "class": null,
+            "onClick": null,
+            "order": 0,
+            "type": "small",
+            "group": null,
+            "float": "left",
+            "id_elem": null,
+            "mapContainer": null,
+        };
+
+        $.extend(options, $option);
+        var localThis = this;
+        var guid = generateGUID();
+        var $elemButton;
+        var disable = false;
+
+        if (options.float == "right-group") {
+            $elemButton = $("<div/>").addClass("mapButton pipka-form ").append($("<div/>"));
+            $elemButtonContainer = $smallMapPanelButtons;
+        } else if (options.float == "top-group") {
+            $elemButton = $("<div/>").addClass("smallButton block-transition bg-main-button border-main-button").append($("<div/>"));
+            $elemButtonContainer = $smallLeftPanelButtons;
+        } else {
+            /*Другие варианты мест где будут размещаться наши тагл кнопки */
+        }
+
+        /*Приватные методы*/
+        var findPositionAndAppend = function () {
+            var $elems = $("> div", $elemButtonContainer);
+
+            if ($elems.length === 0) {
+                $elemButtonContainer.append($elemButton);
+            } else {
+                $("> div", $elemButtonContainer).each(function (index, elem) {
+                    var $tmp = $(elem);
+                    if (parseInt($tmp.attr("data-order")) >= options.order) {
+                        $elemButton.insertBefore($tmp);
+                        return false;
+                    }
+                    if (index == ($elems.length - 1)) {
+                        $elemButtonContainer.append($elemButton);
+                    }
+                });
+            }
+        };
+
+        /*Публичные методы*/
+        localThis.addToTopPanel = function () {
+            $elemButton.attr("title", options.title);
+            $elemButton.attr("id-elem", options.id_elem);
+            $elemButton.attr("data-order", options.order);
+            $elemButton.attr("data-active", 0);
+            $("div", $elemButton).addClass(options.class);
+            $elemButton.click(function () {
+                localThis.onClick();
+            });
+            findPositionAndAppend();
+        };
+
+        localThis.disableButton = function () {
+            $elemButton.attr("data-disabled", "1");
+        };
+
+        localThis.enableButton = function () {
+            $elemButton.attr("data-disabled", "0");
+        };
+
+        localThis.off = function () {
+            console.log("aaa", "SmallToggleButton");
+            if (options.mapContainer == null) {
+                $elemButton.removeClass("headerButtonactive");
+            }
+            $elemButton.attr("data-active", '0');
+            disable = false;
+
+        };
+
+        localThis.on = function () {
+            if (options.mapContainer == null) {
+                $elemButton.addClass("headerButtonactive");
+            }
+            $elemButton.attr("data-active", '1');
+            disable = true;
+        };
+
+        localThis.onClick = function () {
+            contextMenuHide();
+            activeContextMenu = false;
+            if (typeof options.onClick == "function") {
+                options.onClick();
+                if ($elemButton.attr("data-active") == 1) {
+                    localThis.on();
+                } else {
+                    localThis.off();
+                }
+            }
+        };
+    };
+
+    /*---------------------- добавление больших кнопок в горизонтальное меню*/
+    var TopBigButton = function (_options) {
+        var options = {
+            "title": null,
+            "class": null,
+            "onClick": null,
+            "order": 0,
+            "type": "dropdown",
+            "group": null,
+            "float": "left",
+            "mapContainer": null
+        };
+
+        $.extend(options, _options);
+
+        var guid = generateGUID();
+        var _disabled = false;
+        var $elemButton = $("<div/>", { "data-tool": options.class }).addClass(" bigbtn dropDownBtn block-transition bg-main hr").append($("<div/>"));
+        var $elemButtonContainer;
+
+        if (options.float === "info_instrument") {
+            $elemButtonContainer = $infoTitleButtons;
+        }
+        else {
+            $elemButtonContainer = $smallLeftPanelButtons;
+        }
+
+        $elemButton.mouseover(function () {
+            var _next_elem = $(this).next();
+            _next_elem.addClass("not-border");
+        });
+        $elemButton.mouseout(function () {
+            var _next_elem = $(this).next();
+            _next_elem.removeClass("not-border");
+        });
+
+        var findPositionAndAppend = function () {
+            var $elems = $("> div", $elemButtonContainer);
+            if ($elems.length === 0) {
+                $elemButtonContainer.append($elemButton);
+
+            } else {
+                $("> div", $elemButtonContainer).each(function (index, elem) {
+                    var $tmp = $(elem);
+                    if (parseInt($tmp.attr("data-order")) >= options.order) {
+                        $elemButton.insertBefore($tmp);
+                        return false;
+                    }
+                    if (index == ($elems.length - 1)) {
+                        $elemButtonContainer.append($elemButton);
+                    }
+                });
+            }
+        };
+
+        var addDropDownMenu = function () {
+            $elemButton.attr("title", options.title);
+            $elemButton.attr("data-order", options.order);
+            $("div", $elemButton).addClass(options.class);
+            $("div", $elemButton).addClass("ico bg-main-button");
+            $("div", $elemButton).parent().append("<div class='DropDownElemTitle'><div class='contentDropDownElemTitle font-default'>" + options.title + "</div></div>");
+            /*Mobile */
+            /*Проверим модуль */
+            if (!options.mobile || typeof options.mobile == "undefined") {
+                /*Проверим экран юзера */
+                if (window.detectMobile() == "mobile") {
+                    return false;
+                }
+            }
+            findPositionAndAppend();
+            $elemButton.hover(function () {
+                $(this).parent().find(".hov-class-active").removeClass("hov-class-active");
+                $(this).addClass("hov-class-active");
+            });
+            $elemButton.click(function () {
+                indexArray(this.title);
+                loadTemplate();
+                $toolsUnit.removeClass("no-icon");
+                onClick();
+            });
+        };
+
+
+        var indexArray = function (ram) {
+            $.each(arrayBtn, function (key, val) {
+                if (ram == val.title) {
+                    index = key;
+                }
+            });
+        };
+
+        var onClick = function () {
+            if (_disabled) {
+                return;
+            }
+
+            $elemButton.attr("data-active", '1');
+            if (typeof options.onClick == "function") {
+                /* if (activeDropDown) {
+                     
+                 }*/
+
+
+                window.ToolPanelModule.collapse();
+                options.onClick();
+
+            }
+        };
+
+        var onEnd = function () {
+            $elemButton.attr("data-active", '0');
+        };
+
+        var triggerClick = function () {
+            if (!$elemButton.attr("data-active") == '1') {
+                onClick();
+            }
+        };
+
+        var disableButton = function () {
+            _disabled = true;
+            $elemButton.attr("data-disabled", "1");
+        };
+
+        var enableButton = function () {
+            _disabled = false;
+            $elemButton.attr("data-disabled", "0");
+        };
+
+        return {
+            "guid": guid,
+            "type": options.type,
+            "$elemButton": $elemButton,
+            "addDropDownMenu": addDropDownMenu,
+            "triggerClick": triggerClick,
+            "onEnd": onEnd,
+            "disableButton": disableButton,
+            "enableButton": enableButton,
+            "onClick": options.onClick,
+            "title": options.title
+        };
+    }
+
+    return {
+        "init": init,
+        "getNewPanelButton": getNewPanelButton,
+        "expand": expand,
+        "collapse": collapse
+    };
+}());
+
+/*Инфомация в ... для мобайл */
+function MobileToolsPanel() {
+    var localThis = this;
+    this.btn = null;
+    var panelTools = null;
+    var captionText = "Выберите инструмент";
+    this.open = function () {
+        panelTools.setAttribute("data-active", true);
+    };
+    this.close = function () {
+        panelTools.setAttribute("data-active", false);
+        localThis.btn.off();
+    };
+    var init = function () {
+        /*Создадим кнопку в правой панели */
+        localThis.btn = window.ToolPanelModule.getNewPanelButton({
+            "title": "Инструменты",
+            "class": "rightRibbonButton ico ico-small gr-chart-1 map-btn-mobile",
+            "onClick": function () {
+                localThis.open();
+            },
+            "order": 2,
+            "mobile": true,
+            "type": "small",
+            "float": "rightPanelCenter",
+            "mapContainer": "mapPanel"
+        });
+
+        localThis.btn.addToTopPanel();
+        localThis.btn.$elemButton.attr("data-help", "tools-panel-btn");
+        /* Контейнер с инстурментами */
+        panelTools = document.querySelectorAll("[data-placement=toolsInfo-container]")[0];
+
+        /*Заголовок для контейнера */
+        const captionContainer = document.createElement("div");
+        captionContainer.classList.add("caption-container");
+        captionContainer.innerHTML = captionText;
+
+        /*Кнопка закрыть панель */
+        const closeBtn = document.createElement("div");
+        closeBtn.classList.add("btn-close-mobile", "close-list-tools", "gr-close-x-r");
+        closeBtn.addEventListener("click", function () { localThis.close(); });
+
+        panelTools.append(captionContainer);
+        panelTools.append(closeBtn);
+    };
+
+    init();
+};
+
+
+$(document).ready(function () {
+    window.ToolPanelModule.init();
+    if (window.detectMobile() == "mobile") {
+        window.mobileToolsPanel = new MobileToolsPanel();
+    }
+});

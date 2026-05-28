@@ -1,0 +1,565 @@
+window.RequestInfoInCircle = function () {
+
+    /*запросить информацию в радиусе*/
+    var localThis = this;
+    this.id = "info-radius";
+    var _name = "tool_info_radius";
+    this.title = gltxt(_name);
+    this.visible = false;
+    this.active = false;
+    this.topInfoToolButton = null;
+    this.options = {};
+    this.draw = null;
+    this.pending = false;
+    this.waitmarker = null;
+
+    this.additionalMeasurementsEnabled = false;
+    this.rendersLayotsElements = [];
+    this.renderPopulationCounterDetailedYears = [];
+    this.uidMaket = null;
+    var createButton = function () {
+        /*добавить кнопку в меню с инструментами*/
+        localThis.topInfoToolButton = window.ToolPanelModule.getNewPanelButton({
+            "type": "big",
+            "float": "info_instrument",
+            "order": 12,
+            "mobile":true,
+            "title": localThis.title,
+            "text": localThis.title,
+            "class": "ico iso-small ico-tools gr-radius-2",
+            "onClick": localThis.tryDraw
+        });
+        localThis.topInfoToolButton.addDropDownMenu();
+    };
+
+    var onPointDownSet = function () {
+        var point = arguments[0];
+        localThis.options.addressInfo = null;
+        localThis.options.isDown = true;
+
+        /*localThis.options.geometry = point;*/
+        localThis.options.point = point;
+        localThis.options.point.addTo(window.MAP);
+
+        localThis.options.pointAddress.val(gl.text.please_wait___);
+
+        if (point._latlng !== null) {
+            var svc = DoWebApiAction("/geocoder/point2address", {
+                point: "" + point._latlng.lng + "," + point._latlng.lat
+            });
+            
+            svc.done(function (r) {
+                if (r.success && r.results) {
+                    localThis.options.addressInfo = r.results;
+                }
+                var addr = JoinAddressInfo(r.results);
+                localThis.options.pointAddress.val(addr);
+                localThis.options.actionButton.css({ display: "block" });
+            });
+            
+            svc.fail(function () {
+                var addr = JoinAddressInfo();
+                localThis.options.pointAddress.val(addr);
+                localThis.options.actionButton.css({ display: "block" });
+            });
+        }
+    };
+
+    var onPointUpSet = function () {
+        var mapdrawingTool = arguments[0];
+        localThis.options.isDown = false;
+
+        if (typeof mapdrawingTool !== "undefined") {
+            mapdrawingTool._fireCreatedEvent();
+        }
+    };
+
+    var onMouseMove = function () {
+        var _shape = arguments[0];
+        var _options = arguments[1];
+
+        localThis.options.radiusval = _shape.getRadius().toFixed(1);
+        localThis.options.radius.val(localThis.options.radiusval);
+
+        var poly = getCircleFromCircleAsPolygonLL(_shape);
+        localThis.options.areaval = calculateObjectArea(poly);
+        localThis.options.area.html(number_format(localThis.options.areaval, 0, ".", " "));
+
+        if (localThis.options.radiusval > window.UserModule.userData.Limits.MAX_RADIUS) {
+            localThis.options.panel.setStatus(localThis.options.helpafterradiuserror, true, false);
+            _shape.setStyle(_options.shapeOptionsError);
+            localThis.options.actionButton.css({ display: "none" });
+        } else {
+            localThis.options.panel.setStatus(localThis.options.helpafterstart, false, false);
+            _shape.setStyle(_options.shapeOptions);
+            localThis.options.actionButton.css({ display: "block" });
+        }
+    };
+
+    var onGeometryCreated = function () {
+
+        var mapdrawingTool = arguments[0];
+        var point = arguments[1];
+        var shape = arguments[2];
+
+        if (typeof shape === "undefined") {
+
+            var q1 = parseInt(localThis.options.radius.val());
+
+            if (q1 > 0) {
+                /*забираем значение из инпута*/
+                localThis.options.radiusval = q1;
+                localThis.options.radius.val(localThis.options.radiusval);
+            } else {
+                /*30 метров вокруг клика*/
+                localThis.options.radiusval = 100;
+                localThis.options.radius.val(localThis.options.radiusval);
+            }
+
+            localThis.options.geometry = new L.Circle(point, localThis.options.radiusval, mapdrawingTool.options.shapeOptions);
+            L.Draw.SimpleShape.prototype._fireCreatedEvent.call(mapdrawingTool, localThis.options.geometry);
+
+        } else {
+            localThis.options.geometry = new L.Circle(point, shape.getRadius(), mapdrawingTool.options.shapeOptions);
+            L.Draw.SimpleShape.prototype._fireCreatedEvent.call(mapdrawingTool, localThis.options.geometry);
+        }
+
+        if (localThis.options.radiusval > window.UserModule.userData.Limits.MAX_RADIUS) {
+            localThis.options.panel.setStatus(localThis.options.helpafterradiuserror, true, false);
+            localThis.options.geometry.setStyle(mapdrawingTool.options.shapeOptionsError);
+            localThis.options.actionButton.css({ display: "none" });
+        }
+        else
+        {
+            localThis.options.panel.hideStatus();
+            localThis.options.radiusHelp.attr("data-balloon-visible","");
+            localThis.options.geometry.setStyle(mapdrawingTool.options.shapeOptions);
+            localThis.options.actionButton.css({ display: "block" });
+        }
+
+        try {
+            window.MAP.fitBounds(localThis.options.geometry.getBounds());
+        } catch (z) {
+            DoNothing();
+        }
+        window.MAP.invalidateSize();
+
+        localThis.measureGeometry();
+    };
+
+    var onEscape = function () {
+        var mapdrawingTool = arguments[0];
+        if (typeof mapdrawingTool !== "undefined" && localThis.pending !== true) {
+            /*mapdrawingTool.disable();*/
+            localThis.options.panel.close();
+            localThis.close();
+        }
+    };
+
+    var init = function () {
+        /*инициализировать инструмент*/
+        createButton();
+
+        localThis.options.type = localThis.id;
+
+        localThis.options.onPointDownSet = onPointDownSet;
+        localThis.options.onPointUpSet = onPointUpSet;
+        localThis.options.onMouseMove = onMouseMove;
+        localThis.options.onGeometryCreated = onGeometryCreated;
+        localThis.options.onEscape = onEscape;
+
+        localThis.options.help = $("<span/>").html(gl.text.tool_help_click_and_drag_to_draw_a_circle);
+        localThis.options.helpafterstart = gl.text.tool_help_release_mouse_button_to_finish;
+        localThis.options.helpafterfinish = gl.text.tool_help_ready_change_size_and_create_report;
+        localThis.options.helpafterradiuserror = gl.text.tool_help_radius_too_big_decrease_it;
+        localThis.options.helpafterradiuserrorsmall = gl.text.tool_help_radius_too_small_increase_it;
+        localThis.options.helpafterareaerror = gl.text.tool_help_area_is_to_large;
+        localThis.options.helpafterrequest = gl.text.please_wait_for_operation_to_complete;
+
+        localThis.options.radiusCap = $("<span/>", { class:"j-radius" }).html(gl.text.radius + ": ");
+        localThis.options.radiusHelp = $("<button/>", { "data-balloon": gl.text.tool_help_you_can_change_radius_here, "data-balloon-pos": "down", "data-cap": "" }).css({
+            "position": "absolute",
+            "margin-left": "40px",
+            "top":"40px"
+        });
+        localThis.options.radius = $("<input/>", { id: "radius", type: "number" }).val(0);
+
+        localThis.options.radiusval = 0;
+        localThis.options.radiusunits = $("<span/>", { id: "radiusunits" }).html(gl.text.meters_short);
+
+        localThis.options.areaCap = $("<span/>", { class: "j-1 j-area" }).html(gl.text.tool_area + ": ");
+        localThis.options.area = $("<span/>", { id: "area" }).html("0");
+        localThis.options.areaval = 0;
+        localThis.options.areaunits = $("<span/>", { id: "areaunits" }).html(gl.text.meters_short + "<sup>2</sup>");
+
+        localThis.options.area_alt = $("<span/>", { id: "area_alt" }).html("");
+
+        localThis.options.pointCap = $("<span/>", { class: "j-1 j-point" }).html(gl.text.tool_report_name + ": ");
+        localThis.options.pointAddress = $("<input/>", { id: "address", type: "text", maxlength: "50" }).css({ width: "250px" }).val("");
+        localThis.options.addressInfo = null;
+
+        localThis.options.actionButton = $("<div/>").html(gl.text.tool_create_report).addClass("actionButton").css({ display: "block" });
+
+        localThis.options.point = null;
+        localThis.options.geometry = null;
+        window.clearActions.push(localThis.close); /*Добавим событие в ластик*/
+        
+    };
+
+    this.close = function () {
+        /*закрыть инструмент*/
+        if (localThis.pending) return;
+        localThis.active = false;
+        if (window.detectMobile() == "mobile") {
+            window.mobileToolsPanel.close();
+        }
+        try {
+            localThis.draw.disable();
+        } catch (e) {
+            DoNothing();
+        }
+        tryRemoveGeometry(localThis.options.point);
+        tryRemoveGeometry(localThis.options.geometry);  
+        localThis.topInfoToolButton.onEnd(); 
+        window.mapModule01.guessMapClickAllowedOverride();
+        localThis.options.radiusHelp.removeAttr("data-balloon-visible");  
+        window.mapModule01.infopanel.setRemoveClass("info-radius info-tool");
+    };
+
+    this.doRequest = function(clip) {
+        /*выполнить запрос*/        
+        /*если геометрия не пустая, то делаем*/
+        if (localThis.options.point !== null && localThis.options.geometry !== null) {           
+            localThis.pending = true;
+            
+            window.mapModule01.infopanel.setStatus(localThis.options.helpafterrequest, false, true);
+            window.mapModule01.infopanel.wait();
+
+            var latlng = window.requestInfoInCircle.options.point.getLatLng();
+
+            localThis.waitmarker = L.marker([latlng.lat, latlng.lng], {
+                icon: L.icon({
+                    iconUrl: '/resources/styles/images/animan_shlyapa.gif',
+                    iconSize: [50, 50],
+                    iconAnchor: [25, 25],
+                    popupAnchor: [25, 25]
+                }),
+                keyboard: false,
+                zIndexOffset: 10000,
+                opacity: 0.9,
+                pane: "markerPane"
+            }).addTo(window.MAP);
+
+            localThis.options.actionButton.css({ display: "none" });
+
+            /*формируем параметры запроса*/
+
+            var period = getPopulationCounterDetailedYearsPeriod();
+            
+            var request = {};
+            request.Login = window.UserModule.userData.Info.Login;
+            request.Tooltype = localThis.options.type;
+            request.Metadata = {
+                ToolName: localThis.title,
+                Location: localThis.options.addressInfo,
+                Area: localThis.options.areaval,
+                Perimeter: 0,
+                Buffer: localThis.options.radiusval,
+                Params: {
+                    year_1: period && period.start || undefined,
+                    year_2: period && period.end || undefined,
+                }
+            };
+            request.Address = $("input#address").val();
+            request.Name = $("input#address").val();
+            request.Point = getPreparedGeoJsonAsObject(localThis.options.point);
+            request.Line = null;
+            request.Polygon = getPreparedGeoJsonAsObject(getCircleFromCircleAsPolygonLL(localThis.options.geometry));
+            request.GeointellectLayers = window.layerListPanel.getEnabledLayers();
+            request.UserLayers = window.layerListPanel.getEnabledUserLayers();
+
+            if (clip === true) {
+
+                request.clip = clip;
+
+                var _data = {
+                    point: JSON.stringify({
+                        "type": "Point",
+                        "coordinates": [
+                            localThis.options.point._latlng.lng,
+                            localThis.options.point._latlng.lat
+                        ]
+                    }),
+                    polygon: JSON.stringify({
+                        "type": "Polygon",
+                        "coordinates": request.Polygon.coordinates
+                    }),
+                    aswgs: "true"
+                };
+
+                var query = DoWebApiAction("/intersector/clip_with_barriers", _data);
+
+                query.done(function (e) {
+                    if (e.success) {
+
+                        var poly = $.extend({}, e.results);
+
+                        tryRemoveGeometry(localThis.options.point);
+                        tryRemoveGeometry(localThis.options.geometry);
+
+                        localThis.options.geometry = L.geoJson(poly);
+                        localThis.options.geometry.setStyle(L.Draw.Circle.prototype.options.shapeOptions);
+                        localThis.options.geometry.addTo(window.MAP);
+
+                        request.Polygon = JSON.parse(JSON.stringify(poly));
+
+                        doIndoRequestUniversal(localThis, request);
+                    } else {
+                        alert(e.message + "<br/>" +
+                            gl.text.error_ask_for_help + " " +
+                            "<a href='mailto:csr@geointellect.com' target='_blank'>" + gl.text.support_team + "</a>");
+                    }
+                });
+
+            } else {
+                doIndoRequestUniversal(localThis, request);
+                
+            }
+        } else {
+            alert(gl.text.error_unable_to_execute_empty_geometry);
+        }
+
+    };
+
+    this.changeRadius = function (radius) {
+        /*поменять радиус окружности*/
+        localThis.options.radiusHelp.removeAttr("data-balloon-visible");
+        if (localThis.options.geometry === null) return;
+        
+        localThis.options.radiusval = radius;
+        localThis.options.geometry.setRadius(radius);
+        if (radius > window.UserModule.userData.Limits.MAX_RADIUS) {
+            localThis.options.help.html(localThis.options.helpafterradiuserror);
+            window.mapModule01.infopanel.setStatus(localThis.options.help.html(), true);
+            localThis.options.geometry.setStyle(L.Draw.Circle.prototype.options.shapeOptionsError);
+            localThis.options.actionButton.css({display: "none"});
+        } else if (radius <= 0) {
+            localThis.options.help.html(localThis.options.helpafterradiuserrorsmall);
+            window.mapModule01.infopanel.setStatus(localThis.options.help.html(), true);
+            localThis.options.actionButton.css({ display: "none" });
+        } else {
+            localThis.options.help.html(localThis.options.helpafterfinish);
+            window.mapModule01.infopanel.setStatus(localThis.options.help.html(), false);
+            localThis.options.geometry.setStyle(L.Draw.Circle.prototype.options.shapeOptions);
+            localThis.options.actionButton.css({ display: "block" });
+        }
+
+        /*Для мобайла */
+        if (window.detectMobile() == "mobile") {
+            window.MAP.fitBounds(localThis.options.geometry.getBounds());
+            window.MAP.invalidateSize();
+        }
+        localThis.options.geometry.redraw();
+        localThis.measureGeometry();
+    };
+
+    this.measureGeometry = function () {
+
+        if (localThis.options.geometry === null) {
+            localThis.options.areaval = 0.0;
+            localThis.options.area.html("0");
+            localThis.options.area_alt.html("");
+            return {
+                value: 0.0
+            };
+        }
+
+        localThis.options.areaval = calculateObjectArea(getCircleFromCircleAsPolygonLL(localThis.options.geometry));
+        localThis.options.area.html(number_format(localThis.options.areaval, 0, ".", " "));
+
+        if (localThis.additionalMeasurementsEnabled) {
+            try {
+                var hectars = localThis.options.areaval / 10000;
+                var kvkm = localThis.options.areaval / 1000000;
+
+                localThis.options.area_alt.html(
+                    number_format(kvkm, 2, ".", " ") + " " + gltxt("kilometers_short") + "<sup>2</sup>" + "&nbsp;&nbsp;&nbsp;" +
+                    number_format(hectars, 2, ".", " ") + " " + gltxt("unit_hextare")
+                );
+            } catch (ee) {
+                console.error(ee);
+            }
+        }
+
+        return {
+            value: localThis.options.areaval
+        };
+
+    };
+    var layOutAppend = function (_parentBox) {
+        if (localThis.rendersLayotsElements.length > 0) {
+            localThis.options.aRibbonlayoutContainer = $("<div/>", { "class": "aRibbonlayoutContainer" });
+            /* Проверим: есть ли макеты в списке*/
+            (window.layoutsReport.listLayout.length === 0) ? localThis.options.aRibbonlayoutContainer.hide() : localThis.options.aRibbonlayoutContainer.show();
+            localThis.rendersLayotsElements.forEach(function (_element) {
+                localThis.options.aRibbonlayoutContainer.append(_element.element);
+                if (typeof _element.action !== "undefined" || _element.action !== null) {
+                    var a = $(_element.element);
+                    if (a.attr("data-type") === "dropbox") {
+                        _element.element.on("change", function () {
+                            localThis.uidMaket = $(this).val();
+                        });
+                    } else {
+                        _element.element.on("click", function () {
+                            _element.action;
+                        });
+                    }
+                }
+            });
+            _parentBox.append(localThis.options.aRibbonlayoutContainer);
+        }
+    };
+    var populationCounterDetailedYearsAppend = function (_parentBox) {
+        if (localThis.renderPopulationCounterDetailedYears.length > 0) {
+            localThis.renderPopulationCounterDetailedYears.forEach(function (_element) {
+                _parentBox.append(_element.renderElements());
+            });
+
+        }
+    };
+    var getPopulationCounterDetailedYearsPeriod = function() {
+        var period;
+
+        localThis.renderPopulationCounterDetailedYears.forEach(function (element) {
+            var p = element.getPeriod();
+            if(p.start && p.end) {
+                period = p;
+            }
+        });
+
+        return period;
+    }
+    this.tryDraw = function () {
+
+        if (localThis.active || window.mapModule01.infopanel.visible) {
+            window.mapModule01.infopanel.blink();
+            return;
+        };
+
+        var checklimit = DoWebApiAction("/user/check_request_limit", { magic: "wtf" });
+        checklimit.done(function (r) {
+            if (r.success) {
+
+                window.requestHistoryModule.clearSelection();
+                window.clearActions.push(localThis.close);
+                localThis.options.radiusHelp.removeAttr("data-balloon-visible");
+
+                window.mapModule01.infopanel.setTitle(localThis.title);
+                window.mapModule01.MapClickAllowedOverride = false;
+
+                localThis.options.help = $("<span/>").html(gl.text.tool_help_click_and_drag_to_draw_a_circle);
+                localThis.options.radius.val(0);
+                localThis.options.radiusval = 0;
+                localThis.options.area.html("0");
+                localThis.options.areaval = 0;
+
+                localThis.options.panel = window.mapModule01.infopanel;
+
+                localThis.options.pointCap = $("<span/>", { class: "j-1 name-report" }).html(gl.text.tool_report_name + ": ");
+                localThis.options.pointAddress = $("<input/>", { id: "address", type: "text", maxlength: "50" }).css({ width: "250px" }).val("");
+                localThis.options.addressInfo = null;
+
+                localThis.options.actionButton = $("<div/>").html(gl.text.tool_create_report).addClass("actionButton bg-main font-default").css({ display: "block" });
+
+                localThis.options.actionButton.on("click", function () {
+                    
+                    var b = {
+                        type: "ok",
+                        action: function () {
+                            localThis.doRequest(true);
+                        },
+                        title: gl.text.tool_do_cut_text,
+                        text: gl.text.tool_do_cut_btn,
+                        icon: false,
+                        "class": "btn_confirm"
+
+                    };
+
+                    var n = {
+                        type: "skip",
+                        action: function () {
+                            localThis.doRequest(false);
+                        },
+                        title: gl.text.tool_dont_cut_text,
+                        text: gl.text.tool_dont_cut_btn,
+                        icon: false,
+                        "class": "btn_confirm"
+                    };
+
+                    var hhttmmll = gl.text.tool_do_cut_question + "<br/>";
+                    hhttmmll += "<img src=\"/resources/funcparts/info-radius/clipped.gif\">";
+
+                    customConfirm(hhttmmll, null, [b, n], 380, 320);
+                });
+
+                localThis.options.point = null;
+                localThis.options.geometry = null;
+
+                localThis.options.radius.on("change", function () {
+                    var value = $(this).val();                   
+                    localThis.changeRadius(value);
+                  
+                });
+
+                localThis.options.radius.on("keyup", function () {
+                    var value = $(this).val();
+                    localThis.changeRadius(value);
+                });
+
+                var content = $("<div/>")
+
+                    .append(localThis.options.radiusCap)
+                    .append(localThis.options.radiusHelp)
+                    .append(localThis.options.radius)
+                    .append(localThis.options.radiusunits)
+
+                    .append(localThis.options.areaCap)
+                    .append(localThis.options.area)
+                    .append(localThis.options.areaunits)
+
+                    .append(localThis.options.area_alt)
+
+                    .append(localThis.options.pointCap)
+                    .append(localThis.options.pointAddress)
+                    .append(localThis.options.actionButton);
+
+                layOutAppend(content);
+                populationCounterDetailedYearsAppend(content);
+                window.mapModule01.infopanel.setContent(content);
+                window.mapModule01.infopanel.show();
+                window.mapModule01.infopanel.setStatus(localThis.options.help.html(), false, true);
+
+               /* window.mapModule01.infopanel.onclose = [];*/
+               /* window.mapModule01.infopanel.onclose.length = 0;*/
+                window.mapModule01.infopanel.onclose.push(localThis.close);
+                window.mapModule01.infopanel.setClass("info-radius info-tool");
+                window.mapModule01.infopanel.graphics = [];
+                window.mapModule01.infopanel.graphics.length = 0;
+
+                localThis.draw = new L.Draw.Circle(window.MAP, window.mapModule01.drawControl.options.circle);
+                localThis.draw.enable(localThis.options);
+                localThis.active = true;
+            }
+            else {
+                blinkmsg(gltxt("check_request_limit"));
+            }
+        });
+
+    };
+
+    init();
+};
+
+$(document).ready(function() {
+    window.requestInfoInCircle = new RequestInfoInCircle();
+});

@@ -1,0 +1,3884 @@
+function generateGUID() {
+    function s4() {
+        return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+    }
+    return s4() + s4() + "-" + s4() + "-" + s4() + "-" + s4() + "-" + s4() + s4() + s4();
+};
+
+function generateSTRUID() {
+    return generateGUID().replace(/\-/g, "");
+};
+
+function generateSTRUID2() {
+    return btoa(generateSTRUID()).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+};
+
+$.wait = function (callback, milliseconds) {
+    return window.setTimeout(callback, milliseconds);
+};
+
+const DoNothing = (() => {
+    let _flag = false;
+    return function () {
+        _flag = !_flag;
+    };
+})();
+
+function isArray(arr) {
+    return Array.isArray(arr);
+};
+
+function isObject(objstr) {
+    if (Object.prototype.toString.call(objstr) === "[object Object]") {
+        return true;
+    }
+    return false;
+};
+
+function isDate(value) {
+    try {
+        var parts = value.split(".");
+        var chk = new Date(parts[2], parts[1] - 1, parts[0]);
+        return (("" + chk) != "Invalid Date") ? true : false;
+    } catch (er) {
+        return false;
+    }
+};
+
+function toIsoDateString(value) {
+    try {
+        var parts = value.split(".");
+        return "" + parts[2] + "-" + parts[1] + "-" + parts[0];
+    } catch (er) {
+        return "";
+    }
+};
+
+function isFunction(fu) {
+    return typeof fu === 'function';
+};
+
+function isNotEmpty(str) {
+    return str != null && str !== '';
+};
+
+function isEmpty(str) {
+    return !(isNotEmpty(str));
+};
+
+function isNull(value, placeholder = 'Empty') {
+    if (value == null) return placeholder;
+    const val = String(value).trim().toLowerCase();
+    if (val === '' || val === 'null' || val === 'undefined') {
+        return placeholder;
+    }
+    return value;
+};
+
+function findMatches(array, string) {
+    var found = 0;
+    for (var i = 0; i < array.length; i++) {
+        if (string.indexOf(array[i]) !== -1) {
+            found++;
+        }
+    }
+    return array.length === found;
+};
+
+function limiting_characters(maxSymbols, countElem, textElem) {
+    if (countElem?.length > 0) countElem = countElem[0];
+    if (textElem?.length > 0) textElem = textElem[0];
+    function update() {
+
+        try {
+            const text = textElem.textContent;
+            if (text.length > maxSymbols) {
+                textElem.textContent = text.slice(0, maxSymbols);
+            }
+            countElem.textContent = maxSymbols - textElem.textContent.length;
+        } catch (e) {
+
+        }
+    }
+    textElem.addEventListener('input', update);
+    update();
+};
+
+function limiting_characters_inp(maxSymbols, countElem, inp) {
+    if (countElem?.length > 0) {
+        countElem = countElem[0];
+    }
+    if (inp?.length > 0) {
+        inp = inp[0];
+    }
+    inp.maxLength = maxSymbols;
+
+    countElem.textContent = maxSymbols;
+
+    function updateCounter() {
+        var currentLength = inp.value?.length ?? 0;
+
+        if (currentLength > maxSymbols) {
+            inp.value = inp.value.substring(0, maxSymbols);
+            currentLength = maxSymbols;
+        }
+
+        var remaining = maxSymbols - currentLength;
+
+        if (remaining <= 0) {
+            countElem.textContent = '0';
+        } else {
+            countElem.textContent = remaining;
+        }
+    }
+
+    inp.addEventListener('input', updateCounter);
+
+    updateCounter();
+};
+
+function addLineBreaks(str, maxLen = 20) {
+    const words = str.split(' ');
+    const lines = [];
+    let line = '';
+
+    for (const word of words) {
+        const sep = line ? 1 : 0;
+        if (line.length + sep + word.length > maxLen) {
+            lines.push(line);
+            line = word;
+        } else {
+            line = line ? line + ' ' + word : word;
+        }
+    }
+
+    if (line) lines.push(line);
+    return lines.join('<br/>');
+};
+
+var makeid = function (length) {
+    let result = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        counter += 1;
+    }
+    return result;
+};
+Array.prototype.unique = function () {
+    return this.filter(
+        function (a) { return !this[a] ? this[a] = true : false; }, {}
+    );
+};
+
+Array.prototype.equal = function(b) {
+    var a = this;
+    if (a === b) return true;
+    if (typeof (b) === "undefined" || b === null) return false;
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; ++i) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+};
+
+Array.prototype.contains = function (b) {
+    var a = this;
+    var q = false;
+    a.forEach(function (value) {
+        if (value === b) q = true;
+    });
+    return q;
+};
+
+Array.prototype.containsAny = function (b) {
+    var a = this;
+    var q = false;
+    a.forEach(function (value) {
+        if (b.contains(value)) q = true;
+    });
+    return q;
+};
+
+function guessDataType(array, nullable) {
+    if (!Array.isArray(array) || array.length === 0) {
+        return 'unknown';
+    }
+
+    let hasString = false;
+    let hasInt = true;
+    let hasDouble = false;
+    let hasNull = false;
+    let hasContent = false;
+
+    for (const value of array) {
+        if (value === null || value === '') {
+            hasNull = true;
+            continue;
+        }
+
+        hasContent = true;
+
+        if (typeof value === 'number') {
+            if (!Number.isInteger(value)) {
+                hasDouble = true;
+                hasInt = false;
+            }
+            continue;
+        }
+
+        const strValue = String(value).trim();
+
+        const commaAsDecimal = /^-?\d{1,3}(?:\.\d{3})*(?:,\d+)$|^-?\d+,\d+$/.test(strValue);
+        if (commaAsDecimal) {
+            hasDouble = true;
+            hasInt = false;
+            continue;
+        }
+
+        const dotAsDecimal = /^-?\d+\.\d+$/.test(strValue);
+        if (dotAsDecimal) {
+            hasDouble = true;
+            hasInt = false;
+            continue;
+        }
+
+        const isValidInteger = /^-?\d+$/.test(strValue);
+        if (isValidInteger) {
+            continue;
+        }
+
+        if (strValue === '' || isNaN(strValue) ||
+            /[a-df-z]|e[+-]?[^0-9]|\.\.|^0[0-9]|[,%$]|^0x/i.test(strValue)) {
+            hasString = true;
+            hasInt = false;
+            hasDouble = false;
+        }
+    }
+
+    if (!nullable && hasNull) {
+        return 'string';
+    }
+
+    if (hasString) {
+        return 'string';
+    }
+
+    if (hasDouble) {
+        return 'double';
+    }
+
+    if (hasInt) {
+        return 'int';
+    }
+
+    return 'string';
+};
+
+function findElement(arr, sing) {
+    for (var i = 0; i < arr.length; i++) {
+        var element = arr[i];
+        for (prop in element) { if (element[prop] == sing) return i }
+    }
+    return -1;
+};
+
+function findObjectInArray(array, property, value) {
+
+    let result = null;
+
+    let hasIt = false;
+
+    if (Object.prototype.toString.call(array) !== "[object Array]") {
+        return null;
+    }
+    
+    if (typeof property === "undefined" || property === null) {
+        return null;
+    }
+
+    array.forEach(function (item) {
+        if (Object.prototype.toString.call(item) === "[object Object]") {
+            if (item.hasOwnProperty(property)) {
+                hasIt = true;
+                if (item[property] === value) {
+                    result = Object.assign({}, item);
+                }
+            }
+        }
+    });
+
+    if (hasIt === false) {
+        console.error("findObjectInArray(a, p, v) PROPERTY p = [" + property + "] NOT FOUND IN [a]");
+    }
+
+    return result;
+};
+
+/**
+ * @template T
+ * @param {T | Array<T>} array
+ * @param {(value: T, index: number) => void} callback 
+ */
+function foreach(array, callback) {
+    if(Array.isArray(array)) {
+        array.forEach(callback);
+    } else {
+        callback(array, 0);
+    }
+}
+
+String.prototype.startsWith = function (str) {
+    return this.toLocaleLowerCase().indexOf(str.toLocaleLowerCase()) == 0;
+};
+
+String.prototype.left = function (n) {
+    return this.substring(0, n);
+};
+
+String.prototype.right = function (n) {
+    return this.substring(this.length - n);
+};
+
+String.prototype.containsOneOf = function (patterns, ignoreCase = false) {
+    if (patterns == null) return false;
+
+    let hay = this.toString();
+    if (ignoreCase) hay = hay.toLowerCase();
+
+    const parts = Array.isArray(patterns)
+        ? patterns
+        : String(patterns).split(/[;,]/);
+
+    for (let part of parts) {
+        if (!part) continue;
+        const needle = ignoreCase ? part.toLowerCase() : part;
+        if (hay.indexOf(needle) !== -1) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+
+function capitalizeFirstLetter(str) {
+    if (typeof str !== 'string' || str.length === 0) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+/**
+ * 
+ * @param {string} param 
+ * @param {boolean=} _same
+ * @returns {string}
+ */
+function gltxt(param, _same) {
+    if (gl.text.hasOwnProperty(param)) {
+        return gl.text[param];
+    }
+    if (typeof _same != "undefined" && _same == false) {
+        return "";
+    }
+    return param;
+};
+
+function gltxt_f(param, _var) {
+    var _o = gltxt(param, true);
+    if (_o.indexOf("{0}") != -1) {
+        return _o.replace("{0}",_var);
+    }
+    return _o + " (" + _var + ")";
+};
+
+function monthAsText(param) {
+    let month = null;
+    switch (parseInt(param)) {
+        case 1:
+            month = capitalizeFirstLetter(gltxt("mon_january"));
+            break;
+        case 2:
+            month = capitalizeFirstLetter(gltxt("mon_february"));
+            break;
+        case 3:
+            month = capitalizeFirstLetter(gltxt("mon_march"));
+            break;
+        case 4:
+            month = capitalizeFirstLetter(gltxt("mon_april"));
+            break;
+        case 5:
+            month = capitalizeFirstLetter(gltxt("mon_may"));
+            break;
+        case 6:
+            month = capitalizeFirstLetter(gltxt("mon_june"));
+            break;
+        case 7:
+            month = capitalizeFirstLetter(gltxt("mon_july"));
+            break;
+        case 8:
+            month = capitalizeFirstLetter(gltxt("mon_august"));
+            break;
+        case 9:
+            month = capitalizeFirstLetter(gltxt("mon_september"));
+            break;
+        case 10:
+            month = capitalizeFirstLetter(gltxt("mon_october"));
+            break;
+        case 11:
+            month = capitalizeFirstLetter(gltxt("mon_november"));
+            break;
+        case 12:
+            month = capitalizeFirstLetter(gltxt("mon_december"));
+            break;
+        default:
+            break;
+    }
+    return month;
+};
+
+function getLabelByValue(rules, val) {
+    if (!Array.isArray(rules) || rules.length === 0) {
+        return '---';
+    }
+
+    const n = Number(val);
+    if (!Number.isFinite(n)) {
+        return '---';
+    }
+
+    const lastTwo = n % 100;
+    if (lastTwo >= 10 && lastTwo < 20) {
+        return rules[0].label;
+    }
+
+    const lastDigit = n % 10;
+    const lastStr = String(lastDigit);
+
+    const rule = rules.find(r => String(r.last).includes(lastStr));
+
+    return rule
+        ? rule.label
+        : '---';
+};
+
+var JoinAddressInfo = function (r) {
+    var loc = [];
+    loc.length = 0;
+
+    if (!r) {
+        return gltxt("address_not_found");
+    }
+
+    if (r.LocalityName && trim11(r.LocalityName) !== "") {
+        loc.push(r.LocalityName);
+    }
+    if (r.AdminName && trim11(r.AdminName) !== "") {
+        loc.push(r.AdminName);
+    }
+
+    if (loc.length === 0) {
+        if (r.Caption && trim11(r.Caption) !== "") {
+            loc.push(r.Caption);
+        }
+    }
+
+    return loc.join(", ");
+};
+
+String.prototype.stripHtml = function () {
+    var tmp = document.createElement("DIV");
+    tmp.innerHTML = this;
+    return tmp.textContent || tmp.innerText || "";
+};
+
+String.prototype.safe = function () {
+    var tmp = this;
+    tmp = tmp.replace("<", "&lt;");
+    tmp = tmp.replace(">", "&gt;");
+    tmp = tmp.replace("\"", "&quot;");
+    tmp = tmp.replace("'", "&quot;");
+    tmp = tmp.replace("&", "&amp;");
+    //tudu: implement other stuff
+    return tmp;
+};
+
+String.prototype.clean = function () {
+    var str = this;
+    return $.trim(str).replace(/\s\s+/g, " ");
+};
+
+String.prototype.translit = function () {
+    var stri = this;
+    var space = "_";
+    var text = stri.toLowerCase();
+    var transl = {
+        'а': 'a',
+        'б': 'b',
+        'в': 'v',
+        'г': 'g',
+        'д': 'd',
+        'е': 'e',
+        'ё': 'e',
+        'ж': 'zh',
+        'з': 'z',
+        'и': 'i',
+        'й': 'j',
+        'к': 'k',
+        'л': 'l',
+        'м': 'm',
+        'н': 'n',
+        'о': 'o',
+        'п': 'p',
+        'р': 'r',
+        'с': 's',
+        'т': 't',
+        'у': 'u',
+        'ф': 'f',
+        'х': 'h',
+        'ц': 'c',
+        'ч': 'ch',
+        'ш': 'sh',
+        'щ': 'sh',
+        'ъ': space,
+        'ы': 'y',
+        'ь': space,
+        'э': 'e',
+        'ю': 'yu',
+        'я': 'ya',
+        ' ': space,
+        '_': space,
+        '`': space,
+        '~': space,
+        '!': space,
+        '@': space,
+        '#': space,
+        '$': space,
+        '%': space,
+        '^': space,
+        '&': space,
+        '*': space,
+        '(': space,
+        ')': space,
+        '-': space,
+        '\=': space,
+        '+': space,
+        '[': space,
+        ']': space,
+        '\\': space,
+        '|': space,
+        '/': space,
+        '.': space,
+        ',': space,
+        '{': space,
+        '}': space,
+        '\'': space,
+        '"': space,
+        ';': space,
+        ':': space,
+        '?': space,
+        '<': space,
+        '>': space,
+        '№': space
+    };
+
+    var result = "";
+    var curentSim = "";
+
+    for (var i = 0; i < text.length; i++) {
+        if (transl[text[i]] != undefined) {
+            if (curentSim != transl[text[i]] || curentSim != space) {
+                result += transl[text[i]];
+                curentSim = transl[text[i]];
+            }
+        } else {
+            result += text[i];
+            curentSim = text[i];
+        }
+    }
+    return $.trim(result);
+};
+
+String.prototype.toFieldname = function (spravochnik) {
+    var instring = this;
+    var preString = instring.translit();
+    if (["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "_", "-"].indexOf(preString.left(1)) >= 0) {
+        return "f_" + preString;
+    }
+    return preString;
+};
+
+String.prototype.addslashes = function () {
+    var str = this;
+    str = str.replace(/\\/g, '\\\\');
+    str = str.replace(/\'/g, '\\\'');
+    str = str.replace(/\"/g, '\\"');
+    str = str.replace(/\0/g, '\\0');
+    return str;
+};
+
+String.prototype.stripslashes = function () {
+    var str = this;
+    str = str.replace(/\\'/g, '\'');
+    str = str.replace(/\\"/g, '"');
+    str = str.replace(/\\0/g, '\0');
+    str = str.replace(/\\\\/g, '\\');
+    return str;
+};
+
+String.prototype.strEncodeDB = function () {
+    var str = this;
+    str = $.trim(str.addslashes());
+    return str;
+};
+
+String.prototype.strDecodeDB = function () {
+    var str = this;
+    str = $.trim(str.stripslashes());
+    return str;
+};
+
+String.prototype.isEngLetter = function () {
+    var chr = this;
+    return /^[A-Za-z_]+$/.test(chr);
+};
+
+String.prototype.isBlank = function () {
+    var str = this;
+    return /^\s*$/.test(str);
+};
+
+String.prototype.toWordArray = function () {
+    var str = this;
+    //tudu: not implemented
+    return str;
+};
+
+String.prototype.getWord = function (n) {
+    var str = this;
+    //tudu: not implemented
+    return str;
+};
+
+String.prototype.toLineArray = function () {
+    var str = this;
+    if (str.isBlank()) return [];
+    return str.split(/\r?\n/);
+};
+
+String.prototype.getLine = function (n) {
+    var str = this;
+    //tudu: not implemented
+    return str;
+};
+
+function ReplaceSvgProperty(svgText, property, value) {
+    let regex = new RegExp(`${property}:.*?;`, 'g');
+    let replacement = `${property}:${value};`;
+    return svgText.replace(regex, replacement);
+};
+
+function isValidURL(str) {
+    var regex = /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
+    if (!regex.test(str)) {
+        return false;
+    } else {
+        return true;
+    }
+};
+
+function isISODateTime(str) {
+    var regex = /^(\d{4})-(\d{2})-(\d{2})((([ T])(\d{2}):(\d{2}):(\d{2})([.0-9]{0,8})){0,1})$/;
+    if (!regex.test(str)) {
+        return false;
+    } else {
+        return true;
+    }
+};
+
+function isAMPMDate(str) {
+    var regex1 = /^(\d{1,4})\/(\d{1,2})\/(\d{1,4})([ T])(\d{2}):(\d{2}):(\d{2})([ APM]{3})$/;
+    if (!regex1.test(str)) {
+        return false;
+    } else {
+        return true;
+    }
+};
+
+function isLikePattern(pattern, str) {
+    var escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    escapedPattern = escapedPattern.replace(/%/g, '.*');
+    escapedPattern = escapedPattern.replace(/_/g, '.');
+    var regex = new RegExp('^' + escapedPattern + '$', 'i');
+    return regex.test(str);
+};
+
+function isInList(word, list, delimiter = ';') {
+    if (!list || !word) return false;
+
+    const target = word.trim().toLowerCase();
+    const parts = String(list).split(delimiter);
+
+    for (let i = 0, len = parts.length; i < len; i++) {
+        if (parts[i].trim().toLowerCase() === target) {
+            return true;
+        }
+    }
+    return false;
+};
+
+function trim11_old(str) {
+    if (typeof str === "undefined" || str === null) {
+        return "";
+    }
+    str = str.replace(/^\s+/, "");
+    for (var i = str.length - 1; i >= 0; i--) {
+        if (/\S/.test(str.charAt(i))) {
+            str = str.substring(0, i + 1);
+            break;
+        }
+    }
+    return str;
+};
+
+function trim11(str) {
+    return (str == null) ? '' : String(str).trim();
+};
+
+function localizeHtml(html, strings) {
+    if (typeof strings == "undefined") {
+        strings = gl.text;
+    }
+    if (Array.isArray(strings)) {
+        strings.forEach((itm) => {
+            let str = "{{" + itm.key + "}}";
+            html = html.replace(new RegExp(str, "g"), `${itm.value}`);
+        });
+    }
+    else {
+        for (let itm in strings) {
+            if (strings.hasOwnProperty(itm)) {
+                let str = "{{" + itm + "}}";
+                html = html.replace(new RegExp(str, "g"), strings[itm]);
+            }
+        }
+    }
+    return html;
+};
+
+function ReplaceMustachesArray(_html, _array) {
+    _array.forEach(function (_item) {
+        _html = _html.replace(new RegExp('{{' + _item.key + '}}', 'g'), _item.value?.toString() ?? "--");
+    });
+    return _html;
+};
+
+function HtmlElementFromText(_string, _array) {
+    var template = document.createElement('template');
+    var _html = _string.trim();
+
+    if (_html && _array && _array.length > 0) {
+        _html = ReplaceMustachesArray(_html, _array);
+    }
+
+    template.innerHTML = _html;
+
+    var fragment = document.createDocumentFragment();
+    var childNode = template.content.firstChild;
+    fragment.appendChild(childNode.cloneNode(true));
+
+    return fragment.firstChild;
+};
+
+var format = {
+    "phone": function (phone) {
+        if (phone == null) return '';
+        phone = String(phone).trim();
+        if (!phone) return '';
+        if (/[A-Za-zА-Яа-яЁё]/.test(phone)) return phone;
+
+        if (/[,;|\/]/.test(phone)) {
+            return phone.split(/[,;|\/]+/).map(p => format.phone(p.trim())).join(', ');
+        }
+
+        const isInternational = phone.startsWith('+');
+        const digits = phone.replace(/\D/g, '');
+
+        function groupFallback(digs) {
+            if (digs.length <= 1) return digs;
+            if (digs.length % 2 === 0) {
+                let groups = [];
+                for (let i = 0; i < digs.length; i += 2) {
+                    groups.push(digs.substr(i, 2));
+                }
+                return groups.join('&nbsp;');
+            } else {
+                let groups = [digs.substr(0, 3)];
+                for (let i = 3; i < digs.length; i += 2) {
+                    groups.push(digs.substr(i, 2));
+                }
+                return groups.join('&nbsp;');
+            }
+        }
+
+        if (isInternational) {
+            if (phone.startsWith('+7') && digits.length === 11) {
+                return '+7&nbsp;(' + digits.slice(1, 4) + ')&nbsp;' +
+                    digits.slice(4, 7) + '-' +
+                    digits.slice(7, 9) + '-' +
+                    digits.slice(9, 11);
+            } else if (digits.length > 10) {
+                const ccLength = digits.length - 10;
+                const cc = digits.slice(0, ccLength);
+                const local = digits.slice(ccLength);
+                return '+' + cc + '&nbsp;' +
+                    local.slice(0, 3) + '&nbsp;' +
+                    local.slice(3, 6) + (local.length > 6 ? '&nbsp;' + local.slice(6) : '');
+            } else {
+                return '+' + groupFallback(digits);
+            }
+        } else {
+            if (digits.length === 11 && (digits[0] === '8' || digits[0] === '7')) {
+                return digits[0] + '&nbsp;(' + digits.slice(1, 4) + ')&nbsp;' +
+                    digits.slice(4, 7) + '-' +
+                    digits.slice(7, 9) + '-' +
+                    digits.slice(9, 11);
+            } else if (digits.length === 10) {
+                return '(' + digits.slice(0, 3) + ')&nbsp;' +
+                    digits.slice(3, 6) + '-' +
+                    digits.slice(6, 8) + '-' +
+                    digits.slice(8, 10);
+            } else {
+                return groupFallback(digits);
+            }
+        }
+    },
+    "coordinate": function (value) {
+        if (value == null) return '';
+        let str = typeof value === 'string' ? value.trim() : String(value);
+        if (str.indexOf(',') !== -1 && str.indexOf('.') === -1) {
+            str = str.replace(',', '.');
+        }
+        const num = parseFloat(str);
+        if (isNaN(num)) return '';
+        return num.toFixed(6);
+    }
+};
+
+
+
+let Transliterator = {
+    /*
+    Usage example:
+    Transliterator.Russian.getTransliteration("Привет мир");
+    */
+};
+
+Transliterator.Russian = (function () {
+    let VowelCombinations = {
+        "Ай": "Ay",
+        "aЙ": "aY",
+        "ай": "ay",
+        "АЙ": "AY",
+        "Ей": "Ey",
+        "еЙ": "eY",
+        "ей": "ey",
+        "ЕЙ": "EY",
+        "Ий": "Y",
+        "иЙ": "y",
+        "ий": "y",
+        "ИЙ": "Y",
+        "Ой": "Oy",
+        "оЙ": "oY",
+        "ой": "oy",
+        "ОЙ": "OY",
+        "Уй": "Uy",
+        "уЙ": "uY",
+        "уй": "uy",
+        "УЙ": "UY",
+        "Ый": "Yu",
+        "ыЙ": "yU",
+        "ый": "yu",
+        "ЫЙ": "YU",
+        "Юй": "Yuy",
+        "юЙ": "yuY",
+        "юй": "yuy",
+        "ЮЙ": "YUY",
+        "Яй": "Yay",
+        "яЙ": "yaY",
+        "яй": "yay",
+        "ЯЙ": "YAY",
+        "Эй": "Ey",
+        "эЙ": "eY",
+        "эй": "ey",
+        "ЭЙ": "EY"
+    };
+
+    let SingleLetters = {
+        'а': 'a',
+        'б': 'b',
+        'в': 'v',
+        'г': 'g',
+        'д': 'd',
+        'е': 'e',
+        'ё': 'e',
+        'з': 'z',
+        'и': 'i',
+        'й': 'y',
+        'к': 'k',
+        'л': 'l',
+        'м': 'm',
+        'н': 'n',
+        'о': 'o',
+        'п': 'p',
+        'р': 'r',
+        'с': 's',
+        'т': 't',
+        'у': 'u',
+        'ф': 'f',
+        'ы': 'y',
+        'э': 'e'
+    };
+
+    let DoubleLetters = {
+        "ж": "zh",
+        "х": "kh",
+        "ц": "ts",
+        "ч": "ch",
+        "ш": "sh",
+        "щ": "shch",
+        "ю": "yu",
+        "я": "ya"
+    };
+
+    let VowelsLetters = ['а', 'о', 'и', 'е', 'ё', 'э', 'ы', 'у', 'ю', 'я'];
+
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function getTransliteration(value) {
+        if (!value) {
+            return value;
+        }
+
+        let builder = value;
+
+        // 'х' = 'h' if standing after vowels
+        let tempBuilder = '';
+        for (let i = 0; i < builder.length; i++) {
+            let currentChar = builder[i];
+            let lowerCurrent = currentChar.toLowerCase();
+
+            if (i > 0 && lowerCurrent === 'х') {
+                let prevChar = builder[i - 1];
+                let lowerPrev = prevChar.toLowerCase();
+
+                if (VowelsLetters.indexOf(lowerPrev) !== -1) {
+                    tempBuilder += currentChar === 'х' ? 'h' : 'H';
+                    continue;
+                }
+            }
+            tempBuilder += currentChar;
+        }
+        builder = tempBuilder;
+
+        // Removing the unpronounceable letters
+        builder = builder.replace(/ь/gi, '');
+        builder = builder.replace(/ъ/gi, '');
+
+        // Replacing vowel combinations with the letter 'й'
+        for (let key in VowelCombinations) {
+            if (VowelCombinations.hasOwnProperty(key)) {
+                let regex = new RegExp(escapeRegExp(key), 'g');
+                builder = builder.replace(regex, VowelCombinations[key]);
+            }
+        }
+
+        // Uppercase for cyrillic letters with 2+ latin letters
+        let resultBuilder = '';
+        for (let i = 0; i < builder.length; i++) {
+            let currentChar = builder[i];
+            let replaced = false;
+
+            for (let cyrillic in DoubleLetters) {
+                if (DoubleLetters.hasOwnProperty(cyrillic)) {
+                    let upperCyrillic = cyrillic.toUpperCase();
+
+                    if (currentChar === upperCyrillic) {
+                        let isNextCharUpper = i < builder.length - 1 &&
+                            builder[i + 1].match(/[a-zA-Zа-яА-Я]/) &&
+                            builder[i + 1] === builder[i + 1].toUpperCase();
+                        let isLastChar = i === builder.length - 1;
+
+                        if (isNextCharUpper || isLastChar) {
+                            resultBuilder += DoubleLetters[cyrillic].toUpperCase();
+                            replaced = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!replaced) {
+                resultBuilder += currentChar;
+            }
+        }
+        builder = resultBuilder;
+
+        // Replacing single letters
+        for (let cyrillic in SingleLetters) {
+            if (SingleLetters.hasOwnProperty(cyrillic)) {
+                let upperCyrillic = cyrillic.toUpperCase();
+                let upperLatin = SingleLetters[cyrillic].toUpperCase();
+
+                let regexLower = new RegExp(cyrillic, 'g');
+                let regexUpper = new RegExp(upperCyrillic, 'g');
+
+                builder = builder.replace(regexLower, SingleLetters[cyrillic]);
+                builder = builder.replace(regexUpper, upperLatin);
+            }
+        }
+
+        // Replacing double letters with proper casing
+        for (let cyrillic in DoubleLetters) {
+            if (DoubleLetters.hasOwnProperty(cyrillic)) {
+                let upperCyrillic = cyrillic.toUpperCase();
+                let latin = DoubleLetters[cyrillic];
+                let properCaseLatin = latin.charAt(0).toUpperCase() + latin.slice(1);
+
+                let regexLower = new RegExp(cyrillic, 'g');
+                let regexUpper = new RegExp(upperCyrillic, 'g');
+
+                builder = builder.replace(regexLower, latin);
+                builder = builder.replace(regexUpper, properCaseLatin);
+            }
+        }
+
+        return builder;
+    }
+
+    return {
+        getTransliteration: getTransliteration
+    };
+})();
+
+function ToUrlSlug(str) {
+    if (!str) return str;
+    str = str.replace(/№/g, "N").replace(/#/g, "N");
+    str = str.replace(/[,.!\-;\/\\]/g, " ");
+    if (typeof Transliterator !== 'undefined' && Transliterator.Russian) {
+        str = Transliterator.Russian.getTransliteration(str);
+    }
+    str = str.replace(/[^\u0400-\u04FFa-zA-Z0-9_.\s]/g, "");
+    str = str.replace(/\s+/g, "_");
+    return str.toLowerCase();
+};
+
+/**
+ * @param {string} url
+ * @returns {string}
+ */
+function scramble(url) {
+    if (window.app_version) {
+        return url.includes('?')
+            ? url + "&v=" + window.app_version
+            : url + "?v=" + window.app_version;
+    }
+
+    return url;
+}
+
+function dateToString(date) {
+    if (typeof date === "undefined") {
+        date = new Date();
+    }
+    var m0 = date.getMonth() + 1;
+    var d0 = date.getDate();
+    var y0 = date.getFullYear();
+    return "" + pad(d0, 2) + "." + pad(m0, 2) + "." + y0;
+};
+
+function date2Period(date) {
+    var ps = date.split(".");
+
+    var y = parseInt(ps[2]);
+    var m = parseInt(ps[1]);
+    var d = parseInt(ps[0]);
+
+    return parseInt("" + y + pad(m, 2) + pad(d, 2));
+};
+
+function period2Date(period) {
+    period = "" + period;
+    var y = parseInt(period.substring(0, 4));
+    var m = parseInt(period.substring(4, 2));
+    var d = parseInt(period.substring(6, 2));
+
+    return new Date(y, m, d);
+};
+
+function increaseDate(date, days) {
+
+    var ps = date.split(".");
+
+    var y = parseInt(ps[2]);
+    var m = parseInt(ps[1]) - 1;
+    var d = parseInt(ps[0]);
+
+    var dt = new Date(y, m, d);
+    dt.setDate(dt.getDate() + days);
+
+    var m2 = dt.getMonth() + 1;
+    var d2 = dt.getDate();
+    var y2 = dt.getFullYear();
+
+    return pad(d2, 2) + "." + pad(m2, 2) + "." + y2;
+};
+
+function increasePeriod(period, days) {
+
+    period = "" + period;
+
+    var y = parseInt(period.substring(0, 4));
+    var m = parseInt(period.substring(4, 2));
+    var d = parseInt(period.substring(6, 2));
+
+    var dt = new Date(y, m, d);
+    dt.setDate(dt.getDate() + days);
+
+    var m2 = dt.getMonth() + 1;
+    var d2 = dt.getDate();
+    var y2 = dt.getFullYear();
+
+    return pad(d2, 2) + "." + pad(m2, 2) + "." + y2;
+};
+
+function checkIsoDateIsGreaterOrEqual(date1, date2) {
+    var parsedDate1 = new Date(date1);
+    var parsedDate2 = new Date(date2);
+
+    return parsedDate1 >= parsedDate2;
+};
+
+function checkIsoDateIsLessOrEqual(date1, date2) {
+    var parsedDate1 = new Date(date1);
+    var parsedDate2 = new Date(date2);
+
+    return parsedDate1 <= parsedDate2;
+};
+
+function checkIsoDateIsEqual(date1, date2) {
+    var parsedDate1 = new Date(date1);
+    var parsedDate2 = new Date(date2);
+
+    return parsedDate1 == parsedDate2;
+};
+
+function normalizeDate(date) {
+    if (date.indexOf(":") == -1 && date.indexOf("-") == -1) {
+        return date;
+    }
+    try {
+        var cleaned1 = date.split(".")[0];
+        var cleaned2 = cleaned1.replace(" ", "T");
+        var cleaned3 = cleaned2.split("T");
+        var ndate = cleaned3[0].split("-");
+        var ntime = cleaned3[1].split(":");
+        return ndate[2] + "." + ndate[1] + "." + ndate[0] + " " + ntime[0] + ":" + ntime[1];
+    } catch (e) {
+        return date;
+    }
+};
+
+function isIE() {
+    var myNav = navigator.userAgent.toLowerCase();
+    if (myNav.indexOf("msie") !== -1) {
+        return true;
+    }
+    if (myNav.indexOf("rv:11") !== -1) {
+        return true;
+    }
+    return false;
+};
+
+function isIPAD() {
+    var myNav = navigator.userAgent.toLowerCase();
+    if (myNav.indexOf("ipad") !== -1) {
+        return true;
+    }
+    return false;
+};
+
+function isIPHONE() {
+    var myNav = navigator.userAgent.toLowerCase();
+    if (myNav.indexOf("iphone") !== -1) {
+        return true;
+    }
+    return false;
+};
+
+function isSURFACE() {
+    var myNav = navigator.userAgent.toLowerCase();
+    if (myNav.indexOf("touch") !== -1 && myNav.indexOf("arm") !== -1) {
+        return true;
+    }
+    return false;
+};
+
+function isANDROID() {
+    var myNav = navigator.userAgent.toLowerCase();
+    if (myNav.indexOf("android") !== -1) {
+        return true;
+    }
+    return false;
+};
+
+function getUrlParameter(sParam) {
+    var sPageUrl = decodeURIComponent(window.location.search.substring(1)),
+        sUrlVariables = sPageUrl.split("&"),
+        sParameterName,
+        i;
+
+    for (i = 0; i < sUrlVariables.length; i++) {
+        sParameterName = sUrlVariables[i].split("=");
+
+        if (sParameterName[0] === sParam) {
+            return sParameterName[1] === undefined ? true : sParameterName[1];
+        }
+    }
+};
+
+function reloadPage() {
+    window.location.reload(true);
+};
+function removeStyleToExistingSheetBySelector(selector) {
+    var style = document.styleSheets[0];
+    if (!style) return;
+    /*Ищем правило по селектору*/
+    for (var i = 0; i < style.cssRules.length; i++) {
+        if (style.cssRules[i].selectorText === selector) {
+            style.deleteRule(i);
+            break;
+        }
+    }
+};
+
+function addStyleToExistingSheet(selector, content) {
+    var style = document.styleSheets[0];
+    if (!style) return;
+    if (style.insertRule) {
+        style.insertRule(selector + "{ " + content + " }", style.cssRules.length);
+    }
+    else if (style.addRule) {
+        style.addRule(selector, content, style.cssRules.length);
+    }
+};
+
+function appendHeadStyle(url) {
+    url = scramble(url);
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = url;
+    
+    document.head.appendChild(link);
+    return link;
+};
+
+function appendHeadJs(url, callback) {
+    url = scramble(url);
+
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+    script.onload = () => callback?.();
+
+    document.head.append(script);
+    return script;
+};
+
+function loadJS(url) {
+    url = scramble(url);
+    
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.type = 'text/javascript';
+
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Failed to load ${url}`));
+
+        document.head.appendChild(script);
+    });
+};
+
+function clickLink(url, target = '_self') {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = target;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => link.remove(), 1000);
+    return true;
+};
+
+function getParameterByName(name, url) {
+    if (!url) url = window.location.href;
+    name = name.replace(/[\[\]]/g, '\\$&');
+    var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+};
+
+function getAllParameters(url) {
+    if (!url) url = window.location.href;
+    const queryString = url.split('?')[1] || '';
+    const searchParams = new URLSearchParams(queryString);
+    const params = [];
+    for (const [key, value] of searchParams) {
+        params.push({ param: key, value: value });
+    }
+    return params;
+};
+
+function copyToClipboard(text_to_copy) {
+    if (!navigator.clipboard) {
+        let _temp = document.createElement("input");
+        _temp.id = generateSTRUID();
+        _temp.value = text_to_copy;
+        _temp.style.display = "block";
+        _temp.style.position = "absolute";
+        _temp.style.opacity = "0.0";
+        _temp.style.top = "0";
+        _temp.style.left = "0";
+        document.body.appendChild(_temp);
+        _temp.select();
+        let _ok = document.execCommand("copy");
+        _temp.remove();
+        if (_ok) {
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        try {
+            navigator.clipboard.writeText(text_to_copy);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+};
+
+function detectMobile() {
+    var device;
+
+    let screen = Cookies.get("screen");
+
+    if (screen && ["mobile", "tablet", "desktop"].includes(screen)) {
+        return screen;
+    }
+
+    var md = new MobileDetect(window.navigator.userAgent);
+
+    if (md.phone() || (md.tablet() && navigator.maxTouchPoints > 1)) {
+        device = "mobile";
+    } else if (md.tablet() && navigator.maxTouchPoints <= 1) {
+        device = "desktop";
+    } else if (navigator.maxTouchPoints > 1) {
+        device = "desktop";
+    } else {
+        device = "desktop";
+    }
+
+    return device;
+};
+
+function removeFirstSubdomain(domain) {
+    if (domain.includes('.')) {
+        return domain.split('.').slice(1).join('.');
+    }
+    return domain;
+};
+function addTextToCanvasContext(ctx, text, x, y, align, fill_style, font) {
+    ctx.font = font;
+    ctx.fillStyle = fill_style;
+    ctx.textAlign = align;
+
+    ctx.fillText(text, x, y);
+};
+
+function drawSVGOnCanvasContext(ctx, svgUrl, x, y, width, height) {
+    return new Promise(function (resolve, reject) {
+        var img = new Image();
+
+        img.onload = function () {
+            ctx.drawImage(img, x, y, width, height);
+            resolve();
+        };
+
+        img.onerror = function () {
+            reject('Не удалось загрузить SVG изображение.');
+        };
+
+        fetch(svgUrl)
+            .then(function (response) {
+                return response.text();
+            })
+            .then(function (svgText) {
+                var svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+                img.src = URL.createObjectURL(svgBlob);
+            })
+            .catch(function (error) {
+                reject(error);
+            });
+    });
+};
+
+function drawBase64OnCanvasContext(ctx, base64, x, y, width, height) {
+    return new Promise(function (resolve, reject) {
+        var img = new Image();
+
+        img.onload = function () {
+            ctx.drawImage(img, x, y, width, height);
+            resolve();
+        };
+        img.src = base64;
+        img.onerror = function () {
+            reject('Не удалось загрузить SVG изображение.');
+        };
+
+    });
+};
+
+function createCanvas(width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+};
+
+function setFillStyleCanvas(canvas) {
+    let ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+};
+
+function htmlToCanvasContext(htmlString, ctx, x, y) {
+    return new Promise(function (resolve, reject) {
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlString;
+
+        document.body.appendChild(tempDiv);
+
+        html2canvas(tempDiv, {
+            useCORS: true
+        }).then(function (canvas) {
+            ctx.drawImage(canvas, x, y);
+
+            document.body.removeChild(tempDiv);
+
+            resolve();
+        }).catch(function (error) {
+            reject(error);
+        });
+    });
+};
+
+function DOMElemToCanvasContext(DOM_elem, ctx, x, y) {
+    return new Promise(function (resolve, reject) {
+        html2canvas(DOM_elem, {
+            scrollY: -window.scrollY,
+            scrollX: -window.scrollX,
+            useCORS: true
+        }).then(function (canvas) {
+            ctx.drawImage(canvas, x, y);
+            resolve();
+        }).catch(function (error) {
+            reject(error);
+        });
+    });
+};
+
+function renderToCanvasFromDOM(element, ctx, x, y) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, x, y);
+            resolve(canvas);
+        };
+
+        img.onerror = (error) => {
+            reject(error);
+        };
+
+        const tempContainer = document.createElement('div');
+        tempContainer.appendChild(element.cloneNode(true));
+
+        const svgString = new XMLSerializer().serializeToString(tempContainer);
+        img.src = 'data:image/svg+xml,' + encodeURIComponent(svgString);
+    });
+}
+function rgbToHex(rgb) {
+    rgb = rgb.replace("rgb(", "").replace(")", "");
+
+    var rgbs = rgb.split(",");
+
+    return "#" + (1 << 24 | rgbs[0] << 16 | rgbs[1] << 8 | rgbs[2]).toString(16).slice(1);
+};
+
+function hexToRgb(hex) {
+    var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, function (m, r, g, b) {
+        return r + r + g + g + b + b;
+    });
+
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+
+    return result ? "rgb(" + parseInt(result[1], 16) + ", " + parseInt(result[2], 16) + ", " + parseInt(result[3], 16) + ")" : null;
+};
+
+function hexToRgba(hex, opacity) {
+    var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, function (m, r, g, b) {
+        return r + r + g + g + b + b;
+    });
+
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+
+    return result ? "rgba(" + parseInt(result[1], 16) + ", " + parseInt(result[2], 16) + ", " + parseInt(result[3], 16) + ", " + opacity + ")" : null;
+};
+function prepareTables(container) {
+    var root = typeof container === 'string'
+        ? document.querySelector(container)
+        : container;
+    if (!root) return;
+
+    var cells = root.querySelectorAll('table[name] td');
+
+    Array.prototype.forEach.call(cells, function (td) {
+        var type = (td.getAttribute('type') || '').toLowerCase();
+
+        td.textContent = '';
+
+        switch (type) {
+            case 'checkbox':
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                td.appendChild(cb);
+                break;
+
+            case 'number':
+            case 'int':
+            case 'string':
+                var editor = document.createElement('div');
+                editor.contentEditable = 'true';
+                td.appendChild(editor);
+                break;
+
+            case 'date':
+            case 'datetime':
+                var dateInput = document.createElement('input');
+                dateInput.type = 'date';
+                td.appendChild(dateInput);
+                break;
+
+            case 'option':
+                var opts = (td.getAttribute('options') || '').split(',');
+                var select = document.createElement('select');
+                select.style.minWidth = td.offsetWidth + 'px';
+
+                Array.prototype.forEach.call(opts, function (opt) {
+                    if (!opt) return;
+                    var o = document.createElement('option');
+                    o.value = opt;
+                    o.textContent = opt;
+                    select.appendChild(o);
+                });
+
+                td.appendChild(select);
+                break;
+        }
+    });
+}
+
+function prepareTable(container, name) {
+    var root = container && container.nodeType === 1
+        ? container
+        : document.querySelector(container);
+    if (!root) return;
+
+    var table = root.querySelector('table[name="' + name + '"]');
+    if (!table) return;
+
+    var numCells = table.querySelectorAll('td[bgcolor="#9cf9fe"]');
+    Array.prototype.forEach.call(numCells, function (td) {
+        var val = td.innerHTML;
+        td.innerHTML = '';
+        td.setAttribute('type', 'number');
+        td.setAttribute('step', 'any');
+
+        var editor = document.createElement('div');
+        editor.contentEditable = 'true';
+        editor.innerHTML = val;
+        td.appendChild(editor);
+    });
+
+    var redCells = table.querySelectorAll('td[bgcolor="#fa3232"]');
+    Array.prototype.forEach.call(redCells, function (td) {
+        td.style.height = '40px';
+        td.style.color = '#FFFFFF';
+        td.style.fontWeight = 'bold';
+    });
+};
+
+function getv(tableName, rowIndex, colIndex, astype) {
+    /*get value by row/col and use type from getAttribute('type')*/
+    const table = document.querySelector(`table[name="${tableName}"]`);
+    if (!table) return '###';
+
+    const tbody = table.tBodies[0];
+    const row = tbody && tbody.rows[rowIndex - 1];
+    const cell = row && row.cells[colIndex - 1];
+    if (!cell) return '###';
+
+    const rawType = (typeof astype !== 'undefined')
+        ? astype
+        : cell.getAttribute('type') || 'number';
+    const type = rawType.toLowerCase();
+
+    let result = '###';
+    try {
+        if (type === 'checkbox') {
+            const cb = cell.querySelector('input[type="checkbox"]');
+            result = (cb && cb.checked) ? 1 : 0;
+
+        } else if (type === 'datetime') {
+            const dt = cell.querySelector('input[type="date"]');
+            result = dt ? dt.value : '';
+
+        } else if (type === 'option') {
+            const sel = cell.querySelector('select');
+            result = sel ? sel.value : '';
+
+        } else {
+            const editor = cell.querySelector('div[contenteditable]') || cell;
+            const text = editor.innerHTML
+                .replace(/&nbsp;/g, ' ')
+                .replace(/<[^>]+>/g, '')
+                .trim();
+
+            if (type === 'number' || type === 'int') {
+                result = parseInt(text, 10) || 0;
+            } else if (type === 'float' || type === 'double') {
+                result = parseFloat(text.replace(',', '.')) || 0.0;
+            } else {
+                result = text;
+            }
+        }
+    } catch (err) {
+        console.error(err, tableName, rowIndex, colIndex, type);
+    }
+
+    return result;
+};
+
+function getvn(table, name, astype) {
+    /* get value by name */
+    const el = document.querySelector(`table[name="${table}"] [name="${name}"]`);
+    if (!el) return '';
+    const type = (astype || el.getAttribute('type') || 'number').toLowerCase();
+    try {
+        if (type === 'check' || type === 'checkbox')
+            return el.querySelector('input[type="checkbox"]').checked ? 1 : 0;
+        if (type === 'date')
+            return (el.querySelector('input[type="date"]') || {}).value;
+        if (type === 'option')
+            return (el.querySelector('select') || {}).value;
+        let txt = (el.querySelector('div[contenteditable]') || el)
+            .innerHTML.replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '').trim();
+        if (type === 'number' || type === 'int') {
+            const n = parseFloat(txt.replace(',', '.'));
+            return isNaN(n) ? 0 : n;
+        }
+        return txt;
+    } catch (e) {
+        console.error(e);
+        return '';
+    }
+};
+
+function setv(tableName, row, col, value) {
+    /*set cell value by row/column*/
+    const td = document.querySelector(
+        `table[name="${tableName}"] tbody tr:nth-child(${row}) td:nth-child(${col})`
+    );
+    if (td) setProto(td, value);
+};
+
+function setvn(tableName, name, value) {
+    /*set element value by its name attribute*/
+    const el = document.querySelector(
+        `table[name="${tableName}"] [name="${name}"]`
+    );
+    if (el) setProto(el, value);
+};
+
+function setProto(el, value) {
+    /*apply a value to an element based on its type*/
+    const type = (el.getAttribute('type') || 'number').toLowerCase();
+
+    if (['number', 'int', 'string'].includes(type)) {
+        const editor = el.querySelector('div[contenteditable]') || el;
+        editor.innerHTML = value;
+    } else if (['check', 'checkbox'].includes(type)) {
+        const cb = el.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = (parseInt(value, 10) === 1 || value === true || value === 'true');
+    } else if (type === 'date') {
+        const dt = el.querySelector('input[type="date"]');
+        if (dt) dt.value = value;
+    } else if (type === 'option') {
+        const opts = (el.getAttribute('options') || '').split(',');
+        const sel = el.querySelector('select');
+        if (sel) {
+            const idx = opts.findIndex(o => o.toLowerCase() === String(value).toLowerCase());
+            sel.selectedIndex = idx >= 0 ? idx : 0;
+        }
+    }
+};
+
+function normalizeRange(a, b) {
+    /*ensure start ≤ end*/
+    return a < b ? [a, b] : [b, a];
+};
+
+function sumv(tableName, r1, c1, r2, c2) {
+    /*sum numeric values in a table subrange*/
+    const [rowStart, rowEnd] = normalizeRange(r1, r2);
+    const [colStart, colEnd] = normalizeRange(c1, c2);
+    let sum = 0;
+    for (let r = rowStart; r <= rowEnd; r++) {
+        for (let c = colStart; c <= colEnd; c++) {
+            const val = Number(getv(tableName, r, c, 'number')) || 0;
+            sum += val;
+        }
+    }
+    return sum;
+};
+
+function minv(tableName, r1, c1, r2, c2) {
+    /*min numeric value in a table subrange*/
+    const [rowStart, rowEnd] = normalizeRange(r1, r2);
+    const [colStart, colEnd] = normalizeRange(c1, c2);
+    let min = Infinity;
+    for (let r = rowStart; r <= rowEnd; r++) {
+        for (let c = colStart; c <= colEnd; c++) {
+            const val = Number(getv(tableName, r, c, 'number')) || 0;
+            if (val < min) min = val;
+        }
+    }
+    return min === Infinity ? 0 : min;
+};
+
+function maxv(tableName, r1, c1, r2, c2) {
+    /*max numeric value in a table subrange*/
+    const [rowStart, rowEnd] = normalizeRange(r1, r2);
+    const [colStart, colEnd] = normalizeRange(c1, c2);
+    let max = -Infinity;
+    for (let r = rowStart; r <= rowEnd; r++) {
+        for (let c = colStart; c <= colEnd; c++) {
+            const val = Number(getv(tableName, r, c, 'number')) || 0;
+            if (val > max) max = val;
+        }
+    }
+    return max === -Infinity ? 0 : max;
+};
+
+function drawTableContent(content) {
+    /*render each item’s data into [data-content] containers, then prepare tables*/
+    content.forEach(item => {
+        document
+            .querySelectorAll(`[data-content="${item.target}"]`)
+            .forEach(container => {
+                container.innerHTML = '';
+                let el = item.data;
+                if (typeof el === 'string') {
+                    const tmp = document.createElement('template');
+                    tmp.innerHTML = el.trim();
+                    el = tmp.content.firstChild;
+                } else {
+                    el = el.cloneNode(true);
+                }
+                el.setAttribute('name', item.target);
+                el.classList.add('z1ppptable');
+                container.appendChild(el);
+                preparetable(container, item.target);
+            });
+    });
+};
+
+function filter2Cql(_filter) {
+    var str = "";
+    var len = _filter.length;
+    if (len === 0) {
+        return "";
+    }
+
+    var i = -1;
+    _filter.forEach(function (o) {
+        i++;
+        var isQuoted = (!isDouble(o.Value) && !isInt(o.Value));
+        var lastOr = (i === (len - 1)) ? "" : " " + o.Next + " ";
+
+        if (o.Condition === "gte" && isQuoted) {
+            if (!isDate(o.Value)) {
+                str += o.FieldName + " >= '" + o.Value + "'" + lastOr;
+            }
+            else {
+                str += o.FieldName + " >= '" + toIsoDateString(o.Value) + "'" + lastOr;
+            }
+        }
+        else if (o.Condition === "lte" && isQuoted) {
+            if (!isDate(o.Value)) {
+                str += o.FieldName + " <= '" + o.Value + "'" + lastOr;
+            }
+            else {
+                str += o.FieldName + " <= '" + toIsoDateString(o.Value) + "'" + lastOr;
+            }
+        }
+        else if (o.Condition === "gte" && !isQuoted) {
+            str += o.FieldName + " >= " + o.Value + "" + lastOr;
+        }
+        else if (o.Condition === "lte" && !isQuoted) {
+            str += o.FieldName + " <= " + o.Value + "" + lastOr;
+        }
+        else if (o.Condition === "eq" && isQuoted) {
+            if (!isDate(o.Value)) {
+                str += o.FieldName + " = '" + o.Value + "'" + lastOr;
+            }
+            else {
+                str += o.FieldName + " = '" + toIsoDateString(o.Value) + "'" + lastOr;
+            }
+        }
+        else if (o.Condition === "eq" && !isQuoted) {
+            str += o.FieldName + " = " + o.Value + "" + lastOr;
+        }
+        else if (o.Condition === "like" && isQuoted) {
+            str += o.FieldName + " ilike '" + o.Value.replace(/\*/g, "%").replace(/\?/g, "_") + "'" + lastOr;
+        }
+        else if (o.Condition === "in") {
+            var _words = o.Value.split(",");
+            var newIsQuoted = false;
+            var newValue = [];
+            _words.forEach(function (wrd) {
+                if (!isDouble(trim11(wrd)) && !isInt(trim11(wrd))) {
+                    newIsQuoted = true;
+                }
+            });
+            _words.forEach(function (wrd) {
+                if (newIsQuoted) {
+                    newValue.push("'" + trim11(wrd) + "'");
+                } else {
+                    newValue.push(trim11(wrd));
+                }
+            });
+            str += o.FieldName + " in(" + newValue.join(",") + ")" + lastOr;
+        }
+        else {
+            console.error("filter2Cql", i, o);
+        }
+    });
+    return str;
+};
+
+function slider(el, min, max, step) {
+    var container = el.parentElement;
+    var minInput = container.querySelector('[data-id="min"]');
+    var maxInput = container.querySelector('[data-id="max"]');
+
+    minInput.value = min;
+    maxInput.value = max;
+
+    var sliderInst = noUiSlider.create(el, {
+        start: [min, max],
+        connect: true,
+        range: { min: min, max: max },
+        step: step,
+        orientation: 'horizontal',
+        behaviour: 'tap-drag'
+    });
+
+    sliderInst.on('slide', function (values) {
+        var low = Math.round(values[0]),
+            high = Math.round(values[1]);
+
+        if (low === high) {
+            sliderInst.set([minInput.value, maxInput.value]);
+            return;
+        }
+
+        minInput.value = low;
+        maxInput.value = high;
+    });
+
+    function syncInputs() {
+        var low = parseInt(minInput.value, 10) || min,
+            high = parseInt(maxInput.value, 10) || max;
+
+        if (low >= high) {
+            high = low + 1;
+            minInput.value = low;
+            maxInput.value = high;
+        }
+        sliderInst.set([low, high]);
+    }
+
+    minInput.addEventListener('input', syncInputs);
+    maxInput.addEventListener('input', syncInputs);
+
+    return sliderInst;
+};
+
+function HighlightElements(color) {
+    this.myArray = [];
+    this.partId = generateGUID();
+    this.blinkColor = color || 'rgba(233,255,0,0.5)';
+}
+
+HighlightElements.prototype.setElements = function (elements) {
+    if (!elements) return;
+    Array.from(elements).forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const div = document.createElement('div');
+        div.dataset.part = this.partId;
+        Object.assign(div.style, {
+            display: 'none',
+            position: 'absolute',
+            top: `${rect.top + window.scrollY}px`,
+            left: `${rect.left + window.scrollX}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+            zIndex: '100000000000'
+        });
+        this.myArray.push(div);
+        document.body.appendChild(div);
+    });
+};
+
+HighlightElements.prototype.show = function () {
+    const arr = this.myArray;
+    const color = this.blinkColor;
+
+    setTimeout(() => {
+        arr.forEach(d => {
+            d.style.display = 'block';
+            d.style.backgroundColor = color;
+        });
+        setTimeout(() => {
+            arr.forEach(d => {
+                d.style.display = 'none';
+                d.style.backgroundColor = 'transparent';
+            });
+            setTimeout(() => {
+                arr.forEach(d => {
+                    d.style.display = 'block';
+                    d.style.backgroundColor = color;
+                });
+                setTimeout(() => {
+                    arr.forEach(d => d.remove());
+                    this.myArray = [];
+                }, 200);
+            }, 200);
+        }, 200);
+    }, 20);
+};
+
+function animateBlink(element, count, interval, blinkStyle, normalStyle) {
+    let remaining = count;
+
+    function blink() {
+        if (remaining <= 0) return;
+
+        const isBlinkState = remaining % 2 === 1;
+        element.setStyle(isBlinkState ? blinkStyle : normalStyle);
+
+        remaining--;
+        setTimeout(blink, interval);
+    }
+
+    setTimeout(blink, interval);
+};
+Number.prototype.isInRange = function (min, max) {
+    var number = this;
+    if (typeof (min) !== "number" || isNaN(min)) {
+        return false;
+    }
+    if (typeof (max) !== "number" || isNaN(max)) {
+        return false;
+    }
+    return (number >= min && number <= max);
+};
+
+function mustBeDouble(str) {
+    if (str === null || str === undefined || str === '') {
+        return 0;
+    }
+
+    const stringValue = String(str).trim();
+
+    if (stringValue === '') {
+        return 0;
+    }
+
+    const commaAsDecimal = /^-?\d{1,3}(?:\.\d{3})*(?:,\d+)$|^-?\d+,\d+$/.test(stringValue);
+    if (commaAsDecimal) {
+        const normalized = stringValue.replace(/\./g, '').replace(/,/g, '.');
+        const result = parseFloat(normalized);
+        return isNaN(result) ? 0 : result;
+    }
+
+    const dotAsDecimal = /^-?\d{1,3}(?:,\d{3})*(?:\.\d+)$|^-?\d+\.\d+$/.test(stringValue);
+    if (dotAsDecimal) {
+        const normalized = stringValue.replace(/,/g, '');
+        const result = parseFloat(normalized);
+        return isNaN(result) ? 0 : result;
+    }
+
+    const isInteger = /^-?\d+$/.test(stringValue);
+    if (isInteger) {
+        const result = parseInt(stringValue, 10);
+        return isNaN(result) ? 0 : result;
+    }
+
+    const isScientific = /^-?\d+(?:\.\d+)?[eE][+-]?\d+$/.test(stringValue);
+    if (isScientific) {
+        const result = parseFloat(stringValue);
+        return isNaN(result) ? 0 : result;
+    }
+
+    const hasThousands = /^-?\d{1,3}(?:[.,]\d{3})+$/.test(stringValue);
+    if (hasThousands) {
+        const normalized = stringValue.replace(/[.,]/g, '');
+        const result = parseInt(normalized, 10);
+        return isNaN(result) ? 0 : result;
+    }
+
+    const result = parseFloat(stringValue);
+    if (!isNaN(result)) {
+        return result;
+    }
+
+    return 0;
+};
+
+function mustBeInteger(str) {
+    return Math.round(mustBeDouble(str));
+};
+
+function mustBeNumberRange(value, min, max) {
+    var val = parseInt("" + value);
+    if (val >= min && val <= max) {
+        return val;
+    } else {
+        return NaN;
+    }
+};
+
+Number.prototype.format = function (decimals, decPoint, thousandsSep) {
+    var number = this;
+    var n = !isFinite(+number) ? 0 : +number,
+        prec = !isFinite(+decimals) ? 0 : Math.abs(decimals),
+        sep = (typeof thousandsSep === "undefined") ? "," : thousandsSep,
+        dec = (typeof decPoint === "undefined") ? "." : decPoint,
+        toFixedFix = function (n, prec) {
+            var k = Math.pow(10, prec);
+            return Math.round(n * k) / k;
+        },
+        s = (prec ? toFixedFix(n, prec) : Math.round(n)).toString().split('.');
+    if (s[0].length > 3) {
+        s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
+    }
+    if ((s[1] || '').length < prec) {
+        s[1] = s[1] || '';
+        s[1] += new Array(prec - s[1].length + 1).join("0");
+    }
+    return s.join(dec);
+};
+
+Number.prototype.isInt = function () {
+    var number = this;
+    var x = parseFloat(number);
+    return (x | 0) === x;
+};
+
+function isInt(value) {
+    if (isNaN(value)) {
+        return false;
+    }
+    var x = parseFloat(value);
+    return (x | 0) === x;
+};
+
+Number.prototype.isDouble = function () {
+    var number = this;
+    var x = parseFloat(number);
+    return isNaN(x) ? false : true;
+};
+
+function isDouble(value) {
+    var q = "" + value;
+    q = q.replace(",", ".").replace(/ /g, "");
+    var len1 = (q.replace(/\./g, "")).length;
+    var len2 = (q.replace(/\,/g, "")).length;
+    if ((q.length - len1) > 1 || (q.length - len2) > 1) {
+        return false;
+    }
+    var isNumber = /^[0-9.]+$/.test(q);
+    return isNumber;
+};
+
+function max(val1, val2) {
+    return (val1 > val2) ? val1 : val2;
+};
+
+function min(val1, val2) {
+    return (val1 > val2) ? val2 : val1;
+};
+
+Number.prototype.bytesToSize = function (bytez) {
+    var bytes = parseInt(bytez);
+    if (bytes === 0) {
+        return "0 " + gl.text.file_byte;
+    }
+    var k = 1024;
+    var sizes = [gl.text.file_byte, gl.text.file_kb, gl.text.file_mb, gl.text.file_gb, gl.text.file_tb, "ПБ", "ЕБ", "ЗБ", "ЙБ"];
+    var i = Math.floor(Math.log(bytes) / Math.log(k));
+    return (bytes / Math.pow(k, i)).toPrecision(3) + ' ' + sizes[i];
+};
+
+function getRandomInt(a, b) {
+    return Math.floor((Math.random() * b) + a);
+};
+
+function pad(n, width, z) {
+    z = z || '0';
+    n = n + '';
+    return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+};
+
+function number_format(number, decimals, dec_point, thousands_sep) {
+    // *     example 1: number_format(1234.56);
+    // *     returns 1: '1,235'
+    // *     example 2: number_format(1234.56, 2, ',', ' ');
+    // *     returns 2: '1 234,56'
+    // *     example 3: number_format(1234.5678, 2, '.', '');
+    // *     returns 3: '1234.57'
+    // *     example 4: number_format(67, 2, ',', '.');
+    // *     returns 4: '67,00'
+    // *     example 5: number_format(1000);
+    // *     returns 5: '1,000'
+    // *     example 6: number_format(67.311, 2);
+    // *     returns 6: '67.31'
+    // *     example 7: number_format(1000.55, 1);
+    // *     returns 7: '1,000.6'
+    // *     example 8: number_format(67000, 5, ',', '.');
+    // *     returns 8: '67.000,00000'
+    // *     example 9: number_format(0.9, 0);
+    // *     returns 9: '1'
+    // *    example 10: number_format('1.20', 2);
+    // *    returns 10: '1.20'
+    // *    example 11: number_format('1.20', 4);
+    // *    returns 11: '1.2000'
+    // *    example 12: number_format('1.2000', 3);
+    // *    returns 12: '1.200'
+    var n = !isFinite(+number) ? 0 : +number,
+        prec = !isFinite(+decimals) ? 0 : Math.abs(decimals),
+        sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep,
+        dec = (typeof dec_point === 'undefined') ? '.' : dec_point,
+        toFixedFix = function(n, prec) {
+            // Fix for IE parseFloat(0.55).toFixed(0) = 0;
+            var k = Math.pow(10, prec);
+            return Math.round(n * k) / k;
+        },
+        s = (prec ? toFixedFix(n, prec) : Math.round(n)).toString().split('.');
+    if (s[0].length > 3) {
+        s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
+    }
+    if ((s[1] || '').length < prec) {
+        s[1] = s[1] || '';
+        s[1] += new Array(prec - s[1].length + 1).join('0');
+    }
+    return s.join(dec);
+};
+function deepCopy(obj) {
+    if (typeof obj !== 'object' || obj === null) {
+        return obj;
+    }
+    let newObj = Array.isArray(obj) ? [] : {};
+    for (let key in obj) {
+        if (obj.hasOwnProperty(key)) {
+            newObj[key] = deepCopy(obj[key]);
+        }
+    }
+    return newObj;
+};
+function preventMiddleClick(elem) {
+    getElements(elem).forEach(function (el) {
+        /** Prevent middle‐button clicks */
+        el.addEventListener('mousedown', function (e) {
+            /** If middle button (button 1), cancel the event */
+            if (e.button === 1) e.preventDefault();
+        });
+    });
+};
+
+function preventRightClick(elem) {
+    getElements(elem).forEach(function (el) {
+        /** Prevent context menu on right‐click */
+        el.addEventListener('contextmenu', function (e) {
+            /** Cancel the contextmenu event */
+            e.preventDefault();
+        });
+    });
+};
+
+function preventTouchMove(elem) {
+    getElements(elem).forEach(function (el) {
+        /** Prevent touch‐drag scrolling */
+        el.addEventListener('touchmove', function (e) {
+            /** Cancel the touchmove event */
+            e.preventDefault();
+        }, { passive: false });
+    });
+};
+
+function makeClickIgnorable(elem) {
+    getElements(elem).forEach(function (el) {
+        /** Disable all pointer events on this element */
+        el.style.pointerEvents = 'none';
+    });
+};
+
+function lockScreen(name) {
+    var overlay = document.createElement('div');
+    overlay.setAttribute('uid', name);
+    Object.assign(overlay.style, {
+        position: 'absolute',
+        top: '0',
+        right: '0',
+        bottom: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        margin: '0',
+        padding: '0',
+        zIndex: '100000000'
+    });
+    /** Block touch‐drag on the overlay */
+    overlay.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+    /** Block right‐click context menu */
+    overlay.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    document.body.appendChild(overlay);
+    /** Focus the overlay to capture keyboard events if needed */
+    overlay.focus();
+};
+
+function unlockScreen(name) {
+    /** Remove any overlay with matching uid */
+    document.querySelectorAll('[uid="' + name + '"]').forEach(function (el) {
+        el.remove();
+    });
+};
+/*используется для кросдоменных запросов*/
+$.ajaxSetup({
+    xhrFields: {
+        withCredentials: false
+    }
+});
+
+function getModuleParams(module_name, param_name) {
+    return DoWebApiAction("/modules/get_params", { module: module_name, param: param_name });
+};
+
+function setModuleParamsJson(module_name, param_name, value, personal) {
+    var p = DoWebApiAction("/modules/set_params", {
+        module: module_name,
+        param: param_name,
+        format: "json",
+        value: JSON.stringify(value),
+        personal: (personal == true) ? "true" : "false"
+    });
+    return p;
+};
+
+function setModuleParamsString(module_name, param_name, value, personal) {
+    var p = DoWebApiAction("/modules/set_params", {
+        module: module_name,
+        param: param_name,
+        format: "string",
+        value: value,
+        personal: (personal == true) ? "true" : "false"
+    });
+    return p;
+};
+
+function encodeData(data) {
+    var encodedString = '';
+    for (var key in data) {
+        if (data.hasOwnProperty(key)) {
+            if (encodedString.length > 0) {
+                encodedString += '&';
+            }
+            encodedString += encodeURIComponent(key) + '=' + encodeURIComponent(data[key]);
+        }
+    }
+    return encodedString;
+};
+
+function createConfiguredXHR() {
+    var xhr = new XMLHttpRequest();
+    xhr.withCredentials = false;
+    return xhr;
+};
+
+function DoWebApiCall(actionName, data, condition) {
+
+    if (condition && typeof condition != "function") {
+        blinkmsg(actionName + " - condition must be a function");
+    }
+
+    if (typeof condition == "function" && !condition()) return new Promise(function (y) {
+        y({ success: false, results: null });
+        return;
+    });
+
+    var wurl = getNextHost() + "|" + actionName;
+    wurl = wurl.replace("|/", "/").replace("|", "/");
+
+    return new Promise(function (resolve, reject) {
+        var xhr = createConfiguredXHR();
+        xhr.open("POST", wurl, true);
+
+        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        xhr.setRequestHeader("Accept-Language", _current_language);
+
+        xhr.setRequestHeader("_culture", Cookies.get("_culture"));
+        xhr.setRequestHeader("is_public", _is_public ? "true" : "false");
+
+        if (window.type == "web") {
+            xhr.setRequestHeader("login", window.UserModule.userData.login);
+            xhr.setRequestHeader("key", window.UserModule.userData.token);
+
+            xhr.setRequestHeader("webmap_cr", Cookies.get("webmap_cr"));
+        }
+        else if (window.type == "webcore") {
+            if (_is_public == false || _is_public == "false") {
+                if (Cookies.get("gi_open_core_cr")) {
+                    xhr.setRequestHeader("gi_open_core_cr", Cookies.get("gi_open_core_cr"));
+                }
+                else if (Cookies.get("gi_map_core_cr")) {
+                    xhr.setRequestHeader("gi_map_core_cr", Cookies.get("gi_map_core_cr"));
+                }
+            } else {
+                if (Cookies.get("gi_open_core_public_cr")) {
+                    xhr.setRequestHeader("gi_open_core_public_cr", Cookies.get("gi_open_core_public_cr"));
+                }
+                else if (Cookies.get("gi_map_core_public_cr")) {
+                    xhr.setRequestHeader("gi_map_core_public_cr", Cookies.get("gi_map_core_public_cr"));
+                }
+                xhr.setRequestHeader("public_credentials", _public_credentials);
+            }
+        }
+
+        var _date_from = Cookies.get("date_from");
+        var _date_to = Cookies.get("date_to");
+        if (_date_from && _date_to) {
+            xhr.setRequestHeader("date_from", _date_from);
+            xhr.setRequestHeader("date_to", _date_to);
+        }
+
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(JSON.parse(xhr.responseText));
+            } else {
+                reject({
+                    status: xhr.status,
+                    statusText: xhr.statusText
+                });
+            }
+        };
+
+        xhr.onerror = function () {
+            reject({
+                status: xhr.status,
+                statusText: xhr.statusText
+            });
+        };
+
+        xhr.send(encodeData(data));
+    });
+};
+
+/**
+ * @param {string} actionName 
+ * @param {string | JQuery.PlainObject<any>} data 
+*/
+function DoWebApiAction(actionName, data) {
+    return ApiAction("POST", actionName, data);
+};
+
+/**
+ * @param {string} url 
+*/
+function GetApiAction(url) {
+    return ApiAction("GET", url);
+};
+
+/**
+ * @param {string} actionName 
+ * @param {string | JQuery.PlainObject<any>} data 
+*/
+function ApiAction(method, actionName, data = undefined) {    
+    var wurl = getNextHost() + "|" + actionName;
+
+    var _ajaxdata = {
+        url: wurl.replace(/\|\//g, "/").replace(/\|/, "/"),
+        type: method,
+        data: data,
+        headers: {
+            "Content-Type": method === "POST" ? "application/x-www-form-urlencoded" : undefined,
+            "Accept-Language": _current_language,
+            "_culture": Cookies.get("_culture"),
+            "is_public": _is_public ? "true" : "false",
+            "gi_city": Cookies.get("gi_city"),
+        },
+        cache: false,
+        dataType: "json",
+        processData: true,
+        contentType: false
+    };
+
+    if (window.type == "web") {
+        _ajaxdata.headers["login"] = window.UserModule.userData.login;
+        _ajaxdata.headers["key"] = window.UserModule.userData.token;
+        _ajaxdata.headers["webmap_cr"] = Cookies.get("webmap_cr");
+    }
+    else if (window.type == "webcore") {
+        if (_is_public == false || _is_public == "false") {
+            if (Cookies.get("gi_open_core_cr")) {
+                _ajaxdata.headers["gi_open_core_cr"] = Cookies.get("gi_open_core_cr");
+            }
+            else if (Cookies.get("gi_map_core_cr")) {
+                _ajaxdata.headers["gi_map_core_cr"] = Cookies.get("gi_map_core_cr");
+            }
+        } else {
+            if (Cookies.get("gi_open_core_public_cr")) {
+                _ajaxdata.headers["gi_open_core_public_cr"] = Cookies.get("gi_open_core_public_cr");
+            }
+            else if (Cookies.get("gi_map_core_public_cr")) {
+                _ajaxdata.headers["gi_map_core_public_cr"] = Cookies.get("gi_map_core_public_cr");
+            }
+            _ajaxdata.headers["public_credentials"] = _public_credentials;
+        }
+    }
+
+    var _date_from = Cookies.get("date_from");
+    var _date_to = Cookies.get("date_to");
+    if (_date_from && _date_to) {
+        _ajaxdata.headers["date_from"] = _date_from;
+        _ajaxdata.headers["date_to"] = _date_to;
+    }
+
+    return $.ajax(_ajaxdata);
+};
+
+function DoWebApiActionAjax(actionName, data) {
+
+    var wurl = getNextHost() + "|" + actionName;
+
+    var _ajaxdata = {
+        url: wurl.replace(/\|\//g, "/").replace(/\|/, "/"),
+        type: "POST",
+        data: data,
+        headers: {
+            "Accept-Language": _current_language,
+            "_culture": Cookies.get("_culture"),
+            "is_public": _is_public ? "true" : "false"
+        },
+        cache: false,
+        dataType: "json",
+        processData: false,
+        contentType: false
+    };
+
+    if (window.type == "web") {
+        _ajaxdata.headers["login"] = window.UserModule.userData.login;
+        _ajaxdata.headers["key"] = window.UserModule.userData.token;
+        _ajaxdata.headers["webmap_cr"] = Cookies.get("webmap_cr");
+    }
+    else if (window.type == "webcore") {
+        if (_is_public == false || _is_public == "false") {
+            if (Cookies.get("gi_open_core_cr")) {
+                _ajaxdata.headers["gi_open_core_cr"] = Cookies.get("gi_open_core_cr");
+            }
+            else if (Cookies.get("gi_map_core_cr")) {
+                _ajaxdata.headers["gi_map_core_cr"] = Cookies.get("gi_map_core_cr");
+            }
+        } else {
+            if (Cookies.get("gi_open_core_public_cr")) {
+                _ajaxdata.headers["gi_open_core_public_cr"] = Cookies.get("gi_open_core_public_cr");
+            }
+            else if (Cookies.get("gi_map_core_public_cr")) {
+                _ajaxdata.headers["gi_map_core_public_cr"] = Cookies.get("gi_map_core_public_cr");
+            }
+            _ajaxdata.headers["public_credentials"] = _public_credentials;
+        }
+    }
+
+    var _date_from = Cookies.get("date_from");
+    var _date_to = Cookies.get("date_to");
+    if (_date_from && _date_to) {
+        _ajaxdata.headers["date_from"] = _date_from;
+        _ajaxdata.headers["date_to"] = _date_to;
+    }
+
+    return $.ajax(_ajaxdata);
+};
+
+function DoAction(actionName, data) {
+    var url = window.apiserver + "/action/" + actionName + "/" + window.UserModule.userData.token;
+    return $.post(url, data);
+};
+
+function DoActionAjax(actionName, data) {
+    var url = window.apiserver + "/action/" + actionName + "/" + window.UserModule.userData.token;
+    return $.ajax({
+        url: url,
+        type: "POST",
+        data: data,
+        cache: false,
+        dataType: "json",
+        processData: false,
+        contentType: false
+    });
+};
+
+function formatHosts(hosts) {
+    hosts = hosts.map(function (host) {
+        return host.startsWith("http")
+            ? host
+            : window.location.origin + host
+    });
+
+    if (hosts.length === 1) {
+        return {
+            "host": hosts[0],
+            "subdomains": []
+        };
+    }
+    
+    var baseHost = "";
+    var protocol = "";
+    var subdomains = [];
+    var differentDomains = false;
+    var baseDomainPattern = /^(https?:\/\/)?([^\/]+)/i;
+
+    hosts.forEach(function (url, index) {
+        var match = url.match(baseDomainPattern);
+        if (match && match[2]) {
+            var parts = match[2].split('.');
+            var subdomain = parts.shift();
+            var currentBaseHost = parts.join('.');
+            var currentProtocol = match[1] || '';
+
+            if (!baseHost) {
+                baseHost = currentBaseHost;
+                protocol = currentProtocol;
+            } else if (baseHost !== currentBaseHost || protocol !== currentProtocol) {
+                differentDomains = true;
+            }
+
+            subdomains.push(subdomain);
+        } else {
+            differentDomains = true;
+        }
+    });
+
+    if (differentDomains) {
+        return {
+            "host": "",
+            "subdomains": hosts
+        };
+    } else {
+        return {
+            "host": protocol + "{s}." + baseHost,
+            "subdomains": subdomains
+        };
+    }
+};
+
+function onRightPanelExpanded(element) {
+    if (window.G) {
+        window.G.UI.openAtRight();
+        return;
+    }
+
+    const panel = document.getElementById('sub-tools-panel');
+    if (!panel) return;
+
+    let position;
+    if (!element) {
+        position = '33rem';
+    } else {
+        const el = typeof element === 'string'
+            ? document.querySelector(element)
+            : element;
+        if (!el) return;
+
+        const style = getComputedStyle(el);
+        const rightPx = parseFloat(style.right) || 0;
+        const widthPx = parseFloat(style.width) || 0;
+        position = `${rightPx + widthPx}px`;
+    }
+
+    const { duration = 400, type: timingFunction = 'ease' } = window.easing || {};
+
+    panel.style.transition = `right ${duration}ms ${timingFunction}`;
+    panel.offsetWidth;
+    panel.style.right = position;
+};
+
+function onRightPanelCollapsed(element) {
+    if (window.G) {
+        window.G.UI.closeAtRight();
+        return;
+    }
+
+    const panel = document.getElementById('sub-tools-panel');
+    if (!panel) return;
+
+    let position;
+    if (!element) {
+        position = '0px';
+    } else {
+        const el = typeof element === 'string'
+            ? document.querySelector(element)
+            : element;
+        if (!el) return;
+
+        const style = getComputedStyle(el);
+        const rightPx = parseFloat(style.right) || 0;
+        const widthPx = parseFloat(style.width) || 0;
+        position = `${rightPx - widthPx}px`;
+    }
+
+    const { duration = 400, type: timingFunction = 'ease' } = window.easing || {};
+
+    panel.style.transition = `right ${duration}ms ${timingFunction}`;
+    panel.offsetWidth;
+    panel.style.right = position;
+};
+
+function WaitFor(pre, interval, checker_function) {
+    if (window._intervals === undefined) {
+        window._intervals = {};
+    }
+    var _interval_id = pre + '_' + generateSTRUID();
+
+    return new Promise(function (resolve) {
+        window._intervals[_interval_id] = window.setInterval(function () {
+            if (checker_function == undefined || checker_function === null || checker_function() === true) {
+                clearInterval(window._intervals[_interval_id]);
+                delete window._intervals[_interval_id];
+                resolve(true);
+                return;
+            }
+        }, interval);
+    });
+};
+
+/**
+ * @param {string} tag
+ * @param {Record<string, string>?} attribute
+ * @param {Array<HTMLElement>} children
+ */
+function tag(tag, attributes, ...children) {
+    const element = document.createElement(tag);
+    
+    if (typeof attributes !== 'undefined') {
+        for (const attribute of Object.keys(attributes)) {
+            if (attribute === "text") {
+                element.innerText = attributes["text"];
+                continue;
+            }
+
+            if (attribute === "class") {
+                element.className = attributes["class"];
+                continue;
+            }
+
+            if (attribute === "style") {
+                const styles = attributes["style"];
+                for (const style of Object.keys(styles)) {
+                    element.style[style] = styles[style];
+                }
+
+                continue;
+            }
+
+            element.setAttribute(attribute, attributes[attribute]);
+        }
+    }
+
+    if (typeof children !== 'undefined') {
+        for (const child of children) {
+            foreach(child, c => element.appendChild(c));
+        }
+    }
+
+    return element;
+}
+
+/**
+ * @param {Record<string, string>?} attribute
+ * @param {Array<HTMLElement>} children
+ */
+function div(attributes = {}, ...children) {
+    return tag("div", attributes, ...children);
+}
+
+/**
+ * @param {Record<string, string>?} attribute
+ * @param {Array<HTMLElement>} children
+ */
+function span(attributes = {}, ...children) {
+    return tag("span", attributes, ...children);
+}
+
+/**
+ * @param {Record<string, string>?} attribute
+ * @param {Array<HTMLElement>} children
+ */
+function hr(attributes = {}) {
+    return tag("div", Object.assign(attributes, {
+        style: {
+            borderTop: "solid 1px black",
+            opacity: "0.25",
+        }
+    }));
+}
+
+/**
+ * @param {string} content
+ */
+function calculatePaperValues(content) {
+    return document.createTextNode(content);
+}
+function tryRemoveGeometry(geometry, _map) {
+    if (!geometry) return;
+
+    if (typeof _map !== "undefined" && _map !== null) {
+        _map = window.MAP;
+    }
+
+    try {
+        if (geometry._map !== null) {
+            window.MAP.removeLayer(geometry);
+        }
+    } catch (e) {
+        DoNothing();
+    }
+};
+
+function mergeLines(line1, line2) {
+    return turf.combine(turf.featureCollection([line1, line2])).features[0];
+};
+
+function clipMultiLine(multiLine, polygon) {
+    var segments = [];
+    turf.flattenEach(multiLine, function (line) {
+        turf.lineSplit(line, polygon).features.forEach(function (segment) {
+            if (turf.booleanPointInPolygon(turf.midpoint(segment), polygon)) {
+                segments.push(segment);
+            }
+        });
+    });
+    return turf.multiLineString(segments.map(function (segment) {
+        return segment.geometry.coordinates;
+    }));
+};
+
+function toMultiLine(lineOrMultiLine) {
+    if (lineOrMultiLine.geometry.type === 'LineString') {
+        return turf.multiLineString([lineOrMultiLine.geometry.coordinates]);
+    } else {
+        return lineOrMultiLine;
+    }
+};
+
+function getScale(zoom, latitude) {
+    var metersPerPixel = 40075016.686 * Math.abs(Math.cos(latitude * Math.PI / 180)) / Math.pow(2, zoom + 8);
+    var scale = 1 / (metersPerPixel * 0.000264583);
+    return scale;
+};
+
+function toRadians(degrees) {
+    return degrees * Math.PI / 180;
+};
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    var R = 6371e3; /* радиус Земли в метрах*/
+    var φ1 = toRadians(lat1);
+    var φ2 = toRadians(lat2);
+    var Δφ = toRadians(lat2 - lat1);
+    var Δλ = toRadians(lon2 - lon1);
+
+    var a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+};
+
+function calculateScale(extent) {
+    var minLon = extent[0];
+    var minLat = extent[1];
+    var maxLon = extent[2];
+    var maxLat = extent[3];
+
+    var distanceInMeters = calculateDistance(minLat, minLon, maxLat, maxLon) * 100;
+    var scale = 1 / distanceInMeters;
+
+    return "1:" + Math.round(1 / scale);
+};
+
+function getResolutionByZoom(zoom) {
+    var resolutions = [
+        156543.03390625,
+        78271.516953125,
+        39135.7584765625,
+        19567.87923828125,
+        9783.939619140625,
+        4891.9698095703125,
+        2445.9849047851562,
+        1222.9924523925781,
+        611.4962261962891,
+        611.4962261962891,
+        305.74811309814453,
+        152.87405654907226,
+        76.43702827453613,
+        38.218514137268066,
+        19.109257068634033,
+        9.554628534317017,
+        4.777314267158508,
+        2.388657133579254,
+        1.194328566789627,
+        0.5971642833948135,
+        0.29858214164761665,
+        0.14929107082380833,
+        0.07464553541190416,
+        0.03732276770595208,
+        0.01866138385297604
+    ];
+    return resolutions[zoom];
+};
+
+function zoomToRadius(zoom) {
+    let rad;
+    switch (zoom) {
+        case 1:
+            rad = 504000;
+            break;
+        case 2:
+            rad = 248300;
+            break;
+        case 3:
+            rad = 130800;
+            break;
+        case 4:
+            rad = 71400;
+            break;
+        case 5:
+            rad = 35700;
+            break;
+        case 6:
+            rad = 19500;
+            break;
+        case 7:
+            rad = 9200;
+            break;
+        case 8:
+            rad = 3000;
+            break;
+        case 9:
+            rad = 1500;
+            break;
+        case 10:
+            rad = 800;
+            break;
+        case 11:
+            rad = 400;
+            break;
+        case 12:
+            rad = 200;
+            break;
+        case 13:
+            rad = 50;
+            break;
+        case 14:
+            rad = 40;
+            break;
+        case 15:
+            rad = 20;
+            break;
+        case 16:
+            rad = 10;
+            break;
+        case 17:
+            rad = 5;
+            break;
+        case 18:
+            rad = 2;
+            break;
+        default:
+            rad = 2;
+            break;
+    }
+    return rad;
+};
+
+function getTileSize(zoom, tileSize) {
+    var resolution = getResolutionByZoom(zoom);
+    return tileSize * resolution;
+};
+
+function containsPoint(polygon, p) {
+    var inside = false,
+        part, p1, p2, i, j, k, len, len2;
+
+    for (i = 0, len = polygon.length; i < len; i++) {
+        part = polygon[i];
+
+        for (j = 0, len2 = part.length, k = len2 - 1; j < len2; k = j++) {
+            p1 = part[j];
+            p2 = part[k];
+
+            if (((p1[1] > p.y) !== (p2[1] > p.y)) && (p.x < (p2[0] - p1[0]) * (p.y - p1[1]) / (p2[1] - p1[1]) + p1[0])) {
+                inside = !inside;
+            }
+        }
+    }
+    return inside;
+};
+
+function wgsToMercator(xlon, ylat) {
+    if (Math.abs(xlon) > 180 || Math.abs(ylat) > 90) {
+        return [xlon, ylat];
+    }
+    const num = xlon * 0.017453292519943295;
+    const x = 6378137.0 * num;
+    const a = ylat * 0.017453292519943295;
+    return [x, 3189068.5 * Math.log((1.0 + Math.sin(a)) / (1.0 - Math.sin(a)))];
+};
+
+function mercatorToWgs(xlon, ylat) {
+    if (Math.abs(xlon) < 180 && Math.abs(ylat) < 90) {
+        return [xlon, ylat];
+    }
+
+    if (Math.abs(xlon) > 20048966.1 || Math.abs(ylat) > 20048966.1) {
+        return null;
+    }
+
+    const x = xlon;
+    const y = ylat;
+    const num3 = x / 6378137.0;
+    const num4 = num3 * 57.295779513082323;
+    const num5 = Math.floor(((num4 + 180.0) / 360.0));
+    const num6 = num4 - (num5 * 360.0);
+    const num7 = 1.5707963267948966 - (2.0 * Math.atan(Math.exp((-1.0 * y) / 6378137.0)));
+    return [num6, num7 * 57.295779513082323]
+};
+function convertBase64JpgToPdf(base64Jpg, width, height, format, dpi, paperFormat) {
+
+    let img_settings = centerImageOnPaper(width, height, paperFormat, dpi);
+
+    var paperSetting = {
+        orientation: img_settings.orientation,
+        unit: 'mm',
+        format: [width, height]
+    };
+
+    var doc = new jsPDF(paperSetting);
+    doc.addImage(base64Jpg, format, img_settings.x, img_settings.y, img_settings.imgWidthMm, img_settings.imgHeightMm);
+
+    var base64Pdf = doc.output('datauristring');
+
+    return base64Pdf;
+}
+
+function pxToMm(px, dpi) {
+    var mmPerInch = 25.4;
+    return (px * mmPerInch) / dpi;
+};
+
+function centerImageOnPaper(imgWidth, imgHeight, paperFormat, dpi) {
+    /*�������������� �������� ����������� �� �������� � ����������*/
+    var imgWidthMm = pxToMm(imgWidth, dpi);
+    var imgHeightMm = pxToMm(imgHeight, dpi);
+
+    /*����������� ���������� �� ������ �������� �����������*/
+    var orientation = (imgWidthMm > imgHeightMm) ? 'landscape' : 'portrait';
+
+    var sizes = calculatePaperSize(dpi, paperFormat, "cm", orientation);
+
+    var PaperWidthMm = sizes.width * 10;
+    var PaperHeightMm = sizes.height * 10;
+
+    /*���������� ��������� x � y ��� ������������� ����������� �� ����� A4*/
+    var x = (PaperWidthMm - imgWidthMm) / 2;
+    var y = (PaperHeightMm - imgHeightMm) / 2;
+
+    return { x: x, y: y, orientation: orientation, imgWidthMm: imgWidthMm, imgHeightMm: imgHeightMm, paperWidthMm: PaperWidthMm, paperHeightMm: PaperHeightMm };
+};
+
+
+function getPaperFormats() {
+    return {
+        'A4': [210, 297],
+        'A0': [841, 1189],
+        'A1': [594, 841],
+        'A2': [420, 594],
+        'A3': [297, 420],
+        'A5': [148, 210],
+        'A6': [105, 148],
+    };
+};
+
+function calculatePaperSize(dpi, paperFormat, unit, orientation) {
+    const paperFormats = getPaperFormats();
+
+    if (!paperFormats.hasOwnProperty(paperFormat)) {
+        return `����������� ������ ������: ${paperFormat}`;
+    }
+
+    let width, height;
+    if (unit === 'cm') {
+        width = paperFormats[paperFormat][0] / 10;
+        height = paperFormats[paperFormat][1] / 10;
+    } else if (unit === 'px') {
+        width = Math.round(paperFormats[paperFormat][0] * dpi / 25.4);
+        height = Math.round(paperFormats[paperFormat][1] * dpi / 25.4);
+    } else if (unit === 'in') {
+        width = paperFormats[paperFormat][0] / 25.4;
+        height = paperFormats[paperFormat][1] / 25.4;
+    } else {
+        return `����������� ������� ���������: ${unit}`;
+    }
+
+    if (orientation === 'landscape') {
+        let temp = width;
+        width = height;
+        height = temp;
+    }
+
+    return {
+        width: width,
+        height: height
+    };
+};
+
+function recalculateRectangles(mainRect, rectangles, usePercentages) {
+    const resultRectangles = [];
+
+    for (const rect of rectangles) {
+        const relativeTop = rect.top - mainRect.top;
+        const relativeLeft = rect.left - mainRect.left;
+        const newRect = deepCopy(rect);
+        newRect.top= usePercentages ? (relativeTop / mainRect.height) * 100 : relativeTop;
+        newRect.left= usePercentages ? (relativeLeft / mainRect.width) * 100 : relativeLeft;
+        newRect.width= usePercentages ? (rect.width / mainRect.width) * 100 : rect.width;
+        newRect.height= usePercentages ? (rect.height / mainRect.height) * 100 : rect.height;     
+
+        resultRectangles.push(newRect);
+    }
+
+    return resultRectangles;
+};
+
+function calculatePaperValues(percentages, total) {
+    var result = {};
+    for (var key in percentages) {
+        if (percentages.hasOwnProperty(key)) {
+            result[key] = Math.round(percentages[key] / 100 * total);
+        }
+    }
+    return result;
+};
+var GetSize0 = {
+    _measurements: [
+        'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom',
+        'marginLeft', 'marginRight', 'marginTop', 'marginBottom',
+        'borderLeftWidth', 'borderRightWidth', 'borderTopWidth', 'borderBottomWidth'
+    ],
+
+    _getStyleSize: function (value) {
+        var num = parseFloat(value);
+        return isNaN(num) ? 0 : num;
+    },
+
+    getSize: function (e) {
+        if (e == null) return null;
+        var elem = (typeof e === 'string') ? document.querySelector(e) : e;
+        if (!elem) return null;
+
+        var style = window.getComputedStyle(elem);
+        var size = new GSize();
+        if (style.display === 'none') return size;
+
+        size.width = elem.offsetWidth;
+        size.height = elem.offsetHeight;
+        size.isBorderBox = (style.boxSizing === 'border-box');
+
+        this._measurements.forEach(function (prop) {
+            size.setPropByName(prop, GetSize0._getStyleSize(style[prop]));
+        });
+
+        var rect = elem.getBoundingClientRect();
+        size.top = rect.top;
+        size.left = rect.left;
+
+        var pl = size.paddingLeft, pr = size.paddingRight,
+            pt = size.paddingTop, pb = size.paddingBottom,
+            ml = size.marginLeft, mr = size.marginRight,
+            mt = size.marginTop, mb = size.marginBottom,
+            bl = size.borderLeftWidth, br = size.borderRightWidth,
+            bt = size.borderTopWidth, bb = size.borderBottomWidth;
+
+        var paddingWidth = pl + pr,
+            paddingHeight = pt + pb,
+            marginWidth = ml + mr,
+            marginHeight = mt + mb,
+            borderWidth = bl + br,
+            borderHeight = bt + bb;
+
+        var styleW = this._getStyleSize(style.width);
+        size.width = styleW + (size.isBorderBox ? 0 : paddingWidth + borderWidth);
+        var parentRect = elem.parentElement && elem.parentElement.getBoundingClientRect();
+        if (parentRect && size.width > parentRect.width) size.width = parentRect.width;
+
+        var styleH = this._getStyleSize(style.height);
+        size.height = styleH + (size.isBorderBox ? 0 : paddingHeight + borderHeight);
+        if (parentRect && size.height > parentRect.height) size.height = parentRect.height;
+
+        size.innerWidth = size.width - (paddingWidth + borderWidth);
+        size.innerHeight = size.height - (paddingHeight + borderHeight);
+        size.outerWidth = size.width + marginWidth;
+        size.outerHeight = size.height + marginHeight;
+
+        return size;
+    }
+};
+
+function GSize() {
+    this.top = 0;
+    this.left = 0;
+
+    this.width = 0;
+    this.height = 0;
+    this.innerWidth = 0;
+    this.innerHeight = 0;
+    this.outerWidth = 0;
+    this.outerHeight = 0;
+
+    this.paddingLeft = 0;
+    this.paddingRight = 0;
+    this.paddingTop = 0;
+    this.paddingBottom = 0;
+    this.marginLeft = 0;
+    this.marginRight = 0;
+    this.marginTop = 0;
+    this.marginBottom = 0;
+    this.borderLeftWidth = 0;
+    this.borderRightWidth = 0;
+    this.borderTopWidth = 0;
+    this.borderBottomWidth = 0;
+
+    this.isBorderBox = false;
+}
+
+GSize.prototype.setPropByName = function (name, value) {
+    this[name] = value;
+};
+
+GSize.prototype.getPropByName = function (name) {
+    return this[name];
+};
+
+GSize.fromElement = function (el) {
+    return GetSize0.getSize(el);
+};
+
+GSize.fromNumbers = function (width, height) {
+    var size = new GSize();
+    size.width = width;
+    size.height = height;
+    return size;
+};
+
+GSize.fromString = function (str) {
+    var size = new GSize();
+    var parts = String(str).split('x');
+    size.width = Number(parts[0]) || 0;
+    size.height = Number(parts[1]) || 0;
+    return size;
+};
+
+GSize.prototype.toString = function () {
+    return this.width + 'x' + this.height;
+};
+function FeatureCollection() {
+    const localThis = this;
+
+    this.type = "FeatureCollection";
+    this.features = [];
+    this.schema = []; //{name, alias, type}
+    let index = [];
+    let extent = null;
+
+    const flipCoordinates = (geometry) => {
+        if (!geometry || !geometry.coordinates) return geometry;
+
+        const flipRecursive = (coords) => {
+            if (Array.isArray(coords[0])) {
+                return coords.map(flipRecursive);
+            }
+            return [coords[1], coords[0]]; // Swap lat/lng to lng/lat
+        };
+
+        return {
+            ...geometry,
+            coordinates: flipRecursive(geometry.coordinates)
+        };
+    };
+
+    const calculateBoundsFromCoordinates = (coords) => {
+        if (!coords || coords.length === 0) return null;
+
+        let minLng = Infinity;
+        let maxLng = -Infinity;
+        let minLat = Infinity;
+        let maxLat = -Infinity;
+
+        const processCoordinate = (coord) => {
+            const lng = coord[0];
+            const lat = coord[1];
+
+            if (lng < minLng) minLng = lng;
+            if (lng > maxLng) maxLng = lng;
+            if (lat < minLat) minLat = lat;
+            if (lat > maxLat) maxLat = lat;
+        };
+
+        const traverse = (arr) => {
+            for (let i = 0; i < arr.length; i++) {
+                if (Array.isArray(arr[i][0])) {
+                    traverse(arr[i]);
+                } else {
+                    processCoordinate(arr[i]);
+                }
+            }
+        };
+
+        traverse(coords);
+
+        return {
+            southWest: { lng: minLng, lat: minLat },
+            northEast: { lng: maxLng, lat: maxLat }
+        };
+    };
+
+    const calcExtent = (_input_feature) => {
+        const feature = {
+            ..._input_feature,
+            geometry: _input_feature.geometry
+        };
+
+        let bounds = null;
+        const { type, coordinates } = feature.geometry;
+
+        switch (type) {
+            case "Point":
+                bounds = {
+                    southWest: {
+                        lng: coordinates[0] - 0.00045,
+                        lat: coordinates[1] - 0.00045
+                    },
+                    northEast: {
+                        lng: coordinates[0] + 0.00045,
+                        lat: coordinates[1] + 0.00045
+                    }
+                };
+                break;
+
+            case "LineString":
+            case "MultiPoint":
+                bounds = calculateBoundsFromCoordinates(coordinates);
+                break;
+
+            case "Polygon":
+                bounds = calculateBoundsFromCoordinates(coordinates[0]);
+                break;
+
+            case "MultiLineString":
+                bounds = calculateBoundsFromCoordinates(coordinates[0]);
+                break;
+
+            case "MultiPolygon":
+                bounds = coordinates.reduce((currentBounds, poly) => {
+                    const polyBounds = calculateBoundsFromCoordinates(poly[0]);
+                    if (!currentBounds) return polyBounds;
+                    if (!polyBounds) return currentBounds;
+
+                    return {
+                        southWest: {
+                            lng: Math.min(currentBounds.southWest.lng, polyBounds.southWest.lng),
+                            lat: Math.min(currentBounds.southWest.lat, polyBounds.southWest.lat)
+                        },
+                        northEast: {
+                            lng: Math.max(currentBounds.northEast.lng, polyBounds.northEast.lng),
+                            lat: Math.max(currentBounds.northEast.lat, polyBounds.northEast.lat)
+                        }
+                    };
+                }, null);
+                break;
+
+            default:
+                bounds = calculateBoundsFromCoordinates(coordinates);
+        }
+
+        return bounds ? {
+            xmin: bounds.southWest.lng,
+            ymin: bounds.southWest.lat,
+            xmax: bounds.northEast.lng,
+            ymax: bounds.northEast.lat
+        } : { xmin: 0, ymin: 0, xmax: 0, ymax: 0 };
+    };
+
+    this.extendExtent = (feature) => {
+        const bounds = calcExtent(feature);
+        if (!extent) {
+            extent = { ...bounds };
+            return;
+        }
+
+        if (bounds.xmin < extent.xmin) extent.xmin = bounds.xmin;
+        if (bounds.ymin < extent.ymin) extent.ymin = bounds.ymin;
+        if (bounds.xmax > extent.xmax) extent.xmax = bounds.xmax;
+        if (bounds.ymax > extent.ymax) extent.ymax = bounds.ymax;
+    };
+
+    this.extentToGeoJSON = () => ({
+        type: "Feature",
+        geometry: {
+            type: "Polygon",
+            coordinates: [[
+                [extent.xmin, extent.ymin],
+                [extent.xmax, extent.ymin],
+                [extent.xmax, extent.ymax],
+                [extent.xmin, extent.ymax],
+                [extent.xmin, extent.ymin]
+            ]]
+        }
+    });
+
+    this.extentToBounds = () => [
+        [extent.ymin, extent.xmin],
+        [extent.ymax, extent.xmax]
+    ];
+
+    this.isInsidePolygon = (lng, lat, polygon) => {
+        let inside = false;
+        const x = lng, y = lat;
+        const length = polygon.length;
+
+        for (let i = 0, j = length - 1; i < length; j = i++) {
+            const xi = polygon[i][0], yi = polygon[i][1];
+            const xj = polygon[j][0], yj = polygon[j][1];
+
+            if (((yi > y) !== (yj > y)) &&
+                (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)) {
+                inside = !inside;
+            }
+        }
+
+        return inside;
+    };
+
+    this.isInsideMultiPolygon = (lng, lat, multipolygon) => {
+        let inside = false;
+        const x = lng, y = lat;
+
+        for (let p = 0; p < multipolygon.length; p++) {
+            const poly = multipolygon[p][0];
+            const length = poly.length;
+
+            for (let i = 0, j = length - 1; i < length; j = i++) {
+                const xi = poly[i][0], yi = poly[i][1];
+                const xj = poly[j][0], yj = poly[j][1];
+
+                if (((yi > y) !== (yj > y)) &&
+                    (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)) {
+                    inside = !inside;
+                }
+            }
+        }
+
+        return inside;
+    };
+
+    this.isInsideExtent = (lng, lat) => (
+        extent &&
+        lng >= extent.xmin &&
+        lng <= extent.xmax &&
+        lat >= extent.ymin &&
+        lat <= extent.ymax
+    );
+
+    const compareExtents = (extent1, extent2) => {
+        const area1 = (extent1.xmax - extent1.xmin) * (extent1.ymax - extent1.ymin);
+        const area2 = (extent2.xmax - extent2.xmin) * (extent2.ymax - extent2.ymin);
+        return area1 - area2;
+    };
+
+    const _findAllByLngLat = (lng, lat) => {
+        const result = [];
+        for (let i = 0; i < index.length; i++) {
+            const idx = index[i];
+            if (lng >= idx.xmin && lng <= idx.xmax && lat >= idx.ymin && lat <= idx.ymax) {
+                result.push(i);
+            }
+        }
+        return result;
+    };
+
+    const _findOneByLngLat = (lng, lat) => {
+        let smallestExtentIndex = null;
+
+        for (let i = 0; i < index.length; i++) {
+            const idx = index[i];
+            if (lng >= idx.xmin && lng <= idx.xmax && lat >= idx.ymin && lat <= idx.ymax) {
+                if (smallestExtentIndex === null || compareExtents(idx, index[smallestExtentIndex]) < 0) {
+                    smallestExtentIndex = i;
+                }
+            }
+        }
+
+        return smallestExtentIndex !== null ? [smallestExtentIndex] : [];
+    };
+
+    const processSearchResults = (lng, lat,indexResult) => {
+        const results = [];
+        for (let i = 0; i < indexResult.length; i++) {
+            const featureIndex = indexResult[i];
+            const feature = localThis.features[featureIndex];
+            feature.layerid = localThis.layerid;
+
+            const { type, coordinates } = feature.geometry;
+
+            if (type === "Polygon") {
+                if (localThis.isInsidePolygon(lng, lat, coordinates[0])) {
+                    results.push(feature);
+                }
+            } else if (type === "MultiPolygon") {
+                if (localThis.isInsideMultiPolygon(lng, lat, coordinates)) {
+                    results.push(feature);
+                }
+            }
+        }
+        return results;
+    };
+
+    this.search = (lng, lat) => {
+        alert("search(...) is replaced, use search_one(...) or search_all(...) instead");
+    };
+
+    this.search_one = (lng, lat) => {
+        if (!localThis.isInsideExtent(lng, lat)) return [];
+        const results = processSearchResults(lng, lat, _findOneByLngLat(lng, lat));
+        return results.length > 0 ? [results[0]] : [];
+    };
+
+    this.search_all = (lng, lat) => {
+        return localThis.isInsideExtent(lng, lat) ?
+            processSearchResults(lng, lat, _findAllByLngLat(lng, lat)) : [];
+    };
+
+    this.add = (f) => {
+        localThis.features.push(f);
+    };
+
+    const _addOne = (f) => {
+        localThis.features.push(f);
+        const featureExtent = calcExtent(f);
+        index.push(featureExtent);
+        localThis.extendExtent(f);
+    };
+
+    this.load = (_data, _layerid, xprop, yprop) => {
+        if (!_data) return;
+        localThis.clear();
+
+        let firstFeature = true;
+
+        const processFeature = (f) => {
+            if (firstFeature) {
+                extent = calcExtent(f);
+                firstFeature = false;
+            }
+            _addOne(f);
+        };
+
+        const processTableRow = (o) => {
+            let f = {
+                type: "Feature",
+                geometry: {
+                    type: "Point",
+                    coordinates: [
+                        Number(o[xprop]),
+                        Number(o[yprop])
+                    ]
+                },
+                properties: o
+            };
+            processFeature(f);
+        };
+
+        if (_data.type === "FeatureCollection") {
+            if (_layerid) {
+                _data.layerid = _layerid;
+            }
+            localThis.schema = _data.schema ?? null;
+            _data.features.forEach(processFeature);
+        } else if (Array.isArray(_data) && _data.length > 0) {
+            if (_data[0].type === "Feature" && _data[0].hasOwnProperty("geometry") && _data[0].hasOwnProperty("properties")) {
+                _data.forEach(processFeature);
+            }
+            else if (xprop && yprop && _data.length > 0) {
+                _data.forEach(processTableRow);
+            }
+            else {
+                console.error("Don't know how to load the data");
+            }
+        }
+    };
+
+    this.buildSchema = (schema) => {
+        if (schema) {
+            localThis.schema = schema.map(s => ({
+                name: s.key,
+                alias: s.title,
+                type: s.type
+            }));
+        }
+        else {
+            localThis.schema = [];
+            if (localThis.features?.length > 0) {
+                for (let props in localThis.features[0].properties) {
+                    localThis.schema.push({
+                        name: props,
+                        alias: props,
+                        type: "string"
+                    });
+                }
+            }
+        }
+    };
+
+    this.clear = () => {
+        localThis.features = [];
+        index = [];
+        schema = [];
+        extent = null;
+    };
+
+    // Initialize
+    (() => {
+        // Initialization code if needed
+    })();
+};
+let propertyExtractionWorkers = [];
+let propertyExtractionQueue = [];
+let propertyExtractionMaxWorkers = 4;
+let propertyExtractionProcessing = false;
+
+function propertyExtractionCreateWorker() {
+    const workerCode = `
+        self.onmessage = function(e) {
+            const { features, propName, taskId } = e.data;
+            const result = new Array(features.length);
+            for (let i = 0; i < features.length; i++) {
+                result[i] = features[i].properties?.[propName] ?? null;
+            }
+            self.postMessage({ result, taskId });
+        };
+    `;
+
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+
+    return {
+        worker,
+        busy: false,
+        taskId: null
+    };
+};
+
+function propertyExtractionProcessQueue() {
+    if (propertyExtractionProcessing || propertyExtractionQueue.length === 0) return;
+
+    propertyExtractionProcessing = true;
+
+    let availableWorker = propertyExtractionWorkers.find(w => !w.busy);
+
+    if (!availableWorker && propertyExtractionWorkers.length < propertyExtractionMaxWorkers) {
+        availableWorker = propertyExtractionCreateWorker();
+        propertyExtractionWorkers.push(availableWorker);
+    }
+
+    if (!availableWorker) {
+        propertyExtractionProcessing = false;
+        return;
+    }
+
+    const task = propertyExtractionQueue.shift();
+    availableWorker.busy = true;
+    availableWorker.taskId = task.taskId;
+
+    availableWorker.worker.onmessage = (e) => {
+        const { result, taskId } = e.data;
+        const completedTask = propertyExtractionQueue.find(t => t.taskId === taskId) || task;
+
+        if (completedTask && completedTask.taskId === taskId) {
+            completedTask.resolve(result);
+        }
+
+        const worker = propertyExtractionWorkers.find(w => w.taskId === taskId);
+        if (worker) {
+            worker.busy = false;
+            worker.taskId = null;
+        }
+
+        propertyExtractionProcessing = false;
+        propertyExtractionProcessQueue();
+    };
+
+    availableWorker.worker.onerror = (error) => {
+        task.reject(error);
+        const worker = propertyExtractionWorkers.find(w => w.taskId === task.taskId);
+        if (worker) {
+            worker.busy = false;
+            worker.taskId = null;
+        }
+        propertyExtractionProcessing = false;
+        propertyExtractionProcessQueue();
+    };
+
+    availableWorker.worker.postMessage({
+        features: task.featureCollection.features,
+        propName: task.propName,
+        taskId: task.taskId
+    });
+
+    propertyExtractionProcessing = false;
+};
+
+async function extractPropertyAsync(featureCollection, propName) {
+    return new Promise((resolve, reject) => {
+        const taskId = generateSTRUID();
+
+        propertyExtractionQueue.push({
+            featureCollection,
+            propName,
+            resolve,
+            reject,
+            taskId
+        });
+
+        propertyExtractionProcessQueue();
+    });
+};
+
+function propertyExtractionCleanup() {
+    propertyExtractionQueue = [];
+    propertyExtractionWorkers.forEach(workerObj => {
+        workerObj.worker.terminate();
+    });
+    propertyExtractionWorkers = [];
+};
+
+function propertyExtractionGetStats() {
+    return {
+        totalWorkers: propertyExtractionWorkers.length,
+        busyWorkers: propertyExtractionWorkers.filter(w => w.busy).length,
+        queuedTasks: propertyExtractionQueue.length
+    };
+};
+var ElSize = function () {
+    function ElSize() {
+        this.top = 0;
+        this.left = 0;
+        this.width = 0;
+        this.height = 0;
+        this.innerWidth = 0;
+        this.innerHeight = 0;
+        this.outerWidth = 0;
+        this.outerHeight = 0;
+
+        this.paddingLeft = 0;
+        this.paddingRight = 0;
+        this.paddingTop = 0;
+        this.paddingBottom = 0;
+        this.marginLeft = 0;
+        this.marginRight = 0;
+        this.marginTop = 0;
+        this.marginBottom = 0;
+        this.borderLeftWidth = 0;
+        this.borderRightWidth = 0;
+        this.borderTopWidth = 0;
+        this.borderBottomWidth = 0;
+
+        this.isBorderBox = false;
+    }
+
+    ElSize.prototype.setPropByName = function (name, value) {
+        this[name] = value;
+    };
+
+    ElSize.prototype.getPropByName = function (name) {
+        return this[name];
+    };
+
+    ElSize.prototype.toString = function () {
+        return this.width + 'x' + this.height;
+    };
+
+    ElSize.fromElement = function (el) {
+        return GetSize.getSize(el);
+    };
+
+    ElSize.fromNumbers = function (width, height) {
+        var size = new ElSize();
+        size.width = width;
+        size.height = height;
+        return size;
+    };
+
+    ElSize.fromString = function (str) {
+        var size = new ElSize();
+        var parts = str.split('x');
+        size.width = Number(parts[0]);
+        size.height = Number(parts[1]);
+        return size;
+    };
+
+    return ElSize;
+}();
+
+var GetSize = function () {
+    function GetSize() { }
+
+    GetSize._measurements = [
+        'top',
+        'left',
+        'paddingLeft',
+        'paddingRight',
+        'paddingTop',
+        'paddingBottom',
+        'marginLeft',
+        'marginRight',
+        'marginTop',
+        'marginBottom',
+        'borderLeftWidth',
+        'borderRightWidth',
+        'borderTopWidth',
+        'borderBottomWidth'
+    ];
+
+    GetSize._getStyleSize = function (value) {
+        var num = Number(value);
+        var isValid = !isNaN(num);
+        return isValid ? num : 0;
+    };
+
+    GetSize.getSize = function (e) {
+        if (e === undefined || e === null) return null;
+
+        var elem;
+
+        if (typeof e === 'string') {
+            elem = document.querySelector(e);
+        } else {
+            elem = e;
+        }
+
+        var style = getComputedStyle(elem);
+        var size = new ElSize();
+
+        if (style.display === 'none') return size;
+
+        size.width = elem.offsetWidth;
+        size.height = elem.offsetHeight;
+        size.isBorderBox = style.boxSizing === 'border-box';
+
+        var isBorderBox = size.isBorderBox;
+
+        GetSize._measurements.forEach(function (m) {
+            var value = style[m];
+            var num = Number(value.replace("px", ""));
+            size.setPropByName(m, isNaN(num) ? 0 : num);
+        });
+
+        var gbc = elem.getBoundingClientRect();
+        var gbc_parent = elem.parentElement ? elem.parentElement.getBoundingClientRect() : null;
+
+        size.top = gbc.top;
+        size.left = gbc.left;
+
+        var paddingWidth = size.paddingLeft + size.paddingRight;
+        var paddingHeight = size.paddingTop + size.paddingBottom;
+        var marginWidth = size.marginLeft + size.marginRight;
+        var marginHeight = size.marginTop + size.marginBottom;
+        var borderWidth = size.borderLeftWidth + size.borderRightWidth;
+        var borderHeight = size.borderTopWidth + size.borderBottomWidth;
+
+        var styleWidth = GetSize._getStyleSize(style.width.replace("px", ""));
+        size.width = styleWidth + (isBorderBox ? 0 : paddingWidth + borderWidth);
+        if (gbc_parent && size.width > gbc_parent.width) {
+            size.width = gbc_parent.width;
+        }
+
+        var styleHeight = GetSize._getStyleSize(style.height.replace("px", ""));
+        size.height = styleHeight + (isBorderBox ? 0 : paddingHeight + borderHeight);
+        if (gbc_parent && size.height > gbc_parent.height) {
+            size.height = gbc_parent.height;
+        }
+
+        size.innerWidth = size.width - (paddingWidth + borderWidth);
+        size.innerHeight = size.height - (paddingHeight + borderHeight);
+
+        size.outerWidth = size.width + marginWidth;
+        size.outerHeight = size.height + marginHeight;
+
+        return size;
+    };
+
+    return GetSize;
+}();

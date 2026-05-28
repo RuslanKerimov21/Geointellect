@@ -1,0 +1,1435 @@
+function LayerEditor() {
+    var localThis = this;
+    this.id = "layer-editor";
+    this.title = gltxt("tool_geometry_editor");
+    this.subTitle = "";
+    var loadCssUrl = "/resources/engine/layer-editor/styles/style.css";
+    var templateOption = "/resources/engine/layer-editor/templates/options.html";
+    var _template = null;
+    var _content = null;
+    var _type = "new";
+    var _typeIcon = null;
+    var _debug = true;
+    var _stage = null;
+    this.buttons_options = null;
+    this._params = {
+        editor_settings: []
+    };
+
+    this.auto_save = false;
+
+    var _default_draw_style = {
+        line: {
+            color: '#3388ff',
+            opacity: 0.8,
+            weight: 5
+        },
+        polygon: {
+            color: '#3388ff',
+            opacity: 0.8,
+            weight: 5,
+            fillColor: '#3388ff',
+            fillOpacity: 0.2
+        }
+    };
+
+    this.active = false;
+
+    this.GetIsOpen = function () {
+        console.log("active", localThis.active);
+    };
+
+    var _draw_poly_style = null;
+    var _draw_line_style = null;
+
+    this.line_total = null;/*--------*/
+
+    this.line_last_segment = null;/*--------*/
+
+    this.line_segments = [];/*--------*/
+
+    /*--------*/
+    this.options = {
+        help: $("<span/>").html(""),
+        panel: null,
+        layer: {
+            id: 0,
+            name: "sdlfkgjh",
+            feature: null,
+            scheme: null
+        },
+        feature: {},
+        history: [],
+        history_idx: -1,
+        graphics: null
+    };
+
+    /*--------*/
+    var _events = {
+        on_save: null,
+        on_cancel: null,
+        on_change: null,
+        on_dragging: null,
+        clear: function () {
+            _events.on_save = null;
+            _events.on_cancel = null;
+            _events.on_change = null;
+            _events.on_dragging = null;
+        }
+    };
+
+    var submodules = {};
+
+    /*--------*/
+    this.show = function () {
+        window.mapModule01.infopanel.clearStatus();
+        renderContainer();
+    };
+
+    /*--------*/
+    var _render = {
+        point: function (_coords, _options, _flip) {
+            /*--------*/
+            if (typeof _flip == "undefined") {
+                _flip = false;
+            }
+            tryRemoveGeometry(localThis.options.graphics);
+            if (_flip) {
+                _coords = turf.flip(turf.point(_coords)).geometry.coordinates;
+            }
+            localThis.options.graphics = L.marker(_coords, _options);
+            localThis.options.graphics.addTo(window.MAP);
+            localThis.options.graphics.enableEdit();
+            localThis.options.graphics.dragging.disable();
+            _stage = "vertex";
+        },
+        multipoint: function (_coords, _options, _flip) {
+            if (typeof _flip == "undefined") {
+                _flip = false;
+            }
+            tryRemoveGeometry(localThis.options.graphics);
+            _coords = turf.multiPoint(_coords);
+            if (_flip) {
+                _coords = turf.flip(_coords);
+            }
+            localThis.options.graphics = L.GeoJSON(_coords, _options);
+            localThis.options.graphics.addTo(window.MAP);
+            localThis.options.graphics.enableEdit();
+            localThis.options.graphics.dragging.disable();
+            _stage = "vertex";
+        },
+        polygon: function (_coords, _options, _flip) {
+            /*--------*/
+            if (typeof _flip == "undefined") {
+                _flip = false;
+            }
+            tryRemoveGeometry(localThis.options.graphics);
+            if (_flip) {
+                _coords = turf.flip(turf.polygon(_coords)).geometry.coordinates;
+            }
+            localThis.options.graphics = L.polygon(_coords, _options);
+            localThis.options.graphics.addTo(window.MAP);
+            localThis.options.graphics.enableEdit();
+            if (_draw_poly_style !== null) {
+                localThis.options.graphics.setStyle(_draw_poly_style);
+            } else {
+                localThis.options.graphics.setStyle(_default_draw_style.polygon);
+            }            
+            localThis.options.graphics.dragging.disable();
+            _stage = "vertex";
+        },
+        multipolygon: function (_coords, _options, _flip) {
+            /*--------*/
+            if (typeof _flip == "undefined") {
+                _flip = false;
+            }
+            tryRemoveGeometry(localThis.options.graphics);
+            if (_flip) {
+                _coords = turf.flip(turf.multiPolygon(_coords)).geometry.coordinates;
+            }
+            localThis.options.graphics = L.polygon(_coords, _options);
+            localThis.options.graphics.addTo(window.MAP);
+            localThis.options.graphics.enableEdit();
+            if (_draw_poly_style !== null) {
+                localThis.options.graphics.setStyle(_draw_poly_style);
+            } else {
+                localThis.options.graphics.setStyle(_default_draw_style.polygon);
+            }       
+            localThis.options.graphics.dragging.disable();
+            _stage = "vertex";
+        },
+        line: function (_coords, _options, _flip) {
+            /*--------*/
+            if (typeof _flip == "undefined") {
+                _flip = false;
+            }
+            tryRemoveGeometry(localThis.options.graphics);
+            if (_flip) {
+                _coords = turf.flip(turf.lineString(_coords)).geometry.coordinates;
+            }
+            localThis.options.graphics = L.polyline(_coords, _options);
+            localThis.options.graphics.addTo(window.MAP);
+            localThis.options.graphics.enableEdit();
+            if (_draw_line_style !== null) {
+                localThis.options.graphics.setStyle(_draw_line_style);
+            } else {
+                localThis.options.graphics.setStyle(_default_draw_style.line);
+            }    
+            localThis.options.graphics.dragging.disable();
+            _stage = "vertex";
+        },
+        multiline: function (_coords, _options, _flip) {
+            /*--------*/
+            if (typeof _flip == "undefined") {
+                _flip = false;
+            }
+            tryRemoveGeometry(localThis.options.graphics);
+            if (_flip) {
+                _coords = turf.flip(turf.multiLineString(_coords)).geometry.coordinates;
+            }
+            localThis.options.graphics = L.polyline(_coords, _options);
+            localThis.options.graphics.addTo(window.MAP);
+            localThis.options.graphics.enableEdit();
+            if (_draw_line_style !== null) {
+                localThis.options.graphics.setStyle(_draw_line_style);
+            } else {
+                localThis.options.graphics.setStyle(_default_draw_style.line);
+            }   
+            localThis.options.graphics.dragging.disable();
+            _stage = "vertex";
+        }
+    };
+
+    /*--------*/
+    var renderEditPath = function (_coords, _flip) {
+        if (typeof _flip == "undefined") {
+            _flip = false;
+        }
+
+        switch (localThis.options.layer.feature.geometry.type) {
+            case "Point":
+                var _options = {
+                    pane: "overlayPane"
+                };
+                _render.point(_coords, _options, _flip);
+                break;
+            case "Polygon":
+                var _options = {
+                    pane: "overlayPane"
+                };
+                _render.polygon(_coords, _options, _flip);
+                break;
+            case "MultiPolygon":
+                var _options = {
+                    pane: "overlayPane"
+                };
+                _render.multipolygon(_coords, _options, _flip);
+                break;
+            case "LineString":
+                var _options = {
+                    pane: "overlayPane"
+                };
+                _render.line(_coords, _options, _flip);
+                break;
+            case "MultiLineString":
+                var _options = {
+                    pane: "overlayPane"
+                };
+                _render.multiline(_coords, _options, _flip);
+                break;
+            default:
+                alert("GRAPHICS IS WRONG");
+                break;
+        }
+    };
+
+    /*--------*/
+    var renderGraphics = function (_flip) {
+
+        if (!localThis?.options?.layer?.feature) {
+            return;
+        }
+
+        if (typeof _flip == "undefined") {
+            _flip = false;
+        }
+
+        tryRemoveGeometry(localThis.options.graphics);
+
+        renderEditPath(localThis.options.layer.feature.geometry.coordinates, _flip);
+
+        _history.create(localThis.options.layer.feature.geometry.coordinates);
+    };
+
+    var HideContainer = function () {
+        localThis.active = false;
+        localThis.close();
+        _events.on_cancel();
+    };
+
+    /*--------*/
+    var renderContainer = function () {
+
+        window.mapModule01.infopanel.setClass("layerEditorActionRibbon");
+        window.mapModule01.infopanel.setTitle(localThis.title);
+        window.mapModule01.infopanel.setSubTitle(localThis.subTitle);
+        window.mapModule01.infopanel.changeTitleIcon(_typeIcon);
+        _content = _template.clone();
+        window.mapModule01.infopanel.setContent(_content);
+        _content.find(".btn-container").css({ "opacity": 1.0 });
+
+        window.mapModule01.infopanel.onclose = [];
+        window.mapModule01.infopanel.onclose.length = 0;
+        window.mapModule01.infopanel.onclose.push(HideContainer);
+
+        _content.find("[data-action]").each(function () {
+            var action = $(this).attr("data-action");
+            if (typeof (localThis[action]) === "function") {
+                $(this).on("click", function () { localThis[action](); });
+            }
+        });
+
+        window.mapModule01.infopanel.show();
+        localThis.active = true;
+    };
+
+    /*--------*/
+    var _controls = {
+        _history: {
+            show: function () {
+                _content?.find("[data-tool=back]").css({ "display": "inline-block" });
+                _content?.find("[data-tool=next]").css({ "display": "inline-block" });
+            },
+            hide: function () {
+                _content?.find("[data-tool=back]").css({ "display": "none" });
+                _content?.find("[data-tool=next]").css({ "display": "none" });
+            }
+        },
+        _coordinates: {
+            show: function () {
+                _content?.find("[data-tool=coordinates]").css({ "display": "inline-block" });
+            },
+            hide: function () {
+                _content?.find("[data-tool=coordinates]").css({ "display": "none" });
+            }
+        },
+        _geojson: {
+            show: function () {
+                _content?.find("[data-tool=editCoordinates]").css({ "display": "inline-block" });
+            },
+            hide: function () {
+                _content?.find("[data-tool=editCoordinates]").css({ "display": "none" });
+            }
+        },
+        _save: {
+            show: function () {
+                _content?.find("[data-action=save]").css({ "display": "inline-block" });
+            },
+            hide: function () {
+                _content?.find("[data-action=save]").css({ "display": "none" });
+            }
+        },
+        _cancel: {
+            show: function () {
+                _content?.find("[data-action=cancel]").css({ "display": "inline-block" });
+            },
+            hide: function () {
+                _content?.find("[data-action=cancel]").css({ "display": "none" });
+            }
+        }
+    };
+
+    /*--------*/
+    var _history = {
+        create: function (lngs) {
+            localThis.options.history = [];
+            localThis.options.history.length = 0;
+            localThis.options.history.push(JSON.parse(JSON.stringify(lngs)));
+            localThis.options.history_idx = 0;
+        },
+        add: function (lngs) {
+            localThis.options.history = localThis.options.history.slice(0, localThis.options.history_idx + 1);
+            localThis.options.history.push(JSON.parse(JSON.stringify(lngs)));
+            localThis.options.history_idx = localThis.options.history.length - 1;
+        }
+    };
+
+    /*--------*/
+    this.run_lyr_editor = function (_title, _lyrid, _feature, _flip, _onsave, _oncancel, _buttons_options, _auto_save) {
+
+        if (window.mapModule01.infopanel.visible) {
+            window.mapModule01.infopanel.blink();
+            return;
+        }
+        localThis.buttons_options = null;
+        localThis.auto_save = false;
+
+        if (typeof _auto_save !== "undefined") {
+            if (_auto_save !== null) {
+                localThis.auto_save = _auto_save;
+            }
+        }
+
+        clearNewGraphics();
+
+        window.mapModule01.infopanel.clearStatus();
+        _events.clear();
+
+        if (typeof _onsave === "function") {
+            _events.on_save = _onsave;
+        }
+
+        if (typeof _oncancel === "function") {
+            _events.on_cancel = _oncancel;
+        }
+
+        if (typeof _flip == "undefined") {
+            _flip = false;
+        }
+
+        localThis.options.layer.id = _lyrid;
+        localThis.options.layer.name = _title;
+        localThis.options.layer.feature = _feature;
+
+        renderGraphics(_flip);
+
+        if (!localThis.auto_save) {
+            renderContainer();
+
+            if (typeof _buttons_options !== "undefined") {
+                if (_buttons_options !== null) {
+                    localThis.buttons_options = _buttons_options;
+                }
+            }
+
+            $.wait(function () {
+                _controls._history.show();
+                _controls._coordinates.hide();
+                _controls._geojson.hide();
+                ButtonOptionsApply(_buttons_options);
+            }, 1000);
+        } else {
+            localThis.active = true;
+
+            if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+                window.mapModule01.MapClickAllowed = false;
+                window.mapModule01.guessMapClickAllowedOverride();
+            }
+        }       
+
+        _type = "edit";
+    };
+
+    /*--------*/
+    var switch_new_editor = function (_feature, _flip) {
+
+        if (typeof _flip == "undefined") {
+            _flip = false;
+        }
+
+        localThis.options.layer.id = 0;
+        localThis.options.layer.feature = _feature;
+
+        renderGraphics(_flip);
+
+        _controls._history.show();
+        _controls._coordinates.hide();
+        _controls._geojson.hide();
+
+        ButtonOptionsApply(localThis.buttons_options);
+        _type = "edit";
+    };
+
+    this.switch_new_editor = switch_new_editor;
+
+    this.run_new_feature = function (_title, _geom_type, _onsave, _oncancel, _onchange, _ondragging, _buttons_options, _auto_save) {
+
+        if (window.mapModule01.infopanel.visible) {
+            window.mapModule01.infopanel.blink();
+            return;
+        }
+        localThis.buttons_options = null;
+        localThis.auto_save = false;
+
+        if (typeof _auto_save !== "undefined") {
+            if (_auto_save !== null) {
+                localThis.auto_save = _auto_save;
+            }
+        }
+
+        clearNewGraphics();
+
+        window.mapModule01.infopanel.clearStatus();
+        if (_title !== "" && _title != null) {
+            localThis.title = _title;
+        }
+        window.mapModule01.infopanel.setTitle(_title);
+        window.mapModule01.infopanel.setSubTitle(localThis.subTitle);
+
+        _events.clear();
+
+        if (typeof _onsave === "function") {
+            _events.on_save = _onsave;
+        }
+
+        if (typeof _oncancel === "function") {
+            _events.on_cancel = _oncancel;
+        }
+
+        if (typeof _onchange === "function") {
+            _events.on_change = _onchange;
+        }
+
+        if (typeof _ondragging === "function") {
+            _events.on_dragging = _ondragging;
+        }
+
+        localThis.options.layer.id = 0;
+        localThis.options.layer.name = _title;
+        localThis.options.layer.feature = {
+            type: "feature",
+            properties: {},
+            geometry: {
+                type: _geom_type,
+                coordinates: []
+            }
+        };
+
+        switch (_geom_type) {
+            case "Polygon":
+            case "MultiPolygon":
+                if (_draw_poly_style == null) {
+                    window.MAP.editTools.startPolygon('', _default_draw_style.polygon);
+                } else {
+                    window.MAP.editTools.startPolygon('', _draw_poly_style);
+                }                
+                _stage = "new";
+                _typeIcon = "gr-polygon";
+                break;
+            case "LineString":
+            case "MultiLineString":
+                if (_draw_line_style === null) {
+                    window.MAP.editTools.startPolyline(null, _default_draw_style.line);
+                } else {
+                    window.MAP.editTools.startPolyline(null, _draw_line_style);
+                }   
+                _stage = "new";
+                _typeIcon = "gr-line";
+                break;
+            case "Point":
+            case "MultiPoint":
+                window.MAP.editTools.startMarker();
+                _stage = "new";
+                _typeIcon = "gr-point-multi";
+                break;
+            case "Buffer":
+                window.MAP.editTools.startCircle();
+                _stage = "new";
+                _typeIcon = "gr-line-buffer";
+                break;
+            default:
+                break;
+        }
+
+        _type = "new";
+
+        if (!localThis.auto_save) {
+            renderContainer();
+
+            if (typeof _buttons_options !== "undefined") {
+                if (_buttons_options !== null) {
+                    localThis.buttons_options = _buttons_options;
+                }
+            }
+
+            _controls._history.hide();
+            _controls._coordinates.hide();
+            _controls._geojson.hide();
+
+
+            ButtonOptionsApply(_buttons_options);
+        } else {
+            localThis.active = true;
+
+            if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+                window.mapModule01.MapClickAllowed = false;
+                window.mapModule01.guessMapClickAllowedOverride();
+            }
+        }        
+    };
+
+    this.run_generic = function (_title, _geom_type, _onsave, _oncancel, _onchange, _ondragging) {
+
+        clearNewGraphics();
+
+        _events.clear();
+
+        if (typeof _onsave === "function") {
+            _events.on_save = _onsave;
+        }
+
+        if (typeof _oncancel === "function") {
+            _events.on_cancel = _oncancel;
+        }
+
+        if (typeof _onchange === "function") {
+            _events.on_change = _onchange;
+        }
+
+        if (typeof _ondragging === "function") {
+            _events.on_dragging = _ondragging;
+        }
+
+        localThis.options.layer.id = 0;
+        localThis.options.layer.name = _title;
+        localThis.options.layer.feature = {
+            type: "feature",
+            properties: {},
+            geometry: {
+                type: _geom_type,
+                coordinates: []
+            }
+        };
+
+        switch (_geom_type) {
+            case "Polygon":
+            case "MultiPolygon":
+                if (_draw_poly_style == null) {
+                    window.MAP.editTools.startPolygon('', _default_draw_style.polygon);
+                } else {
+                    window.MAP.editTools.startPolygon('', _draw_poly_style);
+                }
+                _stage = "new";
+                _typeIcon = "gr-polygon";
+                break;
+            case "LineString":
+            case "MultiLineString":
+                if (_draw_line_style === null) {
+                    window.MAP.editTools.startPolyline(null, _default_draw_style.line);
+                } else {
+                    window.MAP.editTools.startPolyline(null, _draw_line_style);
+                }
+                _stage = "new";
+                _typeIcon = "gr-line";
+                break;
+            case "Point":
+            case "MultiPoint":
+                window.MAP.editTools.startMarker();
+                _stage = "new";
+                _typeIcon = "gr-point-multi";
+                break;
+            case "Buffer":
+                window.MAP.editTools.startCircle();
+                _stage = "new";
+                _typeIcon = "gr-line-buffer";
+                break;
+            default:
+                break;
+        }
+
+        _type = "new";
+
+        localThis.active = true;
+
+        if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+            window.mapModule01.MapClickAllowed = false;
+            window.mapModule01.guessMapClickAllowedOverride();
+        }
+    };
+
+    /*--------*/
+    var ButtonOptionsApply = function (options) {
+        if (typeof options !== "undefined") {
+            if (options !== null) {
+                if (options.cancel) {
+                    _controls._cancel.show();
+                } else {
+                    _controls._cancel.hide();
+                }
+                if (options.save) {
+                    _controls._save.show();
+                } else {
+                    _controls._save.hide();
+                }
+                if (options.history) {
+                    _controls._history.show();
+                } else {
+                    _controls._history.hide();
+                }
+                if (options.coordinates) {
+                    _controls._coordinates.show();
+                } else {
+                    /* _controls._coordinates.hide();*/
+                    _controls._coordinates.show();
+                }
+                if (options.geojson) {
+                    _controls._geojson.show();
+                } else {
+                    /* _controls._geojson.hide();*/
+                    _controls._geojson.show();
+                }
+            }
+        }
+    };
+
+    var loadEditCoordinates = function () {
+        return $.getScript("/resources/engine/layer-editor/editCoordinates.js");
+    };
+
+    var loadreplacingCoordinates = function () {
+        return $.getScript("/resources/engine/layer-editor/GeoJsonEditor.js");
+    };
+
+    var loadTemplate = function () {
+        var tmplt = $.get("/resources/engine/layer-editor/templates/options.html");
+        tmplt.done(function (html) {
+            _template = $(localizeHtml(html));
+        });
+        return tmplt;
+    };
+
+    /*--------*/
+    var checkGeometry = function () {
+
+        var _ok = "";
+
+        var _coords = localThis.getFeature();
+
+        if (_coords.geometry.type == "Point") {
+            return _ok;
+        }
+
+        var _kinks = turf.kinks(_coords);
+
+        if (_kinks.features.length > 0) {
+            _ok = gltxt("error_selfintersecting_edges").toUpperCase();
+        }
+
+        return _ok;
+    };
+
+    this.save = function () {
+
+        if (typeof _events.on_save != "function") {
+            return;
+        }
+
+        if (_stage != "vertex") {
+            blinkmsg(gltxt("message_finish_by_doubleclick"));
+            return;
+        }
+
+        var _check = checkGeometry();
+
+        if (_check == "") {
+            if (confirm(gltxt("message_close_and_save_q"))) {
+                _events.on_save(localThis.getFeature());
+                window.mapModule01.infopanel.close();
+            };
+        }
+        else {
+            alert(gltxt_f("error_geometry_has_errors_fix", _check));
+        }
+
+    };
+
+    this.cancel = function () {
+        if (typeof _events.on_cancel != "function") {
+            return;
+        }
+
+        if (_stage != "vertex" && _stage != "new") {
+            blinkmsg(gltxt("message_finish_by_doubleclick"));
+            return;
+        }
+
+        if (confirm(gltxt("message_cancel_editor_and_save_q"))) {
+            _events.on_cancel();
+            window.mapModule01.infopanel.close();
+        };
+    };
+
+    /*Метод срабатывает при заакрытие полоски */
+    this.close = function () {
+        window.mapModule01.infopanel.setRemoveClass("layerEditorActionRibbon");
+        window.mapModule01.infopanel.setSubTitle("");
+        disableAll("this.close");
+        _type == "new";
+    };
+
+    this.clear = function () {
+        clearNewGraphics();
+    };
+
+    var disableAll = function (_from) {
+
+        if (_stage != "vertex" && _stage != "new") {
+            return;
+        }
+
+        localThis.options?.graphics?.disableEdit();
+        try {
+            window.MAP.editTools.stopDrawing();
+        } catch (e) {
+            DoNothing();
+        }
+        console.log("disableAll_middle_2");
+        tryRemoveGeometry(localThis.options.graphics);
+        console.log("disableAll_middle_3");
+        layerEditor.options.graphics = null;
+        localThis.options.layer.id = 0;
+        localThis.options.layer.name = "";
+        localThis.options.layer.feature = null;
+        localThis.options.history_idx = -1;
+        localThis.options.history = [];
+        localThis.options.history.length = 0;
+        if (_content) {
+            _content.children()?.remove();
+        }
+        console.log("disableAll_middle_4");
+        clearNewGraphics();
+        _stage = null;
+        console.log("disableAll_end");
+    };
+
+    var clearNewGraphics = function () {
+
+        window.MAP.editTools.editLayer.clearLayers();
+        window.MAP.editTools.featuresLayer.clearLayers();
+
+        localThis.line_segments = [];
+        localThis.line_segments.length = 0;
+        localThis.line_total = null;
+        localThis.line_last_segment = null;
+
+        if (true) {
+            var _f = window.MAP.editTools.featuresLayer._layers;
+
+            for (var _prop in _f) {
+                if (_f.hasOwnProperty("" + _prop)) {
+                    tryRemoveGeometry(window.MAP.editTools.featuresLayer._layers["" + _prop]);
+                }
+            }
+
+            var _e = window.MAP.editTools.editLayer._layers;
+
+            for (var _prop in _e) {
+                if (_e.hasOwnProperty("" + _prop)) {
+                    tryRemoveGeometry(window.MAP.editTools.editLayer._layers["" + _prop]);
+                }
+            }
+        }
+    };
+
+    this.getFeature = function () {
+        return JSON.parse(localThis.getFeatureAsString());
+    };
+
+    this.getFeatureAsString = function () {
+        return JSON.stringify(layerEditor.options.graphics.toGeoJSON());
+    };
+
+    this.undo = function () {
+        if (localThis.options.history_idx <= 0) {
+            return;
+        }
+        localThis.options.history_idx--;
+        localThis.options.graphics.disableEdit();
+
+        var _flip = true;
+        renderEditPath(localThis.options.history[localThis.options.history_idx], _flip);
+
+        if (typeof _events.on_change == "function") {
+            _events.on_change();
+        }
+    };
+    this.deactivate = function () {
+        if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+            window.mapModule01.MapClickAllowed = true;
+            window.mapModule01.guessMapClickAllowedOverride();
+        }
+        _events.on_cancel(localThis.getFeature());
+        tryRemoveGeometry(localThis.options?.graphics);
+        window.mapModule01.infopanel.close();
+        _type == "";
+        localThis.active = false;
+        localThis.auto_save = false;
+        localThis.setDrawPolyStyle(null);
+        localThis.refreshDrawPolyStyle();
+
+        localThis.setDrawLineStyle(null);
+        localThis.refreshDrawLineStyle();
+    };
+    this.redo = function () {
+        if (localThis.options.history_idx >= localThis.options.history.length - 1) {
+            return;
+        }
+        localThis.options.history_idx++;
+        localThis.options.graphics.disableEdit();
+
+        var _flip = true;
+
+        renderEditPath(localThis.options.history[localThis.options.history_idx], _flip);
+
+        if (typeof _events.on_change == "function") {
+            _events.on_change();
+        }
+    };
+
+    this.showlistCoordinates = function () {
+        submodules.EditCoordinates.openWindow();
+    };
+
+    this.replacingCoordinates = function () {
+        submodules.GeoJsonEditor.openWindow();
+    };
+
+    this.setDrawPolyStyle = function (style) {
+        _draw_poly_style = style;
+    };
+
+    this.refreshDrawPolyStyle = function () {
+        if (_draw_poly_style !== null) {
+            localThis.options?.graphics.setStyle(_draw_poly_style);
+        } else {
+            localThis.options?.graphics.setStyle(_default_draw_style.polygon);
+        }        
+    };
+
+    this.setDrawLineStyle = function (style) {
+        _draw_line_style = style;
+    };
+
+    this.refreshDrawLineStyle = function () {
+        if (_draw_line_style !== null) {
+            localThis.options?.graphics.setStyle(_draw_line_style);
+        } else {
+            localThis.options?.graphics.setStyle(_default_draw_style.line);
+        }
+    };
+
+    this.getDrawPolyStyle = function () {
+        console.log("_draw_poly_style", _draw_poly_style);
+    };
+    this.getDrawLineStyle = function () {
+        console.log("_draw_line_style", _draw_line_style);
+    };
+    var recalculateSegments = function (_line, _last_coords) {
+        if (!_line || _line.geometry.coordinates.length < 1) {
+            return;
+        }
+        localThis.line_total = JSON.parse(JSON.stringify(_line));
+
+        if (_last_coords && _last_coords.length >= 2) {
+            localThis.line_total.geometry.coordinates.push(_last_coords);
+        }
+
+        var tt = localThis.line_total.geometry.coordinates;
+
+        localThis.line_last_segment = {
+            type: "Feature",
+            properties: {},
+            geometry: {
+                type: "LineString",
+                coordinates: [
+                    tt[tt.length - 2],
+                    tt[tt.length - 1]
+                ]
+            }
+        };
+
+        localThis.line_segments = [];
+        localThis.line_segments.length = 0;
+
+        for (var i = 0; i < tt.length; i++) {
+            if (i != 0) {
+                localThis.line_segments.push({
+                    type: "Feature",
+                    id: "" + i,
+                    properties: {
+                        id: i
+                    },
+                    geometry: {
+                        type: "LineString",
+                        coordinates: [
+                            tt[i - 1],
+                            tt[i]
+                        ]
+                    }
+                });
+            }
+        }
+    };
+
+    var GetReferenceBooks = function () {
+        var reference_api = DoWebApiAction("reference_books/list", {});
+        reference_api.done(function (r) {
+            if (r.success && r.results !== null) {
+                localThis._params.editor_settings.forEach(function (layer) {
+                    layer?.columns?.forEach(function (column) {
+                        if (column.book_id != undefined && column.book_id != null && column.book_id != "") {
+                            if (r.results[column.book_id] != undefined && r.results[column.book_id] != null && r.results[column.book_id]?.length > 0) {
+                                column.values = r.results[column.book_id];
+                            }
+                        }
+                    });
+                });
+            }
+        });
+    };
+
+
+    var addPopupButtons = function () {
+
+    };
+
+    var insersectPointInGraphics = function (pp) {
+        var point = turf.point([pp.latlng.lng, pp.latlng.lat]);
+        var draw_graphics = null;
+        if (localThis.options?.graphics) {
+            draw_graphics = localThis.options?.graphics.toGeoJSON();
+        }
+
+        var intersect_geom = false;
+        switch (draw_graphics.geometry.type) {
+            case "Polygon":
+                var polygon = turf.polygon(draw_graphics.geometry.coordinates);
+                intersect_geom = turf.booleanPointInPolygon(point, polygon);
+                break;
+            case "MultiPolygon":
+                var multiPolygon = turf.multiPolygon(draw_graphics.geometry.coordinates);
+                intersect_geom = turf.booleanPointInPolygon(point, polygon);
+
+                var polygons = turf.flatten(multiPolygon);
+                var count_intersect = 0;
+                polygons.features.forEach(function (polygon) {
+                    intersect_geom = turf.booleanPointInPolygon(point, polygon);
+                    if (intersect_geom) {
+                        count_intersect++;
+                    }                    
+                });
+
+                intersect_geom = count_intersect > 0;
+                break;
+            case "LineString":
+                var line = turf.lineString(draw_graphics.geometry.coordinates);
+                var bufferDistance = zoomToRadius(window.MAP.getZoom());
+                var buffered = turf.buffer(line, bufferDistance, { units: 'meters' });
+                intersect_geom = turf.booleanPointInPolygon(point, buffered);
+                break;
+            case "MultiLineString":
+                var lines = draw_graphics.geometry.coordinates;
+                intersect_geom = lines.some(line => {
+                    var lineGeo = turf.lineString(line);
+                    var bufferDistance = zoomToRadius(window.MAP.getZoom());
+                    var buffered = turf.buffer(lineGeo, bufferDistance, { units: 'meters' });
+                    return turf.booleanPointInPolygon(point, buffered);
+                });
+                break;
+            case "Point":
+                var check_point = turf.point(draw_graphics.geometry.coordinates);
+                intersect_geom = turf.booleanEqual(point, check_point);
+                break;
+            case "MultiPoint":
+                var multiPoint = turf.multiPoint(draw_graphics.geometry.coordinates);
+                intersect_geom = multiPoint.geometry.coordinates.some(function (coordinate) {
+                    var multiPoint = turf.point(coordinate);
+                    return turf.booleanEqual(point, multiPoint);
+                });
+                break;
+            case "Buffer":
+
+                break;
+            default:
+                break;
+        }
+
+        return intersect_geom;
+    };
+
+    var initialize = function () {
+        appendHeadStyle(loadCssUrl);
+
+        localThis.options.panel = window.mapModule01.infopanel;
+
+        $.when(loadEditCoordinates(), loadreplacingCoordinates(), loadTemplate()).done(function () {
+
+            submodules.EditCoordinates = new EditCoordinates(localThis);
+            submodules.GeoJsonEditor = new GeoJsonEditor(localThis);
+
+            var query = getModuleParams(localThis.id, "editor_settings");
+            query.done(function (r) {
+                if (r.success && r.results !== null) {
+                    localThis._params.editor_settings = JSON.parse(r.results.param_value);
+                    GetReferenceBooks();
+                }
+            });
+
+            window.clearActions.push(localThis.close);
+        });
+        
+        window.MAP.on('click', function (e) {
+            if (!localThis.active) return;
+            if (_type == "edit") {
+                if (localThis.auto_save) {
+                    console.log("click_editor");
+                    var intersect_geom = insersectPointInGraphics(e);
+                    console.log("intersect_geom", intersect_geom);
+                    if (!intersect_geom) {
+                        if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+                            window.mapModule01.MapClickAllowed = true;
+                            window.mapModule01.guessMapClickAllowedOverride();
+                        }
+                        _events.on_save(localThis.getFeature());
+                        tryRemoveGeometry(localThis.options?.graphics);
+                        window.mapModule01.infopanel.close();
+                        _type == "";
+                        localThis.active = false;
+                        localThis.auto_save = false;
+                    }                    
+                }
+            }
+            else {
+                console.log("not edit but " + _type);
+            }
+        });
+
+        window.MAP.on("editable:vertex:dragend", function (e) {
+            console.log("editable:vertex:dragend");
+            if (!localThis.active) return;
+            if (_type == "edit") {
+                var _f = JSON.parse(JSON.stringify(layerEditor.options.graphics.toGeoJSON()));
+                recalculateSegments(_f);
+                _history.add(_f.geometry.coordinates);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+            else {
+                console.log("not edit but " + _type);
+            }
+        });
+
+        window.MAP.on("editable:vertex:new", function (e) {
+            console.log("editable:vertex:new");
+            if (!localThis.active) return;
+            if (_type == "new") {
+                DoNothing();
+            }
+            else if (_type == "edit") {
+                var _f = JSON.parse(JSON.stringify(layerEditor.options.graphics.toGeoJSON()));
+                recalculateSegments(_f);
+                _history.add(_f.geometry.coordinates);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+        });
+
+        window.MAP.on("editable:vertex:deleted", function (e) {
+            console.log("editable:vertex:deleted");
+            if (!localThis.active) return;
+            if (_type == "edit") {
+                var _f = JSON.parse(JSON.stringify(layerEditor.options.graphics.toGeoJSON()));
+                _history.add(_f.geometry.coordinates);
+                recalculateSegments(_f);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+        });
+
+        window.MAP.on("editable:drawing:start", function (e) {
+            console.log("editable:drawing:start");
+            if (!localThis.active) return;
+            _stage = "vertex";
+            if (_type == "new") {
+                DoNothing();
+            }
+        });
+
+        window.MAP.on("editable:drawing:move", function (e) {
+            console.log("editable:drawing:move");
+            if (!localThis.active) return;
+            _stage = "vertex";
+            if (_type == "new") {
+                var f0 = e.layer.editor.feature.toGeoJSON();
+
+                if (f0.geometry.coordinates.length > 0) {
+                    var last_coords = [e.latlng.lng, e.latlng.lat];
+
+                    recalculateSegments(f0, last_coords);
+
+                    if (false) {
+                        L.geoJson(localThis.line_last_segment, {
+                            style: function (feature) {
+                                return {
+                                    color: "#ff0000",
+                                    weight: 0.6,
+                                    opacity: 0.8,
+                                    fillColor: "#ffffff",
+                                    fillOpacity: 0.5
+                                };
+                            },
+                            clickable: false,
+                            interactive: false,
+                            pane: "underLayers"
+                        }).addTo(window.MAP);
+                    }
+
+                    if (typeof _events.on_dragging == "function") {
+                        _events.on_dragging(localThis.line_total);
+                    }
+                }
+            }
+        });
+
+        window.MAP.on("editable:drawing:end", function (e) {
+            console.log("editable:drawing:end");
+            if (!localThis.active) return;
+            _stage = "vertex";
+            if (_type == "new") {
+                var _f = JSON.parse(JSON.stringify(e.layer.editor.feature.toGeoJSON()));
+                clearNewGraphics();
+                switch_new_editor(_f, true);
+                recalculateSegments(_f);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+            else if (_type == "edit") {
+                var _f = JSON.parse(JSON.stringify(e.layer.editor.feature.toGeoJSON()));
+                clearNewGraphics();
+                switch_new_editor(_f, true);
+                recalculateSegments(_f);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+
+            if (localThis.auto_save) {
+                if (window.mapModule01 && window.mapModule01.hasOwnProperty("MapClickAllowed")) {
+                    window.mapModule01.MapClickAllowed = true;
+                    window.mapModule01.guessMapClickAllowedOverride();
+                }
+                _events.on_save(localThis.getFeature());
+                tryRemoveGeometry(localThis.options?.graphics);
+                window.mapModule01.infopanel.close();
+            }
+        });
+
+        window.MAP.on("editable:drawing:cancel", function (e) {
+            console.log("editable:drawing:cancel");
+            if (!localThis.active) return;
+            clearNewGraphics();
+            if (typeof _events.on_cancel == "function") {
+                _events.on_cancel(e);
+            }
+        });
+
+        window.MAP.on("editable:drawing:commit", function (e) {
+            console.log("editable:drawing:commit");
+            if (!localThis.active) return;
+            DoNothing();
+        });
+    };
+
+    var init = function () {
+
+        localThis.timer_retries = 60;
+        localThis.timer_counter = 0;
+        localThis.timer = setInterval(function () {
+            localThis.timer_counter++;
+            if (window.mapInfoPopupModule?.initialized == true && window.mapInfoPopupModule.mapInfoPopup && window.MAP && window.mapModule01?.infopanel) {
+                var _cnt = localThis.timer_counter;
+                clearInterval(localThis.timer);
+                localThis.timer = null;
+                delete localThis.timer;
+                delete localThis.timer_retries;
+                delete localThis.timer_counter;
+                addPopupButtons();
+                initialize();
+                /*blinkmsg(gltxt("layer-editor initialized [" + _cnt + "]", 5000, "success"));*/
+                return;
+            }
+            if (localThis.timer_counter >= localThis.timer_retries) {
+                clearInterval(localThis.timer);
+                localThis.timer = null;
+                delete localThis.timer;
+                delete localThis.timer_retries;
+                delete localThis.timer_counter;
+            }
+        }, 1000);
+
+        
+    };
+
+    var init_old = function () {
+
+        appendHeadStyle(loadCssUrl);
+
+        $.when(loadEditCoordinates(), loadreplacingCoordinates(), loadTemplate()).done(function () {
+
+            submodules.EditCoordinates = new EditCoordinates(localThis);
+            submodules.GeoJsonEditor = new GeoJsonEditor(localThis);
+
+            var query = getModuleParams(localThis.id, "editor_settings");
+            query.done(function (r) {
+                if (r.success && r.results !== null) {
+                    localThis._params.editor_settings = JSON.parse(r.results.param_value);
+                    GetReferenceBooks();
+                }
+            });
+
+            window.clearActions.push(localThis.close);
+        });
+
+        localThis.timer_retries = 20;
+        localThis.timer_counter = 0;
+        localThis.timer = setInterval(function () {
+            localThis.timer_counter++;
+            if (window.mapInfoPopupModule?.initialized == true && window.mapInfoPopupModule.mapInfoPopup) {
+                clearInterval(localThis.timer);
+                localThis.timer = null;
+                delete localThis.timer;
+                delete localThis.timer_retries;
+                delete localThis.timer_counter;
+                addPopupButtons();
+            }
+            if (localThis.timer_counter >= localThis.timer_retries) {
+                clearInterval(localThis.timer);
+                localThis.timer = null;
+                delete localThis.timer;
+                delete localThis.timer_retries;
+                delete localThis.timer_counter;
+            }
+        }, 200);
+
+        window.MAP.on("editable:vertex:dragend", function (e) {
+            if (!localThis.active) return;
+            if (_type == "edit") {
+                var _f = JSON.parse(JSON.stringify(layerEditor.options.graphics.toGeoJSON()));
+                recalculateSegments(_f);
+                _history.add(_f.geometry.coordinates);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+            else {
+                console.log("not edit but " + _type);
+            }
+        });
+
+        window.MAP.on("editable:vertex:new", function (e) {
+            if (!localThis.active) return;
+            if (_type == "new") {
+                DoNothing();
+            }
+            else if (_type == "edit") {
+                var _f = JSON.parse(JSON.stringify(layerEditor.options.graphics.toGeoJSON()));
+                recalculateSegments(_f);
+                _history.add(_f.geometry.coordinates);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+        });
+
+        window.MAP.on("editable:vertex:deleted", function (e) {
+            if (!localThis.active) return;
+            if (_type == "edit") {
+                var _f = JSON.parse(JSON.stringify(layerEditor.options.graphics.toGeoJSON()));
+                _history.add(_f.geometry.coordinates);
+                recalculateSegments(_f);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+        });
+
+        window.MAP.on("editable:drawing:start", function (e) {
+            if (!localThis.active) return;
+            _stage = "vertex";
+            if (_type == "new") {
+                DoNothing();
+            }
+        });
+
+        window.MAP.on("editable:drawing:move", function (e) {
+            if (!localThis.active) return;
+            _stage = "vertex";
+            if (_type == "new") {
+                var f0 = e.layer.editor.feature.toGeoJSON();
+
+                if (f0.geometry.coordinates.length > 0) {
+                    var last_coords = [e.latlng.lng, e.latlng.lat];
+
+                    recalculateSegments(f0, last_coords);
+
+                    if (false) {
+                        L.geoJson(localThis.line_last_segment, {
+                            style: function (feature) {
+                                return {
+                                    color: "#ff0000",
+                                    weight: 0.6,
+                                    opacity: 0.8,
+                                    fillColor: "#ffffff",
+                                    fillOpacity: 0.5
+                                };
+                            },
+                            clickable: false,
+                            interactive: false,
+                            pane: "underLayers"
+                        }).addTo(window.MAP);
+                    }
+
+                    if (typeof _events.on_dragging == "function") {
+                        _events.on_dragging(localThis.line_total);
+                    }
+                }
+            }
+        });
+
+        window.MAP.on("editable:drawing:end", function (e) {
+            if (!localThis.active) return;
+            _stage = "vertex";
+            if (_type == "new") {
+                var _f = JSON.parse(JSON.stringify(e.layer.editor.feature.toGeoJSON()));
+                clearNewGraphics();
+                switch_new_editor(_f, true);
+                recalculateSegments(_f);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+            else if (_type == "edit") {
+                var _f = JSON.parse(JSON.stringify(e.layer.editor.feature.toGeoJSON()));
+                clearNewGraphics();
+                switch_new_editor(_f, true);
+                recalculateSegments(_f);
+                if (typeof _events.on_change == "function") {
+                    _events.on_change(_f);
+                }
+            }
+
+
+        });
+
+        window.MAP.on("editable:drawing:cancel", function (e) {
+            if (!localThis.active) return;
+            clearNewGraphics();
+            if (typeof _events.on_cancel == "function") {
+                _events.on_cancel(e);
+            }
+        });
+
+        window.MAP.on("editable:drawing:commit", function (e) {
+            if (!localThis.active) return;
+            DoNothing();
+        });
+    };
+
+    init();
+};
+
+window.layerEditor = new LayerEditor();

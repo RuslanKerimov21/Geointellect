@@ -1,0 +1,1035 @@
+var geoJsonPointToLayer = function (feature, latlng) {
+    //раскрашивание точек в GeoJSON слое
+    return L.marker(latlng, window.MapElementsStyle.defaultMarker);
+    //return L.marker(latlng, L.Draw.Marker.prototype.options);
+};
+
+var destinationVincenty = function (lonlat, brng, dist) {
+    /*Calculate destination point given start point lat/long (numeric degrees), bearing (numeric degrees) & distance (in m)*/
+    var u = L.Util;
+    var ct = u.VincentyConstants;
+    var a = ct.a, b = ct.b, f = ct.f;
+    var lon1 = lonlat.lng;
+    var lat1 = lonlat.lat;
+    var s = dist;
+    var pi = Math.PI;
+    var alpha1 = brng * pi / 180; /*converts brng degrees to radius*/
+    var sinAlpha1 = Math.sin(alpha1);
+    var cosAlpha1 = Math.cos(alpha1);
+    var tanU1 = (1 - f) * Math.tan(lat1 * pi / 180 /* converts lat1 degrees to radius */);
+    var cosU1 = 1 / Math.sqrt((1 + tanU1 * tanU1)), sinU1 = tanU1 * cosU1;
+    var sigma1 = Math.atan2(tanU1, cosAlpha1);
+    var sinAlpha = cosU1 * sinAlpha1;
+    var cosSqAlpha = 1 - sinAlpha * sinAlpha;
+    var uSq = cosSqAlpha * (a * a - b * b) / (b * b);
+    var A = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)));
+    var B = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
+    var sigma = s / (b * A), sigmaP = 2 * Math.PI;
+    var sinSigma, cosSigma, cos2SigmaM;
+    while (Math.abs(sigma - sigmaP) > 1e-12) {
+        cos2SigmaM = Math.cos(2 * sigma1 + sigma);
+        sinSigma = Math.sin(sigma);
+        cosSigma = Math.cos(sigma);
+        var deltaSigma = B * sinSigma * (cos2SigmaM + B / 4 * (cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM) -
+            B / 6 * cos2SigmaM * (-3 + 4 * sinSigma * sinSigma) * (-3 + 4 * cos2SigmaM * cos2SigmaM)));
+        sigmaP = sigma;
+        sigma = s / (b * A) + deltaSigma;
+    }
+    var tmp = sinU1 * sinSigma - cosU1 * cosSigma * cosAlpha1;
+    var lat2 = Math.atan2(sinU1 * cosSigma + cosU1 * sinSigma * cosAlpha1,
+        (1 - f) * Math.sqrt(sinAlpha * sinAlpha + tmp * tmp));
+    var lambda = Math.atan2(sinSigma * sinAlpha1, cosU1 * cosSigma - sinU1 * sinSigma * cosAlpha1);
+    var C = f / 16 * cosSqAlpha * (4 + f * (4 - 3 * cosSqAlpha));
+    var lam = lambda - (1 - C) * f * sinAlpha *
+        (sigma + C * sinSigma * (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM)));
+    var revAz = Math.atan2(sinAlpha, -tmp); /*final bearing*/
+    var lamFunc = lon1 + (lam * 180 / pi); /*converts lam radius to degrees*/
+    var lat2A = lat2 * 180 / pi; /*converts lat2a radius to degrees*/
+
+    return L.latLng(lamFunc, lat2A);
+};
+
+var createGeodesicPolygon = function (origin, radius, sides, rotation, projection) {
+    /*создаёт геодезический полигон*/
+    var latlon = origin; /*leaflet equivalent*/
+    var angle;
+    var newLonlat, geomPoint;
+    var points = [];
+    for (var i = 0; i < sides; i++) {
+        angle = (i * 360 / sides) + rotation;
+        newLonlat = destinationVincenty(latlon, angle, radius);
+        geomPoint = L.latLng(newLonlat.lng, newLonlat.lat);
+
+        points.push(geomPoint);
+    }
+    return points;
+};
+
+var getCircleFromPointAsPolygonLL = function (latLng, rad) {
+    /*круглый полигон вокруг точки*/
+    /*размер круга зависит от зума карты*/
+    if (typeof rad === "undefined") {
+        switch (window.MAP.getScaleZoom(1)) {
+            case 1:
+                rad = 504000;
+                break;
+            case 2:
+                rad = 248300;
+                break;
+            case 3:
+                rad = 130800;
+                break;
+            case 4:
+                rad = 71400;
+                break;
+            case 5:
+                rad = 35700;
+                break;
+            case 6:
+                rad = 19500;
+                break;
+            case 7:
+                rad = 9200;
+                break;
+            case 8:
+                rad = 4000;
+                break;
+            case 9:
+                rad = 1500;
+                break;
+            case 10:
+                rad = 800;
+                break;
+            case 11:
+                rad = 400;
+                break;
+            case 12:
+                rad = 200;
+                break;
+            case 13:
+                rad = 50;
+                break;
+            case 14:
+                rad = 40;
+                break;
+            case 15:
+                rad = 20;
+                break;
+            case 16:
+                rad = 10;
+                break;
+            case 17:
+                rad = 5;
+                break;
+            case 18:
+                rad = 2;
+                break;
+            default:
+                rad = 2;
+                break;
+        }
+    }
+    var origin = latLng;
+    var projection = L.CRS.EPSG4326;
+    var polys = createGeodesicPolygon(origin, rad, 60, 0, projection);
+    return new L.polygon(polys, window.MapElementsStyle.defaultPolygon);
+};
+
+var getCircleFromCircleAsPolygonLL = function (llObject) {
+    var origin;
+    if (typeof llObject.getLatLng === "function") {
+        origin = llObject.getLatLng();
+    } else {
+        origin = llObject.getLatLngs();
+    }
+    var rad = llObject.getRadius();
+    var projection = L.CRS.EPSG4326;
+    var polys = createGeodesicPolygon(origin, rad, 120, 0, projection);
+    return new L.polygon(polys, window.MapElementsStyle.defaultPolygon);
+};
+
+var calculateObjectPerimetr = function (llObject) {
+    var lineMarkers = llObject.getLatLngs();
+    var distance = 0;
+    for (var i = 1; i < lineMarkers.length; i++) {
+        var markerPrev = lineMarkers[i - 1];
+        var marker = lineMarkers[i];
+        distance += markerPrev.distanceTo(marker);
+    }
+    distance += lineMarkers[0].distanceTo(lineMarkers[lineMarkers.length - 1]);
+    return distance;
+};
+
+var calculateObjectArea = function (llObject) {
+    var area = L.GeometryUtil.geodesicArea(llObject.getLatLngs());
+    return area;
+};
+
+var calculateObjectLength = function (latlngs) {
+    
+    var analysisCoords;
+    if (typeof latlngs.getLatLngs !== "undefined") {
+        analysisCoords = latlngs.getLatLngs();
+    }
+    else {
+        analysisCoords = latlngs;
+    }
+    
+    var distance = 0;
+    var pointsCount = analysisCoords.length;
+
+    if (pointsCount === 1) {
+        if (analysisCoords[0].length > 2) {
+            analysisCoords = analysisCoords[0];
+            pointsCount = analysisCoords.length;
+        }
+    }
+
+    if (pointsCount > 2) {
+        for (var i = 1; i < pointsCount; i++) {
+            var latlngCur = analysisCoords[i];
+            var latlngPrev = analysisCoords[i - 1];
+            distance += latlngPrev.distanceTo(latlngCur);
+        }
+    }
+
+    return distance;
+};
+
+var calculateObjectLastSegmentLength = function (latlngs) {
+    if (latlngs.length < 2) return 0;
+    return calculateObjectLength([latlngs[latlngs.length - 2], latlngs[latlngs.length - 1]]);
+};
+
+//var getDefaultObjectInfoStr = function (llObject, typeObject) {
+//    /*todo:не понял почему это тут в утилитах*/
+//    if (typeObject === "polygon") {
+//        return " <span class='text-block'>" + gl.text.tool_area + ": <b>"
+//            + number_format(calculateObjectArea(llObject), 0, ',', ' ')
+//            + " м2</b></span> "
+//            + " <span class='text-block'>" + gl.text.tool_length + ": <b>"
+//            + number_format(calculateObjectPerimetr(llObject), 0, ',', ' ')
+//            + " м</b></span> ";
+//    } else if (typeObject === "polyline") {
+//        return " <span class='text-block'>" + gl.text.tool_segment + ": <b>"
+//            + number_format(calculateObjectLastSegmentLength(llObject.getLatLngs()), 0, ',', ' ')
+//            + " м</b></span> "
+//            + " <span class='text-block'>" + gl.text.tool_all_line + ": <b>"
+//            + number_format(calculateObjectLength(llObject.getLatLngs()), 0, ',', ' ')
+//            + " м</b></span> ";
+//    }
+//};
+
+var addCRSToGeoJSONGeometry = function (geom) {
+    geom["crs"] = { "type": "name", "properties": { "name": "EPSG:4326" } };
+    return geom;
+};
+
+var addCRSToGeoJSONGeometry3857 = function (geom) {
+    geom["crs"] = { "type": "name", "properties": { "name": "EPSG:3857" } };
+    return geom;
+};
+
+var geojsonToCql = function (aGeojson) {
+    if (typeof (aGeojson) === "undefined" || aGeojson === null) return null;
+    aGeojson = $.parseJSON(aGeojson);
+    var result = "";
+    result += aGeojson.type + "(";
+    for (var i = 0; i < aGeojson.coordinates.length; i++) {
+        var first = true;
+        result += "(";
+        for (var j = 0; j < aGeojson.coordinates[i].length; j++) {
+            if (first) {
+                first = false;
+            } else {
+                result += ", ";
+            }
+            var tmp = aGeojson.coordinates[i][j];
+            //                    result += transformPairCoordinatesTo4326(tmp[0], tmp[1]).join(" ");
+            result += tmp.join(" ");
+        }
+        result += ")";
+    }
+    result += ")";
+    return result;
+};
+
+var transformPairCoordinatesTo4326 = function (xlon, ylat) {
+    var source = 'EPSG:3857';
+    var target = 'EPSG:4326';
+    return proj4(source, target, [xlon, ylat]);
+};
+
+var transformPolygonTo4326 = function (geometry) {
+    var a, i, j, tmp, transformed;
+    var result = geometry;
+    if (result.Type === "Polygon") {
+        for (i = 0; i < result.coordinates.length; i++) {
+            for (j = 0; j < result.coordinates[i].length - 1; j++) {
+                tmp = result.coordinates[i][j];
+                transformed = transformPairCoordinatesTo4326(
+                    tmp[0],
+                    tmp[1]
+                );
+                tmp[0] = transformed[0];
+                tmp[1] = transformed[1];
+            }
+        }
+    }
+    else if (result.Type === "MultiPolygon") {
+        for (a = 0; a < result.coordinates.length; i++) {
+            for (i = 0; i < result.coordinates[a].length; i++) {
+                for (j = 0; j < result.coordinates[a][i].length - 1; j++) {
+                    tmp = result.coordinates[a][i][j];
+                    transformed = transformPairCoordinatesTo4326(
+                        tmp[0],
+                        tmp[1]
+                    );
+                    tmp[0] = transformed[0];
+                    tmp[1] = transformed[1];
+                }
+            }
+        }
+    }
+
+    return result;
+};
+
+var transformPolygonTo3857 = function (geometry) {
+    var a, i, j, tmp, transformed;
+    var result = geometry;
+    if (result.Type === "Polygon") {
+        for (i = 0; i < result.coordinates.length; i++) {
+            for (j = 0; j < result.coordinates[i].length - 1; j++) {
+                tmp = result.coordinates[i][j];
+                transformed = transformPairCoordinatesTo3857(
+                    tmp[0],
+                    tmp[1]
+                );
+                tmp[0] = transformed[0];
+                tmp[1] = transformed[1];
+            }
+        }
+    } else if (result.Type === "MultiPolygon") {
+        for (a = 0; a < result.coordinates.length; i++) {
+            for (i = 0; i < result.coordinates[a].length; i++) {
+                for (j = 0; j < result.coordinates[a][i].length - 1; j++) {
+                    tmp = result.coordinates[a][i][j];
+                    transformed = transformPairCoordinatesTo3857(
+                        tmp[0],
+                        tmp[1]
+                    );
+                    tmp[0] = transformed[0];
+                    tmp[1] = transformed[1];
+                }
+            }
+        }
+    }
+
+    return result;
+};
+
+var splitByZeroMeridian = function (geometry) {
+    if(geometry.type !== "Polygon" && geometry.type !== "MultiPolygon") return geometry;
+
+    var meridian = turf.polygon([[[179.999999, 90], [179.999999, -90], [180, -90], [180, 85], [179.999999, 90]]]);    
+    var feature = turf.difference(geometry, meridian);
+
+    return feature.geometry;
+}
+
+var transformPairCoordinatesTo3857 = function (xlon, ylat) {
+    var target = 'EPSG:3857';
+    var source = 'EPSG:4326';
+    return proj4(source, target, [xlon, ylat]);
+};
+
+var createPolygonFromBounds = function (latLngBounds) {
+    var center = latLngBounds.getCenter();
+    var latlngs = [];
+
+    latlngs.push(latLngBounds.getSouthWest());
+    latlngs.push({ lat: latLngBounds.getSouth(), lng: center.lng });
+    latlngs.push(latLngBounds.getSouthEast());
+    latlngs.push({ lat: center.lat, lng: latLngBounds.getEast() });
+    latlngs.push(latLngBounds.getNorthEast());
+    latlngs.push({ lat: latLngBounds.getNorth(), lng: center.lng });
+    latlngs.push(latLngBounds.getNorthWest());
+    latlngs.push({ lat: center.lat, lng: latLngBounds.getWest() });
+
+    return new L.polygon(latlngs);
+};
+
+var getPreparedGeoJson = function (llObject) {
+    if (typeof llObject === "undefined" || llObject === null) return null;
+    var aGeometry = llObject.toGeoJSON().geometry;
+
+    aGeometry = splitByZeroMeridian(aGeometry);
+
+    if (aGeometry.type === "Point") {
+        // aGeometry.coordinates = fixMeridianPoint(aGeometry.coordinates);
+        aGeometry.coordinates = transformPairCoordinatesTo3857(
+            aGeometry.coordinates[0],
+            aGeometry.coordinates[1]
+        );
+    } else {
+        for (var i = 0; i < aGeometry.coordinates.length; i++) {
+            for (var j = 0; j < aGeometry.coordinates[i].length - 1; j++) {
+                var tmp = aGeometry.coordinates[i][j];
+                var transformed = transformPairCoordinatesTo3857(
+                    tmp[0],
+                    tmp[1]
+                );
+                tmp[0] = transformed[0];
+                tmp[1] = transformed[1];
+            }
+        }
+    }
+
+    aGeometry = addCRSToGeoJSONGeometry3857(aGeometry);
+    return JSON.stringify(aGeometry);
+};
+
+var getPreparedGeoJsonAsObject = function (llObject) {
+    var i, j, k, tmp, transformed;
+
+    if (typeof llObject === "undefined" || llObject === null) return null;
+
+    var aGeometry;
+
+    if (typeof llObject.toGeoJSON == "function") {
+        if (llObject.toGeoJSON().type === "Feature") {
+            aGeometry = llObject.toGeoJSON().geometry;
+        } else if (llObject.toGeoJSON().type === "FeatureCollection") {
+            aGeometry = llObject.toGeoJSON().features[0].geometry;
+        } else {
+            return null;
+        }
+    }
+    else {
+        if (llObject.hasOwnProperty("type") && llObject.hasOwnProperty("coordinates")) {
+            aGeometry = llObject;
+        }
+    }
+    
+    aGeometry = splitByZeroMeridian(aGeometry);        
+    
+    if (aGeometry.type === "Point") {
+        // aGeometry.coordinates = fixMeridianPoint(aGeometry.coordinates);
+        aGeometry.coordinates = transformPairCoordinatesTo3857(
+            aGeometry.coordinates[0],
+            aGeometry.coordinates[1]
+        );
+    }
+    else if (aGeometry.type === "MultiPoint") {
+        var mpoint = aGeometry.coordinates;
+        for (i = 0; i < mpoint.length; i++) {
+            tmp = mpoint[i];
+            transformed = transformPairCoordinatesTo3857(
+                tmp[0],
+                tmp[1]
+            );
+            tmp[0] = transformed[0];
+            tmp[1] = transformed[1];
+        }
+    }
+    else if (aGeometry.type === "Polygon") {
+        var polygon = aGeometry.coordinates;
+        for (i = 0; i < polygon.length; i++) {
+            var line = polygon[i];
+            var offset = line.at(0) === line.at(-1) ? 1 : 0;
+            for (j = 0; j < line.length - offset; j++) {
+                tmp = line[j];
+                transformed = transformPairCoordinatesTo3857(
+                    tmp[0],
+                    tmp[1]
+                );
+                tmp[0] = transformed[0];
+                tmp[1] = transformed[1];
+            }
+        }
+    } else if (aGeometry.type === "MultiPolygon") {
+        var polygons = aGeometry.coordinates;
+        for (i = 0; i < polygons.length; i++) {
+            var polygon = polygons[i];
+            for (j = 0; j < polygon.length; j++) {
+                var line = polygon[j];
+                var offset = line.at(0) === line.at(-1) ? 1 : 0;
+                for (k = 0; k < line.length - offset; k++) {
+                    tmp = line[k];
+                    transformed = transformPairCoordinatesTo3857(
+                        tmp[0],
+                        tmp[1]
+                    );
+                    tmp[0] = transformed[0];
+                    tmp[1] = transformed[1];
+                }
+            }
+        }
+    }
+
+    aGeometry = addCRSToGeoJSONGeometry3857(aGeometry);
+
+    return aGeometry;
+};
+
+var getLlObjectFromGeoJson = function (geojson, transform) {
+    var a, i, j, tmp, transformed;
+    transform = (typeof transform === "undefined") ? true : transform;
+
+    if (typeof geojson === "undefined" || geojson === null) return null;
+    var aGeometry;
+    if (typeof geojson === "string") {
+        aGeometry = $.parseJSON(geojson);
+    } else if (typeof geojson === "object") {
+        aGeometry = geojson;
+    } else {
+        return null;
+    }
+
+    if (!aGeometry) return null;
+
+    aGeometry = splitByZeroMeridian(aGeometry);
+    
+    if (aGeometry.type === "Point") {
+        if (transform) {
+            aGeometry.coordinates = transformPairCoordinatesTo4326(
+                aGeometry.coordinates[0],
+                aGeometry.coordinates[1]
+            );
+        }
+        /*aGeometry = addCRSToGeoJSONGeometry(aGeometry);*/
+        return L.geoJson(aGeometry, {
+            pointToLayer: geoJsonPointToLayer
+        });
+    } else if (aGeometry.type === "Polygon") {
+        var polygon = aGeometry.coordinates;
+        for (i = 0; i < polygon.length; i++) {
+            var line = polygon[i];
+            var offset = line.at(0) === line.at(-1) ? 1 : 0;
+            for (j = 0; j < line.length - offset; j++) {
+                tmp = line[j];
+                transformed = transformPairCoordinatesTo4326(
+                    tmp[0],
+                    tmp[1]
+                );
+                tmp[0] = transformed[0];
+                tmp[1] = transformed[1];
+            }
+        }
+    } else if (aGeometry.type === "MultyPolygon") {
+        var polygons = aGeometry.coordinates;
+        for (a = 0; a < polygons.length; a++) {
+            var polygon = polygons[a];
+            for (i = 0; i < polygon.length; i++) {
+                var line = polygon[i];
+                var offset = line.at(0) === line.at(-1) ? 1 : 0;
+                for (j = 0; j < line.length - offset; j++) {
+                    tmp = line[j];
+                    transformed = transformPairCoordinatesTo4326(
+                        tmp[0],
+                        tmp[1]
+                    );
+                    tmp[0] = transformed[0];
+                    tmp[1] = transformed[1];
+                }
+            }
+        }
+    }
+
+    aGeometry = addCRSToGeoJSONGeometry(aGeometry);
+    
+    return L.geoJson(aGeometry);
+};
+
+var getLods = function () {
+    return [
+        { Zoom: 0, Scale: 591657527.591555, Resolution: 156543.03392800014 },
+        { Zoom: 1, Scale: 295828763.79577702, Resolution: 78271.516963999937 },
+        { Zoom: 2, Scale: 147914381.89788899, Resolution: 39135.758482000092 },
+        { Zoom: 3, Scale: 73957190.948944002, Resolution: 19567.879240999919 },
+        { Zoom: 4, Scale: 36978595.474472001, Resolution: 9783.9396204999593 },
+        { Zoom: 5, Scale: 18489297.737236001, Resolution: 4891.9698102499797 },
+        { Zoom: 6, Scale: 9244648.8686180003, Resolution: 2445.9849051249898 },
+        { Zoom: 7, Scale: 4622324.4343090001, Resolution: 1222.9924525624949 },
+        { Zoom: 8, Scale: 2311162.2171550002, Resolution: 611.49622628137968 },
+        { Zoom: 9, Scale: 1155581.108577, Resolution: 305.74811314055756 },
+        { Zoom: 10, Scale: 577790.55428899999, Resolution: 152.87405657041106 },
+        { Zoom: 11, Scale: 288895.27714399999, Resolution: 76.437028285073239 },
+        { Zoom: 12, Scale: 144447.638572, Resolution: 38.21851414253662 },
+        { Zoom: 13, Scale: 72223.819285999998, Resolution: 19.10925707126831 },
+        { Zoom: 14, Scale: 36111.909642999999, Resolution: 9.5546285356341549 },
+        { Zoom: 15, Scale: 18055.954822, Resolution: 4.7773142679493699 },
+        { Zoom: 16, Scale: 9027.9774109999998, Resolution: 2.3886571339746849 },
+        { Zoom: 17, Scale: 4513.9887049999998, Resolution: 1.1943285668550503 },
+        { Zoom: 18, Scale: 2256.994353, Resolution: 0.59716428355981721 },
+        { Zoom: 19, Scale: 1128.4971760000001, Resolution: 0.29858214164761665 },
+        { Zoom: 20, Scale: 564.248588, Resolution: 0.14929107082380833 },
+        { Zoom: 21, Scale: 282.124294, Resolution: 0.07464553541190416 },
+        { Zoom: 22, Scale: 141.062147, Resolution: 0.03732276770595208 },
+        { Zoom: 23, Scale: 70.5310735, Resolution: 0.01866138385297604 }
+    ];
+    
+};
+
+var getZoomInfo = function (zoomLevel) {
+    return getLods()[zoomLevel];
+};
+
+var getMapExtentAsPolygon = function (_map) {
+    if (typeof _map === "undefined" || _map === null || _map.hasOwnProperty("boxZoom") === false) {
+        return null;
+    }
+    if (_map.boxZoom._enabled === false) {
+        return null;
+    }
+    
+    var screenb = _map.getBounds();
+    var Xmin = screenb._southWest.lng;
+    var Ymin = screenb._southWest.lat;
+    var Xmax = screenb._northEast.lng;
+    var Ymax = screenb._northEast.lat;
+
+    return {
+        type: "Polygon",
+        coordinates: [[[Xmin, Ymin], [Xmin, Ymax], [Xmax, Ymax], [Xmax, Ymin], [Xmin, Ymin]]]
+    };
+
+};
+
+var getMapExtentAsMultiPolygon = function (_map) {
+    if (typeof _map === "undefined" || _map === null || _map.hasOwnProperty("boxZoom") === false) {
+        return null;
+    }
+    if (_map.boxZoom._enabled === false) {
+        return null;
+    }
+
+    var screenb = _map.getBounds();
+    var Xmin = screenb._southWest.lng;
+    var Ymin = screenb._southWest.lat;
+    var Xmax = screenb._northEast.lng;
+    var Ymax = screenb._northEast.lat;
+
+    return {
+        type: "MultiPolygon",
+        coordinates: [[[[Xmin, Ymin], [Xmin, Ymax], [Xmax, Ymax], [Xmax, Ymin], [Xmin, Ymin]]]]
+    };
+
+};
+
+var invertFeatureCoordinates = function (_feature) {
+    if (typeof _feature === "undefined" || _feature === null || _feature.type != "Feature") {
+        return null;
+    }
+    var geom;
+    switch (_feature.geometry.type) {
+        case "Polygon":
+            geom = turf.flip(turf.polygon(_feature.geometry.coordinates));
+            break;
+        case "MultiPolygon":
+            geom = turf.flip(turf.multiPolygon(_feature.geometry.coordinates));
+            break;
+        case "LineString":
+            geom = turf.flip(turf.lineString(_feature.geometry.coordinates));
+            break;
+        case "MultiLineString":
+            geom = turf.flip(turf.multiLineString(_feature.geometry.coordinates));
+            break;
+        default:
+            alert("not supported");
+            break;
+    }
+    return geom;
+};
+
+function polygonToLineGeometry(geometry) {
+    if (!geometry || !geometry.type) {
+        return false;
+    }
+
+    const type = geometry.type;
+    const coordinates = geometry.coordinates;
+
+    if (type === "Polygon") {
+        return {
+            type: "LineString",
+            coordinates: coordinates[0] 
+        };
+    } else if (type === "MultiPolygon") {
+        const lines = coordinates.map(polygon => polygon[0]);
+        return {
+            type: "MultiLineString",
+            coordinates: lines
+        };
+    } else {
+        return false;
+    }
+}
+function extractFullCircularOutline(multiPolygon) {
+    /* Проверка валидности входных данных */
+    if (!multiPolygon || multiPolygon.type !== "MultiPolygon" || !Array.isArray(multiPolygon.coordinates)) {
+        return null;
+    }
+
+    /* Проверка пересечения 180-го меридиана */
+    let minLon = Infinity;
+    let maxLon = -Infinity;
+
+    for (const polygon of multiPolygon.coordinates) {
+        for (const ring of polygon) {
+            for (const [lon] of ring) {
+                if (lon < minLon) minLon = lon;
+                if (lon > maxLon) maxLon = lon;
+            }
+        }
+    }
+
+    const crosses180 = (maxLon - minLon) > 180;
+
+    /* Если не пересекает 180, возвращаем первый внешний контур */
+    if (!crosses180) {
+        return {
+            type: "LineString",
+            coordinates: multiPolygon.coordinates[0][0]
+        };
+    }
+
+    /* Преобразование координат из 0..360 в -180..180 */
+    const toMinus180 = ([lon, lat]) => [(lon > 180 ? lon - 360 : lon), lat];
+    const to360 = ([lon, lat]) => [(lon < 0 ? lon + 360 : lon), lat];
+
+    /* Собираем все внешние кольца */
+    let allPoints = [];
+    for (const polygon of multiPolygon.coordinates) {
+        const ring = polygon[0];
+        allPoints.push(...ring.slice(0, -1)); /* Убираем замыкающую точку */
+    }
+
+    /* Преобразуем в -180..180 для вычислений */
+    const points180 = allPoints.map(toMinus180);
+
+    /* Вычисляем центр по долготе и широте */
+    const centerLat = points180.reduce((sum, [_, lat]) => sum + lat, 0) / points180.length;
+    const centerLon = points180.reduce((sum, [lon]) => sum + lon, 0) / points180.length;
+
+    /* Вычисляем углы для сортировки */
+    const pointsWithAngles = points180.map(([lon, lat]) => {
+        const dx = lon - centerLon;
+        const dy = lat - centerLat;
+        let angle = Math.atan2(dy, dx);
+        if (angle < 0) angle += 2 * Math.PI;
+        return { point: [lon, lat], angle };
+    });
+
+    /* Сортировка по углу против часовой стрелки */
+    pointsWithAngles.sort((a, b) => a.angle - b.angle);
+
+    /* Получение упорядоченных точек */
+    const sorted = pointsWithAngles.map(p => p.point);
+
+    /* Замыкаем контур */
+    sorted.push(sorted[0]);
+
+    /* Преобразуем обратно в 0..360 */
+    const sorted360 = sorted.map(to360);
+
+    /* Возвращаем как LineString */
+    return {
+        type: "LineString",
+        coordinates: sorted360
+    };
+}
+
+function extractUnifiedOutline(multiPolygon) {
+    if (!multiPolygon || multiPolygon.type !== "MultiPolygon" || !Array.isArray(multiPolygon.coordinates)) {
+        return null;
+    }
+
+    let allPoints = [];
+    for (const polygon of multiPolygon.coordinates) {
+        const ring = polygon[0];
+        allPoints.push(...ring.slice(0, -1)); 
+    }
+
+    const centerLat = allPoints.reduce((sum, [_, lat]) => sum + lat, 0) / allPoints.length;
+    const centerLon = allPoints.reduce((sum, [lon]) => sum + lon, 0) / allPoints.length;
+
+    const pointsWithAngles = allPoints.map(([lon, lat]) => {
+        const dx = lon - centerLon;
+        const dy = lat - centerLat;
+        let angle = Math.atan2(dy, dx);
+        if (angle < 0) angle += 2 * Math.PI;
+        return { point: [lon, lat], angle };
+    });
+
+    pointsWithAngles.sort((a, b) => a.angle - b.angle);
+
+    const sorted = pointsWithAngles.map(p => p.point);
+
+    sorted.push(sorted[0]);
+
+    return {
+        type: "LineString",
+        coordinates: sorted
+    };
+}
+
+function convertLongitudesTo360(geometry) {
+    return processGeometry(geometry, function (lon) {
+        return lon < 0 ? lon + 360 : lon;
+    });
+}
+
+function convertLongitudesTo180(geometry) {
+    return processGeometry(geometry, function (lon) {
+        return lon >= 180 ? lon - 360 : lon;
+    });
+}
+
+
+function convertLongitudesTo360Mercator(geometry) {
+    return processGeometry(geometry, function (lon) {
+        return lon < 0 ? lon + 20037508.342789244 * 2 : lon;
+    });
+}
+
+function convertLongitudesTo180Mercator(geometry) {
+    return processGeometry(geometry, function (lon) {
+        return lon >= 20037508.342789244 ? lon - 20037508.342789244 * 2 : lon;
+    });
+}
+
+
+function processGeometry(geometry, convertFn) {
+    if (!geometry || !geometry.type || !geometry.coordinates && geometry.type !== 'GeometryCollection') {
+        return geometry;
+    }
+
+    function deepMap(coords) {
+        if (typeof coords[0] === 'number') {
+            var converted = [convertFn(coords[0]), coords[1]];
+            for (var i = 2; i < coords.length; i++) {
+                converted.push(coords[i]);
+            }
+            return converted;
+        }
+
+        var result = [];
+        for (var i = 0; i < coords.length; i++) {
+            result.push(deepMap(coords[i]));
+        }
+        return result;
+    }
+
+    if (geometry.type === 'GeometryCollection') {
+        var newGeometries = [];
+        for (var j = 0; j < geometry.geometries.length; j++) {
+            newGeometries.push(processGeometry(geometry.geometries[j], convertFn));
+        }
+        return {
+            type: "GeometryCollection",
+            geometries: newGeometries
+        };
+    }
+
+    return {
+        type: geometry.type,
+        coordinates: deepMap(geometry.coordinates)
+    };
+}
+
+/**
+ * Проверяет, пересекает ли мультиполигон 180-й меридиан
+ * @param {Array} coords - массив coordinates из GeoJSON MultiPolygon
+ * @returns {boolean}
+ */
+function IsCrossing180Meridian(coords) {
+    let hasLeft = false;
+    let hasRight = false;
+
+    for (let i = 0; i < coords?.length; i++) {
+        const ring = coords[i][0];
+        let allNegative = true;
+        let allPositive = true;
+
+        for (let j = 0; j < ring.length; j++) {
+            const lon = ring[j][0];
+            if (lon > 0) allNegative = false;
+            if (lon < 0) allPositive = false;
+        }
+
+        if (allNegative) hasLeft = true;
+        if (allPositive) hasRight = true;
+
+        if (hasLeft && hasRight) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Вырезает полосу по 180 меридиану и сшивает пары полигонов
+ * @param {Array} coords - массив coordinates из GeoJSON MultiPolygon (в системе -180..180)
+ * @returns {Array} - новый массив coordinates
+ */
+/*function Cut180Meridian(coords) {
+    if (!IsCrossing180Meridian(coords)) {
+        console.log("❌ Мультиполигон не пересекает 180-й меридиан");
+        return coords;
+    }
+
+    console.log("✅ Мультиполигон пересекает 180-й меридиан");
+    console.log(`Найдено полигонов: ${coords.length}`);
+
+    const all = [];
+
+    for (let i = 0; i < coords.length; i++) {
+        const ring = coords[i][0];
+        const avgLat = ring.reduce((sum, p) => sum + p[1], 0) / ring.length;
+
+        let isLeft = true;
+        let isRight = true;
+
+        for (const [lon] of ring) {
+            if (lon > 0) isLeft = false;
+            if (lon < 0) isRight = false;
+        }
+
+        const side = isLeft ? "left" : isRight ? "right" : null;
+        if (!side) continue;
+
+        all.push({
+            index: i,
+            side,
+            avgLat,
+            ring: JSON.parse(JSON.stringify(ring)) // deep copy
+        });
+    }
+
+    // Группировка по широте (рядам)
+    all.sort((a, b) => b.avgLat - a.avgLat);
+    const rows = [];
+    const rowThreshold = 1;
+    for (const poly of all) {
+        let found = false;
+        for (const row of rows) {
+            if (Math.abs(row.avgLat - poly.avgLat) < rowThreshold) {
+                row.items.push(poly);
+                found = true;
+                break;
+            }
+        }
+        if (!found) rows.push({ avgLat: poly.avgLat, items: [poly] });
+    }
+
+    const clean = (ring) => {
+        if (ring.length < 3) return ring;
+        const lons = ring.map(([lon]) => lon);
+        const minLon = Math.min(...lons);
+        const maxLon = Math.max(...lons);
+        return ring.filter(([lon]) => lon !== minLon && lon !== maxLon);
+    };
+
+    const result = [];
+
+    rows.forEach((row, rIndex) => {
+        const left = row.items.find(p => p.side === "left");
+        const right = row.items.find(p => p.side === "right");
+
+        if (!left || !right) return;
+
+        const L = clean([...left.ring]);
+        const R = clean([...right.ring]).reverse();
+
+        const rightFirst = R[0];
+        const rightLast = R[R.length - 1];
+
+        const stitched = [...L, rightFirst, rightLast, ...R.slice(1), L[0]];
+        result.push([stitched]);
+
+        console.log(`🔹 Ряд ${rIndex + 1}:`);
+        console.log(`  Сшиваем: left [${left.index}] и right [${right.index}]`);
+        console.log(`  - left start: ${JSON.stringify(L[0])}`);
+        console.log(`  - left end:   ${JSON.stringify(L.at(-1))}`);
+        console.log(`  - right start: ${JSON.stringify(R[0])}`);
+        console.log(`  - right end:   ${JSON.stringify(R.at(-1))}`);
+        console.log(`  ➤ Всего точек в результате: ${stitched.length}`);
+    });
+
+    return result;
+}*/
+function Cut180Meridian(multiPolygon) {
+    if (multiPolygon.length === 0) return [];
+
+    // Group into rows
+    var sorted = multiPolygon.slice().sort(function (a, b) {
+        var minA = Math.min.apply(null, a.map(function (p) { return p[1]; }));
+        var minB = Math.min.apply(null, b.map(function (p) { return p[1]; }));
+        return minA - minB;
+    });
+
+    var rows = [];
+    var currentGroup = [sorted[0]];
+    var currentMax = Math.max.apply(null, sorted[0].map(function (p) { return p[1]; }));
+
+    for (var i = 1; i < sorted.length; i++) {
+        var poly = sorted[i];
+        var minL = Math.min.apply(null, poly.map(function (p) { return p[1]; }));
+        if (minL <= currentMax) {
+            currentGroup.push(poly);
+            currentMax = Math.max(currentMax, Math.max.apply(null, poly.map(function (p) { return p[1]; })));
+        } else {
+            rows.push(currentGroup);
+            currentGroup = [poly];
+            currentMax = Math.max.apply(null, poly.map(function (p) { return p[1]; }));
+        }
+    }
+    rows.push(currentGroup);
+
+    var resultMultiPolygon = [];
+
+    for (var j = 0; j < rows.length; j++) {
+        var row = rows[j];
+        var lefts = row.filter(function (poly) {
+            return poly.some(function (p) { return p[0] === 180; });
+        });
+        var rights = row.filter(function (poly) {
+            return poly.some(function (p) { return p[0] === -180; });
+        });
+        var others = row.filter(function (p) {
+            return lefts.indexOf(p) === -1 && rights.indexOf(p) === -1;
+        });
+
+        var cleanedOthers = others.map(function (poly) {
+            return poly.filter(function (p) { return p[0] !== 180 && p[0] !== -180; });
+        });
+
+        if (lefts.length === 1 && rights.length === 1) {
+            var left = lefts[0];
+            var right = rights[0];
+            var cleanedLeft = left.filter(function (p) { return p[0] !== 180 && p[0] !== -180; });
+            var cleanedRight = right.filter(function (p) { return p[0] !== 180 && p[0] !== -180; });
+
+            // Assume polygons are closed (last point equals first)
+            var leftPath = cleanedLeft.slice(0, -1);
+            var rightPathReversed = cleanedRight.slice(0, -1).reverse();
+            var newPolygon = leftPath.concat(rightPathReversed).concat([cleanedLeft[0]]);
+
+            resultMultiPolygon.push(newPolygon);
+        } else {
+            // If not exactly one left and one right, just add cleaned versions of all in the row
+            var cleanedLefts = lefts.map(function (poly) {
+                return poly.filter(function (p) { return p[0] !== 180 && p[0] !== -180; });
+            });
+            var cleanedRights = rights.map(function (poly) {
+                return poly.filter(function (p) { return p[0] !== 180 && p[0] !== -180; });
+            });
+            resultMultiPolygon = resultMultiPolygon.concat(cleanedLefts).concat(cleanedRights).concat(cleanedOthers);
+        }
+    }
+
+    return resultMultiPolygon;
+}

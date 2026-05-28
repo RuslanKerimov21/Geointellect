@@ -1,0 +1,2961 @@
+/*
+var toolicons = {
+    filter: $("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"  version=\"1.1\" baseProfile=\"full\" width=\"27\" height=\"27\" viewBox=\"0 0 27.00 27.00\" enable-background=\"new 0 0 27.00 27.00\" xml:space=\"preserve\"><path fill=\"#000000\" class=\"bg-main-contrast\"  fill-opacity=\"1\" stroke-linejoin=\"round\" d=\"M 3.70313,5.71875L 23.2969,5.71875L 16.2813,12.7266L 16.2812,18.9685L 10.7188,21.2812L 10.7188,12.7045L 3.70313,5.71875 Z \"/></svg>"),
+    favorite_on: $("<svg width=\"100%\" height=\"100%\" viewBox=\"0 0 27 27\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xml:space=\"preserve\" xmlns:serif=\"http://www.serif.com/\" style=\"fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;\"><g transform=\"matrix(0.396659,0,0,0.396659,2.81658,2.65595)\"><path d=\"M26.934,1.318l8.322,16.864l18.611,2.705l-13.467,13.126l3.179,18.536l-16.645,-8.751l-16.646,8.751l3.179,-18.536l-13.467,-13.126l18.611,-2.705l8.323,-16.864Z\" style=\"fill:#efdb4a;fill-rule:nonzero;\"/></g></svg>"),
+    favorite_off: $("<svg width=\"100%\" height=\"100%\" viewBox=\"0 0 27 27\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xml:space=\"preserve\" xmlns:serif=\"http://www.serif.com/\" style=\"fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;\"><g transform=\"matrix(0.396659,0,0,0.396659,2.81658,2.65595)\"><path d=\"M26.934,1.318l8.322,16.864l18.611,2.705l-13.467,13.126l3.179,18.536l-16.645,-8.751l-16.646,8.751l3.179,-18.536l-13.467,-13.126l18.611,-2.705l8.323,-16.864Z\" style=\"fill:#e6e6e6;fill-rule:nonzero;\"/></g></svg>"),
+    clearfilter: $("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" baseProfile=\"full\" width=\"27\" height=\"27\" viewBox=\"0 0 27.00 27.00\" enable-background=\"new 0 0 27.00 27.00\" xml:space=\"preserve\"><path fill=\"#000000\" class=\"bg-main-contrast\" fill-opacity=\"1\" stroke-linejoin=\"round\" d=\"M 3.70313,5.71875L 23.2969,5.71875L 16.2813,12.7266L 16.2812,18.9685L 10.7188,21.2812L 10.7188,12.7045L 3.70313,5.71875 Z \"/><ellipse fill=\"#FF0000\" fill-opacity=\"1\" stroke-linejoin=\"round\" cx=\"18\" cy=\"17.9375\" rx=\"4.25\" ry=\"4.25\"/><path fill=\"#4988C2\" fill-opacity=\"1\" stroke-linejoin=\"round\" d=\"M 15.5693,19.5285L 17.1603,17.9375L 15.5693,16.3465L 16.409,15.5068L 18,17.0978L 19.591,15.5068L 20.4307,16.3465L 18.8397,17.9375L 20.4307,19.5285L 19.591,20.3682L 18,18.7772L 16.409,20.3682L 15.5693,19.5285 Z \"/></svg>"),
+    layerinfo: $("<svg  xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" baseProfile=\"full\" width=\"27\" height=\"27\" viewBox=\"0 0 27.00 27.00\" enable-background=\"new 0 0 27.00 27.00\" xml:space=\"preserve\"><path fill=\"#000000\" class=\"bg-main-contrast\"  fill-opacity=\"1\" stroke-linejoin=\"round\" d=\"M 14.942,21.0307C 14.5567,21.1667 14.1087,21.2347 13.598,21.2347C 12.8113,21.2347 12.198,21.0413 11.7647,20.656C 11.3273,20.276 11.114,19.7867 11.114,19.1973L 11.1607,18.4947L 11.3167,17.6867L 12.13,14.8173L 12.3113,14.0413L 12.3847,13.364C 12.3847,13 12.3073,12.744 12.1553,12.5987C 12.0047,12.4533 11.718,12.3853 11.2913,12.3853L 10.6447,12.4787L 10.0833,12.6667L 10.2967,11.7867L 11.822,11.2293C 12.3073,11.072 12.7647,10.9947 13.198,10.9947C 13.978,10.9947 14.578,11.1867 14.9993,11.5627C 15.4207,11.9373 15.6353,12.4267 15.6353,13.0307L 15.5927,13.6867L 15.4313,14.552L 14.6247,17.4107L 14.442,18.1973L 14.3647,18.864C 14.3647,19.244 14.4527,19.5053 14.6193,19.64C 14.7913,19.7813 15.0833,19.848 15.5047,19.848L 16.1713,19.744L 16.7127,19.5627L 16.494,20.448L 14.942,21.0307 Z M 14.9887,9.36933C 14.4633,9.36933 14.0047,9.192 13.6247,8.844C 13.25,8.49467 13.0567,8.068 13.0567,7.568C 13.0567,7.072 13.25,6.64533 13.6247,6.29067C 14.0047,5.94267 14.4633,5.76534 14.9887,5.76534C 15.5207,5.76534 15.974,5.94267 16.354,6.29067C 16.7287,6.64533 16.9167,7.072 16.9167,7.568C 16.9167,8.068 16.7287,8.49467 16.354,8.844C 15.974,9.192 15.5207,9.36933 14.9887,9.36933 Z \"/></svg>"),
+    gear: $("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" baseProfile=\"full\" width=\"27\" height=\"27\" viewBox=\"0 0 27.00 27.00\" enable-background=\"new 0 0 27.00 27.00\" xml:space=\"preserve\"><path fill=\"#000000\" class=\"bg-main-contrast\" fill-opacity=\"1\" fill-rule=\"evenodd\" stroke-linejoin=\"round\" d=\"M 21.83,12.5439C 21.8034,12.3082 21.5287,12.1309 21.2912,12.1309C 20.523,12.1309 19.8413,11.6801 19.5553,10.9823C 19.2635,10.2677 19.4517,9.43468 20.0241,8.9096C 20.2044,8.74484 20.2263,8.46889 20.0752,8.27731C 19.682,7.77804 19.2352,7.32696 18.7473,6.93616C 18.5563,6.78301 18.2757,6.8043 18.1101,6.9877C 17.6106,7.54108 16.7129,7.74669 16.0193,7.45733C 15.2978,7.1537 14.8425,6.42239 14.8872,5.63742C 14.9018,5.39071 14.7215,5.17629 14.4758,5.14767C 13.8495,5.07515 13.2178,5.07305 12.5897,5.14276C 12.347,5.16958 12.1666,5.37886 12.1749,5.62253C 12.202,6.39985 11.7415,7.1183 11.0269,7.41102C 10.3416,7.69094 9.45035,7.48689 8.95178,6.93834C 8.78702,6.75767 8.51131,6.73545 8.31918,6.88532C 7.81687,7.27948 7.36002,7.73087 6.96314,8.22608C 6.80844,8.4186 6.83128,8.69759 7.01312,8.86297C 7.59667,9.39148 7.7849,10.2318 7.48182,10.9546C 7.19246,11.6438 6.47705,12.0877 5.65801,12.0877C 5.39212,12.0792 5.20295,12.2576 5.17371,12.4994C 5.09995,13.129 5.09909,13.7708 5.17005,14.4055C 5.19656,14.6422 5.47953,14.818 5.71984,14.818C 6.44991,14.7994 7.15043,15.2511 7.4447,15.9665C 7.73773,16.6811 7.54919,17.5139 6.97592,18.0396C 6.79651,18.2043 6.77366,18.4796 6.92509,18.671C 7.31433,19.1671 7.76143,19.6185 8.25095,20.0127C 8.44308,20.1674 8.72238,20.1458 8.88901,19.9621C 9.3907,19.4075 10.288,19.2022 10.9788,19.4921C 11.7025,19.7949 12.1575,20.5262 12.1131,21.3114C 12.0984,21.5581 12.2794,21.7732 12.5242,21.8012C 12.8447,21.8387 13.1669,21.8572 13.4901,21.8572C 13.7968,21.8572 14.1035,21.8405 14.4103,21.8064C 14.6533,21.7796 14.8334,21.57 14.8251,21.3263C 14.7971,20.5493 15.2585,19.8309 15.9722,19.5387C 16.6621,19.257 17.5493,19.4632 18.0482,20.0108C 18.2139,20.1912 18.4878,20.2131 18.6808,20.0638C 19.1822,19.6706 19.6382,19.2195 20.0369,18.7231C 20.1916,18.5309 20.1697,18.2516 19.9869,18.0859C 19.4033,17.5577 19.2142,16.717 19.5172,15.9949C 19.802,15.3151 20.491,14.8585 21.232,14.8585L 21.3356,14.8612C 21.5762,14.8807 21.7974,14.6955 21.8263,14.45C 21.9003,13.8198 21.9012,13.1787 21.83,12.5439 Z M 13.5133,16.2885C 11.9714,16.2885 10.7174,15.0342 10.7174,13.4924C 10.7174,11.9506 11.9714,10.6963 13.5133,10.6963C 15.0553,10.6963 16.3093,11.9506 16.3093,13.4924C 16.3093,15.0342 15.0553,16.2885 13.5133,16.2885 Z \"/></svg>"),
+    user: $("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" baseProfile=\"full\" width=\"27\" height=\"27\" viewBox=\"0 0 27.00 27.00\" enable-background=\"new 0 0 27.00 27.00\" xml:space=\"preserve\"><path fill=\"#000000\" class=\"bg-main-contrast\" fill-opacity=\"1\" fill-rule=\"evenodd\" stroke-linejoin=\"round\" d=\"M 13.5007,12.9736C 11.3297,12.9736 9.56963,10.836 9.56963,8.19888C 9.56963,5.56199 10.1474,3.4242 13.5007,3.4242C 16.8537,3.4242 17.4317,5.56199 17.4317,8.19888C 17.4317,10.836 15.6714,12.9736 13.5007,12.9736 Z M 20.9168,20.0713L 20.925,20.3897L 20.9247,20.7465C 20.9247,20.7465 19.8318,22.95 13.5007,22.95C 7.16921,22.95 6.07639,20.7465 6.07639,20.7465L 6.07584,20.2638L 6.08699,19.922C 6.17061,15.4492 6.80722,14.1596 11.3479,13.3399C 11.3479,13.3399 11.9943,14.1634 13.5007,14.1634C 15.0068,14.1634 15.6532,13.3399 15.6532,13.3399C 20.244,14.1685 20.8441,15.4775 20.9168,20.0713 Z \"/></svg>")
+};
+*/
+
+var svg_square =
+    '<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-miterlimit:2;"><g><rect x="2" y="2" width="12" height="12" style="fill:#FFFFFF;stroke:#FF0000;stroke-width:1px;"/></g></svg>';
+var svg_circle =
+    '<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;"><g transform="matrix(1,0,0,1,-16,0)"><circle cx="24" cy="8" r="6" style="fill:#FFFFFF;fill-opacity:1.0;stroke:#FF0000;stroke-opacity:1.0;stroke-width:1px;"/></g></svg>';
+var svg_poly =
+    '<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;"><path d="M14,2L14,14L7.175,14L2,8.943L2,2L14,2Z" style="fill:#FFFFFF;fill-opacity:1.0;stroke:#FF0000;stroke-opacity:1.0;stroke-width:1px;"/></svg>';
+var svg_line =
+    '<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;"><g transform="matrix(1,0,0,1,0,-16)"><path d="M14,24L11,21L5,27L2,24" style="fill:none;fill-opacity:1.0;stroke:#FF0000;stroke-opacity:1.0;stroke-width:1px;"/></g></svg>';
+
+var LayerListPanel = function () {
+    var localThis = this;
+    var id = "layer-list-panel";
+
+    var loadCssUrl = "/resources/funcparts/" + id + "/styles/style.css";
+    var loadCssUrlsecondary =
+        "/resources/styles/funcparts/list-layers/list-layers.css";
+
+    this.layersWindow = null;
+
+    this.filter_key = "G_layer_filter";
+    this.legend_key = "G_layer_legend";
+    this.opacity_key = "G_layer_opacity";
+
+    this.layerCityStorage = null;
+
+    this.tagspanel = null;
+    this.tags = [];
+    this.panelvisible = false;
+    this.isDocked = true;
+    this.layerList = [];
+    this.userLayerList = [];
+    this.selectedLayers = [];
+    this.layerGroups = [];
+    this.enabledLayersTag = [];
+    this.groups = [];
+    this.folders =
+        []; /* В этот массив положим папку(группу) с вложен слоями (легкий объект) */
+    this.loaded = false;
+    this.commonActions = {};
+    this.topPanelButton = null;
+    this.btnOffLayers = null;
+    this.contextMenu = null;
+    this.afterInit = [];
+    this.afterSelectionChanged = [];
+    this.dublicatesLayer = [];
+    this.template_dynamicLayer = null;
+    this.template_userLayer = null;
+    this.template_layerGroup = null;
+
+    var _initial_params = {
+        selected: [],
+        filters: [],
+        favorites: [],
+    };
+    var _timers = {};
+
+    /*Создадим глобальный state */
+    this.globalStore = zustand.createStore(
+        zustand.subscribeWithSelector((set, get) => ({
+            options: {},
+            dublicatesLayers: [],
+            idLayerActive: null,
+
+            getOptions: (layerId) => get().options[layerId],
+
+            setOptions: (layerId, newLayerOptions) =>
+                set((state) => {
+                    if (!state.options[layerId]) {
+                        return {
+                            ...state,
+                            options: {
+                                ...state.options,
+                                [layerId]: {
+                                    id: layerId,
+                                    options: newLayerOptions,
+                                },
+                            },
+                        };
+                    }
+
+                    return {
+                        ...state,
+                        options: {
+                            ...state.options,
+                            [layerId]: {
+                                id: layerId,
+                                options: {
+                                    ...state.options[layerId].options,
+                                    ...newLayerOptions,
+                                },
+                            },
+                        },
+                    };
+                }),
+
+            setAllOptions: (newOptions) =>
+                set((state) => ({
+                    ...state,
+                    options: newOptions,
+                })),
+
+            /**
+             * @deprecated
+             */
+            getOptionsList: () => get((state) => Object.values(state.options)),
+
+            /**
+             * @deprecated
+             */
+            addOptions: (params) => {
+                const { id: layerId, options: newLayerOptions } = params;
+
+                get().setOptions(layerId, newLayerOptions);
+            },
+
+            /**
+             * @deprecated
+             */
+            updateOptions: (layerId, newLayerOptions) => {
+                get().setOptions(layerId, newLayerOptions);
+            },
+
+            // addOptions: function (params) {
+            //     const { id: layerId, options: newOptions } = params;
+
+            //     localThis.globalStore.set(function (state) {
+            //         return {
+            //             ...state,
+            //             options: {
+            //                 [layerId]: {
+            //                     id: layerId,
+            //                     options: newOptions,
+            //                 }
+            //             }
+            //         };
+            //     });
+
+            //     console.log("add options", layerId, localThis.globalStore.get().options)
+            // },
+            // updateOptions: function (layerId, newOptions) {
+            //     localThis.globalStore.set(function (state) {
+            //         const itemToUpdate = state.options[layerId];
+
+            //         if (!state.idLayerActive) {
+            //             previousStateByLayer = itemToUpdate;
+            //         }
+
+            //         if (!itemToUpdate) return state;
+
+            //         const updatedItem = {
+            //             ...itemToUpdate,
+            //             options: {
+            //                 ...itemToUpdate.options,
+            //                 ...newOptions
+            //             }
+            //         };
+
+            //         return {
+            //             ...state,
+            //             options: {
+            //                 ...state.options,
+            //                 [layerId]: {
+            //                     id: layerId,
+            //                     options: {
+            //                         ...state.options[layerId].options,
+            //                         ...newOptions,
+            //                     }
+            //                 }
+            //             }
+            //         };
+            //     });
+
+            //     console.log("update options", layerId, localThis.globalStore.get().options)
+            // },
+            // // setOptions: function (newOptions) {
+            // //     localThis.globalStore.set(function (state) {
+            // //         return {
+            // //             ...state,
+            // //             options: newOptions,
+            // //         }
+            // //     })
+            // // },
+            // getOptions: function (layerId) {
+            //     const options = get().options;
+
+            //     console.log("get options", layerId, localThis.globalStore.get().options, options[layerId])
+
+            //     return options[layerId];
+            // },
+            // // getOptionsList: function () {
+            // //     return Object.values(get().options);
+            // // },
+        })),
+    );
+
+    let layerListViewObject = {
+        icons: ["gr-list-9", "gr-list-3"],
+        view: null,
+        groups: [] /*name group [ids layers] */,
+        layers: [] /*ids layers */,
+    };
+
+    /*Класс, который будет управлять объектом layerListViewObject*/
+    function LayerListView() {
+        let self = this;
+        const hiddenLayers = []; /* Удаленные слои */
+        const listLayersDIV = localThis.layersWindow[0].querySelector(
+            ".layer-list .scroll-container",
+        );
+        let loader = null;
+
+        self.renderButton = function (_type, _button) {
+            let button = null;
+            let typeIcon =
+                _type === "list"
+                    ? layerListViewObject.icons[0]
+                    : layerListViewObject.icons[1];
+            let typeName =
+                _type === "list" ? _button?.title_folder : _button?.title_list;
+
+            button = document.createElement("div");
+
+            button.classList.add("icon-item", "button-view-type", typeIcon);
+
+            if (_button.type === "context-menu") {
+                button.classList.add("context-menu-item");
+                button.innerHTML = typeName;
+            }
+
+            if (_button.type === "header-button") {
+                button.classList.add("header-button");
+            }
+
+            button.setAttribute("title", typeName);
+            button.addEventListener("click", toggleView);
+            return button;
+        };
+
+        self.addButtonToContextMenu = function () {
+            const _contextMenu = localThis.contextMenu[0];
+            const button = self.renderButton(layerListViewObject.view, {
+                type: "context-menu",
+                title_folder: gltxt("show_as_folders"),
+                title_list: gltxt("show_as_list"),
+            });
+
+            _contextMenu.querySelector(".button-view-type")?.remove();
+            _contextMenu?.append(button);
+        };
+
+        self.addButtonToHeaderPanel = function () {
+            const _header =
+                localThis.layersWindow[0].querySelector(".layer-list-header");
+            const button = self.renderButton(layerListViewObject.view, {
+                type: "header-button",
+                title_folder: gltxt("show_as_folders"),
+                title_list: gltxt("show_as_list"),
+            });
+
+            _header.querySelector(".button-view-type")?.remove();
+            _header?.append(button);
+        };
+
+        self.setType = function (_type) {
+            loader = new Loading(listLayersDIV);
+            loader.init();
+            loader.showLoader();
+            loader.createPelina(listLayersDIV);
+            self.addButtonToContextMenu();
+            self.addButtonToHeaderPanel();
+            listLayersDIV.setAttribute("data-view", _type);
+            updateViewHandler();
+        };
+
+        self.setGroups = function (_group) {
+            layerListViewObject.groups.push(_group);
+        };
+
+        self.getGroups = function () {
+            return layerListViewObject.groups;
+        };
+
+        let removeAllLayersAndGroups = function () {
+            const scrollContainer = localThis?.layersWindow[0]?.querySelector(
+                ".layer-list .scroll-container",
+            );
+            if (!scrollContainer) return;
+
+            const elements = Array.from(scrollContainer.children);
+
+            elements.forEach((item) => {
+                const isGroup = item.classList.contains("layer-item-group");
+                const isItem = item.classList.contains("layer-item");
+                const isUserLayer =
+                    item.getAttribute("data-type") === "user-layer-group";
+
+                if ((isGroup || isItem) && !isUserLayer) {
+                    item.remove();
+                } /*удалим все,кроме юзер папки*/
+
+                if (isItem) {
+                    hiddenLayers.push(item);
+                } /* Сохр. только layer-item  */
+            });
+        };
+        function toggleView() {
+            if (layerListViewObject.view === "list") {
+                layerListViewObject.view = "folders";
+                self.setType("folders");
+            } else {
+                layerListViewObject.view = "list";
+                self.setType("list");
+            }
+            localThis.hideContextMenu();
+        }
+
+        function restoreHiddenLayers() {
+            const scrollContainer = localThis?.layersWindow[0]?.querySelector(
+                ".layer-list .scroll-container",
+            );
+            if (!scrollContainer || hiddenLayers.length === 0) return;
+
+            hiddenLayers.forEach((layerItem) => {
+                scrollContainer.appendChild(layerItem);
+            });
+
+            hiddenLayers.length = 0;
+        }
+
+        let updateViewHandler = function () {
+            if (self.currentModeHandler) {
+                self.currentModeHandler.destroy();
+            }
+
+            removeAllLayersAndGroups();
+
+            switch (layerListViewObject.view) {
+                case "list":
+                    loader.removeLoader();
+                    loader.removePelina();
+                    restoreHiddenLayers();
+                    console.log(
+                        "applyLayerListFilter call from updateViewHandler",
+                    );
+                    localThis.applyLayerListFilter();
+
+                    break;
+                case "folders":
+                    let layersCache = new Map();
+
+                    localThis.dublicatesLayer = [];
+                    localThis.layerGroups = [];
+
+                    let resolveCycle;
+                    const cyclePromise = new Promise((resolve) => {
+                        resolveCycle = resolve;
+                    });
+
+                    self.getGroups().forEach((_group) => {
+                        let groupInst = new LayerGroup(
+                            _group.name,
+                            localThis,
+                            false,
+                            "layer-group",
+                        );
+                        localThis.layerGroups.push(groupInst);
+
+                        for (const [
+                            index,
+                            layer,
+                        ] of _group.layers_tag.entries()) {
+                            let object;
+
+                            if (layersCache.has(layer)) {
+                                let opts = localThis.globalStore
+                                    .getState()
+                                    .getOptions(layer).options;
+
+                                let layerDubl = new LayerElementContollers(
+                                    opts,
+                                    false,
+                                    null,
+                                );
+                                groupInst.setGroupIDToLayer(layerDubl);
+                                groupInst._addLayer(layerDubl.getParts().self);
+                                localThis.dublicatesLayer.push({
+                                    id: layer,
+                                    object: layerDubl,
+                                });
+                                groupInst.idsLayers.push(opts.id);
+                            } else {
+                                object = localThis.findLayerById(layer);
+                                layersCache.set(layer, {
+                                    id: object.opts.id,
+                                });
+
+                                groupInst._addLayer(object.getHtmlElement());
+                                groupInst.setGroupIDToLayer(
+                                    object.elementLayer,
+                                );
+                                groupInst.idsLayers.push(object.opts.id);
+                            }
+                        }
+                        groupInst.checkVisibleLayers();
+                        groupInst.group_visibility();
+                    });
+                    resolveCycle();
+                    cyclePromise.then(() => {
+                        setTimeout(function () {
+                            console.log(
+                                "applyLayerListFilter call from cyclePromise",
+                            );
+                            localThis.applyLayerListFilter();
+                            loader.removeLoader();
+                            loader.removePelina();
+                        }, 100);
+                    });
+
+                    break;
+                default:
+            }
+        };
+
+        let init = function () {
+            layerListViewObject.view = "list";
+            self.setType("list");
+        };
+
+        init();
+    }
+
+    var appendMainButton = function () {
+        localThis.topPanelButton = window.ToolPanelModule.getNewPanelButton({
+            id: "layerListPanelRibon",
+            type: "context-menu-btn",
+            float: "left-group",
+            order: 101,
+            priority: true,
+            title: gltxt("geodata"),
+            class: "gr-layers btn-image-color",
+            onClick: function () {
+                localThis.show();
+            },
+        });
+
+        localThis.topPanelButton.addToTopPanel();
+
+        if (window.detectMobile() == "mobile") {
+            mobileParts.renderMainButton();
+            mobileParts.renderClearAllLayersButton();
+            mobileParts.renderOffOnGroupsLayersButton();
+        }
+
+        localThis.btnOffLayers = window.ToolPanelModule.getNewPanelButton({
+            title: window.gl.text.menu_turnoff_all,
+            class: "gr-layers-off rightRibbonButton btn-image-color",
+            onClick: function () {
+                localThis.commonActions["disable-all-layers"]();
+                localThis.btnOffLayers.off();
+            },
+            order: 100,
+            type: "small",
+            float: "rightPanelBottom",
+            mapContainer: "mapPanel",
+        });
+
+        localThis.btnOffLayers.addToTopPanel();
+    };
+
+    this.toggleGroupsVisibility = function () {
+        let groups = localThis.layersWindow[0].querySelectorAll(
+            ".layer-item-group[data-type=layer-group]",
+        );
+        if (groups.length === 0) {
+            return;
+        }
+        groups.forEach((_group) => {
+            let layers = _group.querySelectorAll(
+                ".group-layer-list .layer-item[data-visible=true]",
+            );
+
+            let count = _group.querySelector(".top-panel .badge");
+            count.innerHTML = layers.length;
+
+            layers.length === 0
+                ? _group.setAttribute("data-visible", false)
+                : _group.setAttribute("data-visible", true);
+        });
+    };
+
+    var applyTagsVisibility = function () {
+        var searchval = localThis.layersWindow
+            .find("input.layer-list-header-search")
+            .val();
+        localThis.layerList.forEach(function (o) {
+            var lyrshow = false;
+
+            if (trim11(searchval.toLowerCase()) === "") {
+                lyrshow = true;
+            } else {
+                if (
+                    o.name
+                        .toLowerCase()
+                        .indexOf(trim11(searchval.toLowerCase())) !== -1
+                ) {
+                    lyrshow = true;
+                }
+            }
+
+            var tg = localThis.tagspanel.findTag(o.tag);
+            if (lyrshow) {
+                tg.on();
+            }
+        });
+    };
+
+    this.applyLayerListFilter = function () {
+        const start = performance.now();
+        const searchString = localThis.layersWindow
+            .find("input.layer-list-header-search")
+            .val();
+        const options = localThis.globalStore.getState().options;
+        const newOptions = {};
+
+        for (const layerObject of localThis.layerList) {
+            /*тут добавляем все правила фильтрации*/
+            var isTagEnabled = false;
+            var isInSearchResult = false;
+            var hasSelectedTerra = false;
+            var hasAttribute = false;
+
+            /*правило для tags*/
+            if (
+                localThis.tagspanel
+                    .selectedTagNames()
+                    .indexOf(layerObject.tag) !== -1
+            ) {
+                isTagEnabled = true;
+            }
+
+            /* выставляем флаг, если выбран город и этот город есть в слое */
+            if (window.mapModule01.currentCity !== null) {
+                if (typeof layerObject.checkLayerHasTerra == "function") {
+                    if (
+                        layerObject.checkLayerHasTerra(
+                            window.mapModule01.currentCity.Id,
+                        )
+                    ) {
+                        hasSelectedTerra = true;
+                    }
+                } else {
+                    hasSelectedTerra = true;
+                }
+            }
+
+            /*правило для searchstring*/
+            if (trim11(searchString?.toLowerCase()) === "") {
+                isInSearchResult = true;
+            } else {
+                if (
+                    layerObject.name
+                        .toLowerCase()
+                        .indexOf(trim11(searchString?.toLowerCase())) !== -1
+                ) {
+                    isInSearchResult = true;
+                }
+            }
+
+            if (typeof layerObject.checkAttribute === "function") {
+                hasAttribute = layerObject.checkAttribute(searchString);
+            }
+
+            /*а дальше собственно применяем сам фильтр*/
+            if (
+                (isTagEnabled && isInSearchResult && hasSelectedTerra) ||
+                (isTagEnabled && hasAttribute && hasSelectedTerra)
+            ) {
+                // localThis.globalStore.getState().updateOptions(layerObject.opts.id, { visible: true });
+                newOptions[layerObject.opts.id] = {
+                    id: layerObject.opts.id,
+                    options: {
+                        ...(options[layerObject.opts.id].options ?? {}),
+                        visible: true,
+                    },
+                };
+            } else {
+                // localThis.globalStore.getState().updateOptions(layerObject.opts.id, { visible: false });
+                newOptions[layerObject.opts.id] = {
+                    id: layerObject.opts.id,
+                    options: {
+                        ...(options[layerObject.opts.id].options ?? {}),
+                        visible: false,
+                    },
+                };
+            }
+        }
+
+        localThis.globalStore.getState().setAllOptions(newOptions);
+
+        localThis.folders.forEach((_folder) => {
+            _folder.checkFolder();
+        });
+        localThis.toggleGroupsVisibility();
+        console.log(
+            "applyLayerListFilter call took %dms",
+            performance.now() - start,
+        );
+    };
+
+    var bindEvents = function () {
+        /*клик по любой кнопке в шапке*/
+        localThis.layersWindow.on(
+            "click",
+            "div.layer-list-header .header-button",
+            function () {
+                var actionName = $(this).attr("data-action");
+                if (localThis.commonActions.hasOwnProperty(actionName)) {
+                    localThis.commonActions[actionName]($(this));
+                }
+            },
+        );
+
+        localThis.layersWindow.on(
+            "click",
+            "div.layer-list-header .layer-list-header-search .clear-search-query",
+            function () {
+                var actionName = $(this).attr("data-action");
+                if (localThis.commonActions.hasOwnProperty(actionName)) {
+                    localThis.commonActions[actionName]($(this));
+                }
+            },
+        );
+
+        localThis.layersWindow.on("click", ".layer-list", function () {
+            localThis.hideContextMenu();
+            localThis.tagspanel.layerTypesCollapse();
+        });
+
+        localThis.layersWindow.on("click", ".layer-list-header", function (e) {
+            if (e.target.className.indexOf("header-button") === -1) {
+                localThis.hideContextMenu();
+            }
+            localThis.tagspanel.layerTypesCollapse();
+        });
+
+        localThis.contextMenu.on("click", "div.context-menu-item", function () {
+            var actionName = $(this).attr("data-action");
+            if (localThis.commonActions.hasOwnProperty(actionName))
+                localThis.commonActions[actionName]($(this));
+            localThis.hideContextMenu();
+        });
+
+        /*ввод или любое изменение текста в фильтре слоёв*/
+        localThis.layersWindow.on(
+            "change  keyup",
+            "div.layer-list-header input.layer-list-header-search",
+            function (e) {
+                localThis.hideContextMenu();
+                if (e.which === 13) {
+                    applyTagsVisibility();
+                    console.log(
+                        "applyLayerListFilter call from layersWindow header-search onchange onkeyup",
+                    );
+                    localThis.applyLayerListFilter();
+                    return true;
+                } else {
+                    return false;
+                }
+            },
+        );
+        localThis.showHideBtnContextMenu = function () {
+            var btnHead = localThis.layersWindow.find(
+                "[data-action=context-menu]",
+            );
+            localThis.contextMenu.children().length > 0
+                ? btnHead.show()
+                : btnHead.hide();
+        };
+
+        localThis.hideContextMenu = function () {
+            localThis.contextMenu.attr("data-state", "closed");
+            setTimeout(function () {
+                localThis.contextMenu.css({ display: "none" });
+            }, 200);
+        };
+
+        localThis.showContextMenu = function () {
+            localThis.contextMenu.css({ display: "block" });
+            localThis.contextMenu.attr("data-state", "opened");
+            localThis.tagspanel.layerTypesCollapse();
+        };
+
+        /*add action*/
+        /*закрытие окна*/
+        localThis.commonActions["close-window"] = function () {
+            localThis.hide();
+            localThis.hideContextMenu();
+        };
+
+        /*Открепить/Закрепить окно слои*/
+        localThis.commonActions["toogle-window"] = function () {
+            var btn = localThis.layersWindow.find(
+                '[data-action="toogle-window"]',
+            );
+            if (localThis.isDocked) {
+                btn.removeClass("gr-undock");
+                btn.addClass("gr-dock");
+                btn.attr("title", gltxt("menu_dock"));
+                localThis.commonActions["undock-window"]();
+            } else {
+                btn.addClass("gr-undock");
+                btn.removeClass("gr-dock");
+                btn.attr("title", gltxt("menu_undock"));
+                localThis.commonActions["dock-window"]();
+            }
+        };
+
+        /*Закрепить окно слои*/
+        localThis.commonActions["dock-window"] = function () {
+            localThis.layersWindow.css({
+                left: "10px",
+                height: "",
+                top: 0,
+            });
+            localThis.layersWindow.attr("data-docked", "true");
+            localThis.contextMenu
+                .find('[data-action="dock-window"]')
+                .css({ display: "none" });
+            localThis.contextMenu
+                .find('[data-action="undock-window"]')
+                .css({ display: "inline-block" });
+            $("div[geointellect-container=tools-head]").css({ left: "620px" });
+
+            /*Делаем метку: что окно закреплено*/
+            localThis.isDocked = true;
+
+            localThis.layersWindow.draggable({ disabled: true });
+            /*            scroll();*/
+        };
+
+        /*Открепить окно слои*/
+        localThis.commonActions["undock-window"] = function () {
+            let dragInstanse;
+            const dragHandle =
+                localThis.layersWindow[0].querySelector(".layer-list-header");
+
+            localThis.layersWindow.css({
+                left: "30%",
+                top: "30%",
+                height: "600px",
+            });
+            /* scroll();*/
+            localThis.layersWindow.attr("data-docked", "false");
+            localThis.contextMenu
+                .find('[data-action="undock-window"]')
+                .css({ display: "none" });
+            localThis.contextMenu
+                .find('[data-action="dock-window"]')
+                .css({ display: "inline-block" });
+            localThis.layersWindow.css(
+                "top",
+                localThis.layersWindow.offset().top,
+            );
+            localThis.layersWindow.css(
+                "left",
+                localThis.layersWindow.offset().left,
+            );
+            $("div[geointellect-container=tools-head]").css({ left: "290px" });
+
+            /*Делаем метку: что окно откреплено*/
+            localThis.isDocked = false;
+            /*Делаем окно перетаскивающимся*/
+            localThis.layersWindow.draggable({
+                handle: ".layer-list-header",
+                disabled: false,
+            });
+        };
+
+        localThis.commonActions["disable-all-layers"] = function () {
+            localThis.disableAllLayers();
+        };
+
+        /*скрыть/показать все елементы в шапке*/
+        localThis.hide_open_all_items_in_the_cap = function (from) {
+            if (!from) {
+                DoNothing();
+            }
+            var headerLayer = $(".layer-list-header");
+            if (headerLayer.attr("hide-childrenElem") === "false") {
+                headerLayer.children().hide();
+                headerLayer.attr("hide-childrenElem", "true");
+            } else {
+                headerLayer.children().show();
+                headerLayer.attr("hide-childrenElem", "false");
+            }
+            localThis.hideContextMenu();
+        };
+
+        /*лупа в шапке*/
+        localThis.commonActions["find-layer"] = function () {
+            localThis.expandSearch();
+            localThis.hideContextMenu();
+        };
+
+        /*крестик в инпуте*/
+        localThis.commonActions["clear-search-query"] = function () {
+            localThis.layersWindow
+                .find("input.layer-list-header-search")
+                .val("");
+            applyTagsVisibility();
+            console.log(
+                "applyLayerListFilter call from commonActions clear search query",
+            );
+            localThis.applyLayerListFilter();
+            $(".layer-list-layer-tags")
+                .find("[data-action=select-all-tags]")
+                .attr("data-selected", "false");
+            $(".layer-list-layer-tags")
+                .find("[data-action=unselect-all-tags]")
+                .attr("data-selected", "true");
+        };
+
+        /*ссылка на полный список слоёв*/
+        localThis.commonActions["open-store"] = function () {
+            clickLink(location.market, "_blank");
+        };
+
+        window.G.Dynamic.addListener(GiEvents.TerraId, function (e) {
+            console.log("terra id change", e);
+            localThis.applyLayerListFilter();
+            localThis.layerList.forEach(function (layer) {
+                const layerOptions = localThis.globalStore
+                    .get()
+                    .getOptions(layer.opts.id).options;
+
+                if (
+                    !layer.checkLayerHasTerra?.(e.value) &&
+                    layerOptions.isactive
+                ) {
+                    localThis.globalStore
+                        .get()
+                        .updateOptions(layer.opts.id, { isactive: false });
+                }
+
+                if (
+                    layerOptions.hasCityId &&
+                    layerOptions.initialized &&
+                    layerOptions.isactive
+                ) {
+                    layer.refresh();
+                }
+            });
+        });
+
+        localThis.commonActions["context-menu"] = function () {
+            if (localThis.contextMenu.attr("data-state") === "closed") {
+                localThis.showContextMenu();
+            } else {
+                localThis.hideContextMenu();
+            }
+        };
+
+        localThis.afterInit.push(localThis.hideContextMenu);
+        /*localThis.afterInit.push(localThis.commonActions["dock-window"]);*/
+    };
+
+    this.disableAllLayers = function () {
+        console.log("disableAllLayers");
+
+        localThis.layerList.forEach(function (o) {
+            const GetOptions = localThis.globalStore
+                .get()
+                .getOptions(o.id).options;
+            if (GetOptions.initialized && GetOptions.isactive) {
+                layerOff(GetOptions.id);
+            }
+        });
+        localThis.folders.forEach((_folder) => {
+            _folder.checkFolder();
+        });
+        localThis.selectionChanged();
+        setModuleParamsJson(id, "selected_layers", [], true);
+    };
+
+    this.expandSearch = function () {
+        /*разворачивает инпут с фильтром списка слоёв*/
+        var parent = localThis.layersWindow.find(".layer-list-header-search");
+        parent.css({ width: "250px" });
+        parent.children(".header-button").css({ opacity: 0.0 });
+
+        parent.children("input").on("change", function (e) {
+            e.preventDefault();
+        });
+
+        parent.children("input").css({ opacity: 1.0 });
+        if (window.detectMobile() == "mobile") {
+            mobileParts.inputOffFocus(parent.children("input"));
+        } else {
+            parent.children("input").focus();
+        }
+
+        localThis.tagspanel.layerTypesCollapse();
+    };
+
+    var refreshZindexes = function () {
+        var _idx = -1;
+        localThis.layerList.forEach(function (obj) {
+            _idx++;
+            obj.zIndex = 600 + localThis.layerList.length - _idx;
+            obj.mapLayerObject?.setZIndex(obj.zIndex);
+        });
+    };
+
+    /*------Module params & send link-------------- */
+    this.uploadFilters = function () {
+        var _filter = [];
+
+        Object.values(localThis.globalStore.get().options).forEach(
+            function (o) {
+                let f = o.options.filter;
+
+                if (f && f.length > 0) {
+                    _filter.push({ layer: o.id, filter: f });
+                }
+            },
+        );
+
+        _initial_params["filters"] = [];
+        _initial_params["filters"].length = 0;
+        _initial_params["filters"] = _filter;
+
+        console.log(_filter);
+        return setModuleParamsJson(id, "filter_layers", _filter, true);
+    };
+
+    this.uploadOpacity = function () {
+        let opacites = Object.values(localThis.globalStore.get().options).map(
+            (_layer) => ({ id: _layer.id, value: _layer.options.opacity }),
+        );
+        setModuleParamsJson(id, "opacity_layers", opacites, true);
+    };
+
+    this.uploadLegend = function () {
+        /*Вернем массив активных галочек у легенды*/
+        let rulesActiveByLayer = Object.values(
+            localThis.globalStore.get().options,
+        )
+            .map((_layer) => {
+                let object = {
+                    id: _layer.id,
+                    legend_items: [],
+                };
+                let rules = _layer.options.rules;
+
+                for (const value of rules) {
+                    if (value.is_checked) {
+                        object.legend_items.push(value.idx);
+                    }
+                }
+                return object.legend_items.length > 0 ? object : null;
+            })
+            .filter(Boolean);
+
+        /*       console.log("+legend",rulesActiveByLayer);*/
+        setModuleParamsJson(id, "legend_items", rulesActiveByLayer, true);
+    };
+
+    this.findLegendRules = function (_id) {
+        let _f = null;
+
+        /* Модуль парамс*/
+        _initial_params["legend_items"]?.forEach(function (item) {
+            if (item.id == _id) {
+                _f = item.legend_items;
+            }
+        });
+        /* ссылка*/
+        let _link = window.G.DynamicArray.getValue(`G_layer_legend_${_id}`);
+        if (!_link || (_link.length == 1 && _link[0] == 0)) {
+            DoNothing();
+        } else {
+            _f = _link;
+        }
+        return _f;
+    };
+
+    this.findFilter = function (_id) {
+        var _f = null;
+        _initial_params["filters"].forEach(function (item) {
+            if (item.layer == _id) {
+                _f = item.filter;
+            }
+        });
+
+        let _link = window.G.Dynamic.getValue(`G_layer_filter_${_id}`);
+        if (_link !== "null") {
+            let _parsedlink = JSON.parse(_link);
+            if (_parsedlink) {
+                _f = _parsedlink.map(function (_fitem) {
+                    return {
+                        FieldName: _fitem.field_name,
+                        Condition: _fitem.condition,
+                        Value: _fitem.value,
+                        Next: _fitem.next,
+                    };
+                });
+            }
+        }
+        return _f;
+    };
+
+    var findFavorite = function (_id) {
+        var _f = false;
+        _initial_params["favorites"].forEach(function (item) {
+            if (item == _id) {
+                _f = true;
+            }
+        });
+        return _f;
+    };
+
+    var findSelected = function (_id) {
+        var _f = false;
+        _initial_params["selected"].forEach(function (item) {
+            if (item == _id) {
+                _f = true;
+            }
+        });
+        let _link = window.G.Dynamic.getValue(`G_layer_on_${_id}`);
+        if (_link === true) {
+            _f = true;
+        }
+        return _f;
+    };
+
+    this.findOpacity = function (_id) {
+        var _f = null;
+        _initial_params["opacity"]?.forEach(function (item) {
+            if (item.id === _id) {
+                _f = item.value;
+            }
+        });
+
+        let _link = window.G.Dynamic.getValue(`G_layer_opacity_${_id}`);
+        if (_link) {
+            _f = _link;
+        }
+
+        return _f;
+    };
+
+    var loadParam = function (_param, _saveto) {
+        var _q = getModuleParams(id, _param);
+        _q.done(function (r) {
+            if (
+                r.success &&
+                r.results != null &&
+                r.results.param_format == "json" &&
+                r.results.param_value != null
+            ) {
+                _initial_params[_saveto] = JSON.parse(r.results.param_value);
+                /* console.log(_initial_params[_saveto]);*/
+            }
+        });
+
+        return _q;
+    };
+
+    var loadModuleParams = function () {
+        var _se = loadParam("selected_layers", "selected");
+        var _op = loadParam("opacity_layers", "opacity");
+        var _fa = loadParam("favorites", "favorites");
+        var _fi = loadParam("filter_layers", "filters");
+        var _le = loadParam("legend_items", "legend_items");
+
+        return $.when(_se, _op, _fa, _fi, _le).done(function () {});
+    };
+
+    this.saveSelectedLayers = function () {
+        var _ids = [];
+        var qqq = localThis.getEnabledLayers();
+
+        if (qqq != null) {
+            qqq.forEach(function (item) {
+                _ids.push(item.Id);
+            });
+
+            setModuleParamsJson(id, "selected_layers", _ids, true);
+        }
+    };
+
+    var initLayerSettings = function () {
+        localThis.afterInit.push(function () {
+            localThis.layerList.forEach(function (item) {
+                var _f = localThis.findFilter(item.id);
+                if (_f != null) {
+                    item.applyFilter(_f);
+                }
+            });
+
+            localThis.layerList.forEach(function (item) {
+                var _f = findFavorite(item.id);
+                if (_f == true) {
+                    // item.makeFavorite(false);
+                    localThis.globalStore.get().setOptions(item.id, {
+                        isFavorite: true,
+                    });
+                }
+            });
+
+            localThis.layerList.forEach(function (item) {
+                var _f = findSelected(item.id);
+
+                if (_f == true) {
+                    /* item.elementLayer.on();*/
+                    localThis.globalStore
+                        .get()
+                        .updateOptions(item.id, { isactive: true });
+                }
+            });
+
+            localThis.layerList.forEach(function (item) {
+                var value = localThis.findOpacity(item.id);
+                /* console.log(value);*/
+                if (value) {
+                    item.opacity = value;
+                    /* console.log("item.opacity", item.opacity);*/
+                    /* console.log("layer-opacity",item.opacity);*/
+                    item.setOpacityFx(value);
+
+                    localThis.globalStore
+                        .get()
+                        .updateOptions(item.id, { opacity: item.opacity });
+                }
+            });
+        });
+    };
+
+    this.doAfterInit = function () {
+        localThis.afterInit.forEach(function (f) {
+            if (typeof f === "function") {
+                f();
+            }
+        });
+        let _states = window.G.Dynamic.getKeysForTag("layerstate");
+
+        if (_states) {
+            let _on = _states
+                .filter(function (item) {
+                    return item.indexOf("G_layer_on_") >= 0;
+                })
+                .map(function (item) {
+                    return parseInt(item.replace("G_layer_on_", ""));
+                });
+
+            _on.forEach(function (item) {
+                let _layer = localThis.findLayerById(item);
+                if (!_layer) {
+                    blinkmsg(
+                        `Слой не найден [ ID = ${item} ]`,
+                        10000,
+                        "danger",
+                    );
+                }
+            });
+        }
+    };
+    /*--------------------------- */
+
+    /**
+     * Загрузка всех слоёв с API
+     * @param {() => void} clearRetryTimeout коллбек для очистки setInterval, в который ты разумеется обернул эту функцию
+     * @returns
+     */
+    var loadLayers = function (clearRetryTimeout) {
+        if (
+            typeof localThis == "undefined" &&
+            typeof localThis.layersWindow == "undefined" &&
+            localThis.layersWindow.find(".layer-list").length == 0
+        ) {
+            return;
+        }
+
+        window.ulaGroup = new LayerGroup(
+            "Мои слои",
+            localThis,
+            true,
+            "user-layer-group",
+        );
+        clearRetryTimeout();
+
+        const data = {
+            login: window.UserModule.userData.Info.Login,
+            content: {},
+            include_tags: "true",
+        };
+        const layersResponse = DoWebApiAction("/layers/list", data);
+        const userLayersResponse = DoWebApiAction("/ulayers/list", data);
+        const moduleParamsReady = loadModuleParams();
+
+        $.when(layersResponse, userLayersResponse, moduleParamsReady).done(
+            initializeLayers,
+        );
+    };
+
+    /**
+     * Инициализация всех слоёв
+     * @param {*} layersResponseData обычные слои
+     * @param {*} userLayersResponseData пользовательские слои
+     * @returns
+     */
+    var initializeLayers = function (
+        layersResponseData,
+        userLayersResponseData,
+    ) {
+        if (
+            !layersResponseData[0].success ||
+            layersResponseData[0].results == null
+        ) {
+            console.log(layersResponseData);
+
+            return;
+        }
+
+        const layersData = layersResponseData[0].results;
+        const userLayers = userLayersResponseData[0].results;
+        const batchSize =
+            localStorage.getItem("layer-list-panel-batch-size") ?? 10;
+
+        Promise.all([
+            initializeInBatches(layersData, batchSize),
+            initializeInBatches(userLayers, batchSize, { isUserLayers: true }),
+        ]).then(function () {
+            console.log("All layers initialized");
+
+            localThis.loaded = true;
+            assignIndexLayer();
+            localThis.doAfterInit();
+            localThis.tagspanel.loadTags();
+            refreshZindexes();
+
+            document.dispatchEvent(new CustomEvent("layer-list-panel.init"));
+        });
+    };
+
+    /**
+     * Инициализация конкретного слоя
+     * @param {*} layerData данные слоя
+     * @param {*} initLayerInstance класс-имплементация слоя
+     * @returns
+     */
+    var initializeLayer = function (layerData, initLayerInstance, isUserLayer) {
+        if (layerData.provider == "gi2") return;
+
+        const layerInstance = initLayerInstance([layerData, localThis]);
+
+        if (layerInstance.initialized) {
+            if (isUserLayer) {
+                localThis.addUserLayer(layerInstance);
+                layerListPanel.layersWindow[0].querySelector(
+                    ".layer-list [data-type=user-layer-group] .badge",
+                ).innerHTML = layerListPanel.userLayerList.length;
+
+                return;
+            }
+
+            localThis.addLayer(
+                layerInstance,
+            ); /*Сам слой со св-ми и методами  */
+            localThis.addLayerGroup(layerInstance.o); /*папки*/
+        }
+    };
+
+    /**
+     * Карта, которая содержит инициализирующую функцию для каждого типа слоя.
+     * Внутри функции вызывается конструктор класса, отвечающего за этот тип слоя
+     * @type {{
+     *   [layerType: string]: (args: any[]) => LayerClassInstance
+     * }}
+     */
+    const layerTypes = {
+        dynamic: (args) => new DynamicLayer(...args), // TODO: убрать вызов
+        "dynamic-empty": (args) => new DynamicEmpty(...args),
+        "dynamic-point": (args) => new DynamicLayer(...args),
+        "dynamic-polygon": (args) => new DynamicLayer(...args),
+        "dynamic-line": (args) => new DynamicLayer(...args),
+        "vector-line": (args) => new DynamicLayer(...args),
+        "vector-point": (args) => new DynamicLayer(...args),
+        raster: (args) => new DynamicLayer(...args),
+        "vector-polygon": (args) => new VectorLayer(...args),
+        "vector-point-cluster": (args) => new ClusterLayer(...args),
+        "vector-point-multi-cluster": (args) => new MultiClusterLayer(...args),
+        "vector-point-cluster-terra": (args) => new ClusterTerrasLayer(...args),
+        "vector-point-pie-chart": (args) =>
+            new VectorPointPiechartLayer(...args),
+        wmts: (args) => new WmtsLayer(...args),
+        "wmts-empty": (args) => new WmtsLayer(...args),
+        "vector-point-marker": (args) => new VectorPointMarkerLayer(...args),
+        "territory-cluster": (args) => new TerrritoryClusteringLayer(...args),
+        marker: (args) => new MarkerLayer(...args),
+
+        user: (args) => new UserLayer(...args),
+
+        /**
+         * Возвращает функцию-инициализатор по типу слоя
+         * @param {string} type
+         * @returns {(args) => LayerClassInstance}
+         * @throws {Error}
+         */
+        get: (type) => {
+            if (layerTypes[type]) return layerTypes[type];
+
+            throw new Error(
+                `There is no initialization function for layer type ${type}. Add it manually inside layerTypes object definition in layer-list-panel module`,
+            );
+        },
+    };
+
+    /**
+     * Инициализирует слои асинхронно пачками по несколько элементов.
+     * Это нужно, чтобы избежать полной загрузки основного потока и фризов отрисовки DOM
+     * @param {*} layersData
+     * @param {number} batchSize
+     * @param {{ isUserLayers: boolean }} options
+     */
+    var initializeInBatches = function (layersData, batchSize, options = {}) {
+        return new Promise(function (resolve) {
+            const { isUserLayers } = options;
+            let i = 0;
+
+            const processNextBatch = () => {
+                const end = Math.min(i + batchSize, layersData.length);
+
+                for (; i < end; i++) {
+                    const layerData = layersData[i];
+
+                    try {
+                        let initLayerInstance;
+
+                        if (!isUserLayers) {
+                            initLayerInstance = layerTypes.get(layerData.type);
+                        } else {
+                            initLayerInstance = layerTypes.get("user");
+                        }
+
+                        const start = performance.now();
+
+                        initializeLayer(
+                            layerData,
+                            initLayerInstance,
+                            isUserLayers,
+                        );
+                        console.log(
+                            `Layer #${layerData.id} (${
+                                layerData.type
+                            }) initialized in ${performance.now() - start}ms`,
+                        );
+                    } catch (error) {
+                        console.error(
+                            `Cannot initialize layer ${layerData.id}`,
+                        );
+                        console.error(error);
+                    }
+                }
+
+                if (i < layersData.length) {
+                    setTimeout(
+                        processNextBatch,
+                        localStorage.getItem(
+                            "layer-list-panel-batch-timeout",
+                        ) ?? 0,
+                    );
+                } else {
+                    resolve();
+                }
+            };
+
+            processNextBatch();
+        });
+    };
+
+    var loadLayersLegacy = function () {
+        window.lyrstimer = setInterval(function () {
+            const start = performance.now();
+            var _lp = localThis;
+
+            if (
+                typeof _lp != "undefined" &&
+                typeof _lp.layersWindow != "undefined" &&
+                _lp.layersWindow.find(".layer-list").length > 0
+            ) {
+                window.ulaGroup = new LayerGroup(
+                    "Мои слои",
+                    localThis,
+                    true,
+                    "user-layer-group",
+                );
+                clearInterval(window.lyrstimer);
+                delete window.lyrstimer;
+
+                /*загрузка списка слоёв с сервера*/
+                var data = {
+                    login: window.UserModule.userData.Info.Login,
+                    content: {},
+                    include_tags: "true",
+                };
+
+                var lyr = DoWebApiAction("/layers/list", data);
+                var ula = DoWebApiAction("/ulayers/list", data);
+
+                $.when(lyr, ula, loadModuleParams()).done(
+                    function (lyr0, ula0) {
+                        if (lyr0[0].success && lyr0[0].results != null) {
+                            if (localThis.layersWindow) {
+                                if (lyr0[0].results.length === 0) {
+                                    localThis.loaded = true;
+                                    localThis.doAfterInit();
+                                } else {
+                                    var i = -1;
+                                    lyr0[0].results.forEach(function (o) {
+                                        i++;
+                                        if (o.provider != "gi2") {
+                                            if (
+                                                [
+                                                    "dynamic",
+                                                    "dynamic-empty",
+                                                    "dynamic-point",
+                                                    "dynamic-polygon",
+                                                    "dynamic-line",
+                                                    "vector-line",
+                                                    "vector-point",
+                                                    "raster",
+                                                ].indexOf(o.type) !== -1
+                                            ) {
+                                                var dl = new DynamicLayer(
+                                                    o,
+                                                    localThis,
+                                                );
+
+                                                if (dl.initialized) {
+                                                    localThis.addLayer(
+                                                        dl,
+                                                    ); /*Сам слой со св-ми и методами  */
+                                                    localThis.addLayerGroup(
+                                                        dl.o,
+                                                    ); /*папки*/
+                                                    if (
+                                                        i ===
+                                                        lyr0[0].results.length -
+                                                            1
+                                                    ) {
+                                                        localThis.loaded = true;
+                                                    }
+                                                }
+                                            } else if (
+                                                ["vector-polygon"].indexOf(
+                                                    o.type,
+                                                ) !== -1
+                                            ) {
+                                                var dl = new VectorLayer(
+                                                    o,
+                                                    localThis,
+                                                );
+
+                                                if (dl.initialized) {
+                                                    localThis.addLayer(dl);
+                                                    localThis.addLayerGroup(
+                                                        dl.o,
+                                                    );
+                                                    if (
+                                                        i ===
+                                                        lyr0[0].results.length -
+                                                            1
+                                                    ) {
+                                                        localThis.loaded = true;
+                                                    }
+                                                }
+                                            } else if (
+                                                [
+                                                    "vector-point-cluster",
+                                                ].indexOf(o.type) !== -1
+                                            ) {
+                                                var dl = new ClusterLayer(
+                                                    o,
+                                                    localThis,
+                                                );
+                                                if (dl.initialized) {
+                                                    localThis.addLayer(dl);
+                                                    localThis.addLayerGroup(
+                                                        dl.o,
+                                                    );
+                                                    if (
+                                                        i ===
+                                                        lyr0[0].results.length -
+                                                            1
+                                                    ) {
+                                                        localThis.loaded = true;
+                                                    }
+                                                }
+                                            } else if (
+                                                [
+                                                    "vector-point-multi-cluster",
+                                                ].indexOf(o.type) !== -1
+                                            ) {
+                                                var dl = new MultiClusterLayer(
+                                                    o,
+                                                    localThis,
+                                                );
+
+                                                if (dl.initialized) {
+                                                    localThis.addLayer(dl);
+                                                    localThis.addLayerGroup(
+                                                        dl.o,
+                                                    );
+                                                    if (
+                                                        i ===
+                                                        lyr0[0].results.length -
+                                                            1
+                                                    ) {
+                                                        localThis.loaded = true;
+                                                    }
+                                                }
+                                            } else if (
+                                                [
+                                                    "vector-point-cluster-terra",
+                                                ].indexOf(o.type) !== -1
+                                            ) {
+                                                var dl = new ClusterTerrasLayer(
+                                                    o,
+                                                    localThis,
+                                                );
+
+                                                if (dl.initialized) {
+                                                    localThis.addLayer(dl);
+                                                    localThis.addLayerGroup(
+                                                        dl.o,
+                                                    );
+                                                    if (
+                                                        i ===
+                                                        lyr0[0].results.length -
+                                                            1
+                                                    ) {
+                                                        localThis.loaded = true;
+                                                    }
+                                                }
+                                            } else if (
+                                                [
+                                                    "vector-point-pie-chart",
+                                                ].indexOf(o.type) !== -1
+                                            ) {
+                                                var dl =
+                                                    new VectorPointPiechartLayer(
+                                                        o,
+                                                        localThis,
+                                                    );
+
+                                                if (dl.initialized) {
+                                                    localThis.addLayer(dl);
+                                                    localThis.addLayerGroup(
+                                                        dl.o,
+                                                    );
+                                                    if (
+                                                        i ===
+                                                        lyr0[0].results.length -
+                                                            1
+                                                    ) {
+                                                        localThis.loaded = true;
+                                                    }
+                                                }
+                                            } else if (
+                                                ["wmts", "wmts-empty"].indexOf(
+                                                    o.type,
+                                                ) !== -1
+                                            ) {
+                                                var dl = new WmtsLayer(
+                                                    o,
+                                                    localThis,
+                                                );
+                                                /* console.log("WmtsLayer", dl);*/
+                                                if (dl.initialized) {
+                                                    localThis.addLayer(dl);
+                                                    localThis.addLayerGroup(
+                                                        dl.o,
+                                                    );
+                                                    if (
+                                                        i ===
+                                                        lyr0[0].results.length -
+                                                            1
+                                                    ) {
+                                                        localThis.loaded = true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                    assignIndexLayer();
+                                    localThis.doAfterInit();
+                                }
+                                localThis.tagspanel.loadTags();
+                                refreshZindexes();
+                            }
+                        } else {
+                            console.info(lyr0[0].message);
+                        }
+
+                        /*потом пользовательские слои*/
+                        if (ula0[0].success && ula0[0].results != null) {
+                            ula0[0].results.forEach(function (o) {
+                                var ul = new UserLayer(o, localThis);
+                                if (ul.initialized) {
+                                    localThis.addUserLayer(ul);
+                                    layerListPanel.layersWindow[0].querySelector(
+                                        ".layer-list [data-type=user-layer-group] .badge",
+                                    ).innerHTML =
+                                        layerListPanel.userLayerList.length;
+                                }
+                            });
+                        } else {
+                            console.error(ula0[0].message);
+                        }
+                    },
+                );
+            }
+            console.log(
+                "layers initialization took %dms",
+                performance.now() - start,
+            );
+        }, 500);
+    };
+
+    var createLayerListWindow = function () {
+        appendMainButton();
+
+        localThis.layersWindow = $("<div/>", {
+            id: "layerListWindow",
+            "data-windowtype": "panel",
+            "data-docked": "true",
+            "data-visible": "false",
+            "data-type": "test",
+        }).addClass("layer-list-container bg-color-fon");
+
+        $("body").append(localThis.layersWindow);
+
+        var html = localizeHtml(`
+            <div class="layer-list-container" id="layerListWindow"  data-windowtype="panel" data-visible="false">
+            
+                <div class="layer-list">
+                    <div class="scroll-container min-blue-scroll">
+                        <div class="heatmap-poi-list"></div>
+                    </div>
+                    <div class="timeLine-layers-container"></div>
+                </div>
+            
+                <div class="layer-list-header bg-main-contrast" hide-childrenElem="false">
+                
+                    <div class="layer-list-header-logo main-logotip"></div>
+                                    
+                    <div class="header-button gr-close-x-r icon-without-cover" data-action="close-window" title="{{close}}"></div>
+                    <div class="header-button gr-undock  icon-without-cover" data-action="toogle-window" title="{{menu_undock}}"></div>
+                    <div class="header-button gr-context-v  icon-without-cover" data-action="context-menu" title="{{context_menu}}"></div>
+                    
+                    <div class="header-label-right font-default">{{geodata}}</div>
+                
+                    <div class="layer-list-header-search">
+                        <div class="header-button" data-action="find-layer" title="{{find_layer}}" style="position: absolute; top: -5px; left: -5px"></div>
+                        <input type="text" class="layer-list-header-search gr-lens"  style=" position: absolute; top: 0; left: 0; -ms-opacity: 0.0; opacity: 0.0;" />
+                        <span class="clear-search-query gr-close-x-r" data-action="clear-search-query" title="{{clear}}" autofocus></span>
+                    </div>
+                
+                </div>
+            
+                <div class="window-context-menu font-solid bg-main-halo-02" data-state="closed">
+                    <div data-container="geodata-store"></div>
+                </div>
+            
+                <div class="layer-list-layer-tags-bg"></div>
+            
+                <div class="layer-list-layer-tags">
+                    <div class="layer-list-hamburger-button gr-hamburger-0"></div>
+                    <div class="layer-list-favorites-button" data-selected="false"><div class="icon gr-star"></div></div>
+                    <div class="layer-list-layer-tags-container min-blue-scroll"></div>
+                    <div class="layer-list-layer-tags-separator"></div>
+                    <div class="layer-list-layer-tags-button icon-unselect-all gr-select-multi" data-action="select-all-tags" data-selected="true" title="{{tags_turnon_all}}">{{tags_turnon_all}}</div>
+                    <div class="layer-list-layer-tags-button icon-select-all gr-unselect-multi" data-action="unselect-all-tags" data-selected="false" title="{{tags_turnoff_all}}">{{tags_turnoff_all}}</div>
+                </div>
+            
+                <div class="layer-list-hresizer"></div>
+            </div>
+        `);
+
+        localThis.template_layerGroup = $(
+            localizeHtml(
+                '\
+        <div class="layer-item-group" data-type="layer-group" data-expanded="false">\
+            <div class="top-panel">\
+                <div class="checkbox"></div>\
+                <div class="caption">\
+                    <div class="badge font-primary" title="{{layer_group_count}}">0</div>\
+                    <span class="hspace"></span>\
+                    <span class="gr-name font-primary">_GROUP_NAME_</span>\
+                    <span class="hspace"></span>\
+                </div>\
+                <div class="arrow gr-down-l"></div>\
+            </div>\
+            <div class="tool-panel">\
+            \
+            </div>\
+            <div class="group-layer-list">\
+            </div>\
+        </div>\
+        ',
+            ),
+        );
+
+        localThis.layersWindow.append($(html).children());
+
+        localThis.contextMenu = $("#layerListWindow").find(
+            ".window-context-menu",
+        );
+
+        localThis.tagspanel = new window.LayerTagsBar(localThis);
+
+        bindEvents();
+
+        /*  scroll();*/
+
+        appendSubmodules();
+    };
+
+    this.showLayerInfo = function (info, layername) {
+        /*создаёт окно с информацией о слое и показывает его анимировано*/
+        let windowInfoTemplate = `
+             <div id="layerInfoWindow" data-windowtype="panel" isopen="{{isopen}}">
+                <span class="title-layer-info-window">${gl.text.layer_metadata}</span>
+                <div class="icon-close  gr-close-x-r" data-action="closelayerInfoWindow"></div>
+                <div class="content-container"></div>
+             </div>
+        `;
+
+        let strInfoLayer = MarkdownToHtml.parse(info);
+        console.log(strInfoLayer);
+
+        let windowInfoContainer = HtmlElementFromText(
+            localizeHtml(windowInfoTemplate),
+            [{ key: "isopen", value: false }],
+        );
+        windowInfoContainer.querySelector(".content-container").innerHTML =
+            strInfoLayer;
+
+        windowInfoContainer.addEventListener("click", (event) => {
+            if (event.target.dataset.action === "closelayerInfoWindow") {
+                windowInfoContainer.remove();
+            }
+        });
+        localThis.layersWindow[0].appendChild(windowInfoContainer);
+
+        setTimeout(() => {
+            windowInfoContainer.setAttribute("isopen", true);
+        }, 100);
+    };
+
+    var init = function () {
+        /*инициализация модуля*/
+        appendHeadStyle(loadCssUrl);
+        appendHeadStyle(loadCssUrlsecondary);
+
+        createLayerListWindow();
+        initLayerSettings();
+
+        addStyleToExistingSheet(
+            ".gray-icon",
+            "filter: invert(56%); opacity:0.5",
+        );
+        addStyleToExistingSheet(
+            ".golden-icon > .gr-pic",
+            "filter: invert(83%) sepia(65%) saturate(3338%) hue-rotate(332deg) !important; opacity:1",
+        );
+
+        window.clearActions.push(function () {
+            window.mapModule01?.removeHoverPolygon();
+        });
+
+        if (UserModule?.userData?.Info?.ClientId == 1209) {
+            addStyleToExistingSheet(
+                ".leaflet-overlay-pane > .leaflet-zoom-animated",
+                "pointer-events:none",
+            );
+        }
+
+        window.addEventListener("layers.enable", (e) => {
+            if (window.debug === true) {
+                blinkmsg(`enableLayer(${e.detail?.id})`);
+            }
+
+            if (!e.detail.ids && !e.detail.id) return;
+
+            if (e.detail.ids) {
+                for (let i = 0; i < e.detail.ids.length; i++) {
+                    layerOn(e.detail.ids[i]);
+                }
+            } else {
+                layerOn(e.detail.id);
+            }
+
+            localThis.folders.forEach((_folder) => {
+                _folder.checkFolder();
+            });
+        });
+
+        window.addEventListener("layers.disableAll", (e) => {
+            if (window.debug === true) {
+                blinkmsg(`layers.disableAll()`);
+                console.log("layers.disableAll", e);
+            }
+            localThis.disableAllLayers();
+        });
+
+        window.addEventListener("layers.applyFilter", (e) => {
+            if (window.debug === true) {
+                blinkmsg(`layers.applyFilter(...)`);
+                console.log("layers.applyFilter", e);
+            }
+
+            let filter = e.detail.filter?.map(function (_fitem) {
+                return {
+                    FieldName: _fitem.field_name,
+                    Condition: _fitem.condition,
+                    Value: _fitem.value,
+                    Next: _fitem.next ?? "AND",
+                };
+            });
+
+            if (filter) {
+                foreach(e.detail.id, (id) => {
+                    id = typeof id === "string" ? parseInt(id) : id;
+                    
+                    localThis.globalStore.get().setOptions(id, { filter });
+                    localThis.findLayerById(id)?.applyFilter(filter);
+                });
+            }
+        });
+    };
+
+    let layerOn = function (_layerId) {
+        if (
+            localThis.globalStore.get().getOptions(_layerId).options
+                .isactive === true
+        )
+            return;
+        localThis.globalStore.get().updateOptions(_layerId, { isactive: true });
+    };
+
+    let layerOff = function (_layerId) {
+        if (
+            localThis.globalStore.get().getOptions(_layerId).options
+                .isactive === false
+        )
+            return;
+        localThis.globalStore
+            .get()
+            .updateOptions(_layerId, { isactive: false });
+    };
+
+    this.layerOn = layerOn;
+    this.layerOff = layerOff;
+
+    let assignIndexLayer = function () {
+        let count = localThis.layersWindow[0].querySelectorAll(
+            ".scroll-container .layer-item",
+        ).length;
+        localThis.layersWindow[0]
+            .querySelectorAll(".scroll-container .layer-item")
+            .forEach(function (_item) {
+                count--;
+                _item.setAttribute("data-index", count);
+            });
+    };
+
+    this.selectionChanged = function () {
+        console.log("Цикл afterSelectionChanged - начало");
+        localThis.afterSelectionChanged.forEach(function (f) {
+            console.log("Цикл afterSelectionChanged - элемент");
+            if (typeof f === "function") {
+                f();
+            }
+        });
+        console.log("Цикл afterSelectionChanged - конец");
+
+        var _ids = [];
+        var _ids_with_timeline = [];
+        console.log("Метод getEnabledLayers");
+        var qqq = localThis.getEnabledLayers();
+
+        console.log("getEnabledLayers =>", qqq);
+        console.log("layerList =>", localThis.layerList);
+
+        if (qqq != null) {
+            console.log("Цикл getEnabledLayers - start");
+            qqq.forEach(function (item) {
+                _ids.push(item.Id);
+
+                console.log("Поиск слоя getEnabledLayers");
+                var lyr = localThis.layerList[item.Index];
+
+                if (lyr.hasTimeline === true) {
+                    _ids_with_timeline.push(lyr.id);
+                }
+            });
+            console.log("Цикл getEnabledLayers - end");
+        }
+
+        window.G.DynamicArray.setValue(GiEvents.LayersSelected, _ids);
+        window.G.DynamicArray.setValue(
+            GiEvents.LayersWithTimeline,
+            _ids_with_timeline,
+        );
+    };
+
+    this.favoritesChanged = function () {
+        var _ids = [];
+
+        // localThis.layerList.forEach(function (item) {
+        //     if (item?.opts) { item = item.opts; }
+
+        //     if (item.isFavorite) {
+        //         _ids.push(item.id);
+        //     }
+        // });
+
+        for (const layer of Object.values(
+            localThis.globalStore.get().options,
+        )) {
+            if (!layer.options.isFavorite) continue;
+
+            _ids.push(layer.id);
+        }
+
+        setModuleParamsJson(id, "favorites", _ids, true);
+    };
+
+    this.appendSubmodule = function () {
+        DoNothing();
+    };
+
+    function appendSubmodules() {
+        var layerListPanelGeodataStore;
+        try {
+            layerListPanelGeodataStore = new layerListPanelGeodataStorePlugin(
+                localThis,
+            );
+        } catch (e) {
+            layerListPanelGeodataStore = null;
+        }
+
+        localThis.template_dynamicLayer = $(
+            localizeHtml(
+                '\
+            <div class=layer-item data-id=0 data-url="" data-type=dynamic data-isactive=true data-expanded=false>\
+                <div class= top-panel>\
+                <div class=checkbox></div>\
+                <div class=filter-container title="{{layer_filter_applied}}"></div>\
+                <div class=caption>NoCaption</div>\
+                <div class="arrow gr-down-l"></div>\
+            </div>\
+            <div class=tool-panel>\
+                <div class=layer-tools-control>\
+                    <div class=caption>\
+                        <div>{{layer_settings}}</div>\
+                    </div>\
+                    <div class="opacity-item" data-opacity=0.1 data-active=0>90%</div>\
+                    <div class="opacity-item" data-opacity=0.2 data-active=0>80%</div>\
+                    <div class="opacity-item" data-opacity=0.3 data-active=0>70%</div>\
+                    <div class="opacity-item" data-opacity=0.4 data-active=0>60%</div>\
+                    <div class="opacity-item" data-opacity=0.5 data-active=0>50%</div>\
+                    <div class="opacity-item" data-opacity=0.6 data-active=0>40%</div>\
+                    <div class="opacity-item" data-opacity=0.7 data-active=0>30%</div>\
+                    <div class="opacity-item" data-opacity=0.8 data-active=0>20%</div>\
+                    <div class="opacity-item" data-opacity=0.9 data-active=0>10%</div>\
+                    <div class="opacity-item" data-opacity=1 data-active=1>0%</div>\
+                    \
+                    <div class=tool data-tool=layer-favorite title="{{layer_favorite}}">F</div>\
+                    <div class=tool data-tool=layer-filter title="{{layer_filter}}">F</div>\
+                    <div class="tool last" data-tool=clear-layer-filter>C</div>\
+                    <div class=tool data-tool=layer-metadata title="{{layer_metadata}}">M</div>\
+                    <div class=tool data-tool=layer-settings>...</div>\
+                </div>\
+            </div>\
+            <div class=layer-legend>\
+                <div class=caption><div class=bg-main-contrast>{{ layer_legend }}</div></div>\
+                <div class=legend-content>\
+                    <div class="legend-line">\
+                        <div class="left-container">\
+                            <span class="checkbox" data-active="false" style="display:none"></span>\
+                            <div class="legend-image">\
+                                <img data-field="image"/>\
+                            </div>\
+                        </div>\
+                        <div class="right-container">\
+                            <div class="legend-title" data-field="title"></div>\
+                        </div>\
+                    </div>\
+                </div>\
+            </div>\
+        </div>\
+        ',
+            ),
+        );
+
+        localThis.template_userLayer = $(
+            localizeHtml(`
+        <div class=layer-item data-uid=0 data-url="" data-type=user data-isactive=true data-expanded=false>
+            <div class=top-panel>
+                <div class=checkbox></div>
+                <div class=icon-container data-icon=""></div>
+                <div class=icon-container data-iseditable=idontknow></div>
+                <div class=caption style="width:390px">_LAYER_NAME_</div>
+                <div class="arrow gr-down-l"></div>
+            </div>
+            <div class=tool-panel>
+                <div class=layer-tools-control>
+                    <div class=caption>
+                        <div>{{settings}}</div>
+                    </div>
+                    <div class="tools">
+                        <div class="opacity-control">
+                            <div class="opacity-item" data-opacity="0.1" data-active="0">90</div>
+                            <div class="opacity-item" data-opacity="0.2" data-active="0">80</div>
+                            <div class="opacity-item" data-opacity="0.3" data-active="0">70</div>
+                            <div class="opacity-item" data-opacity="0.4" data-active="0">60</div>
+                            <div class="opacity-item" data-opacity="0.5" data-active="0">50</div>
+                            <div class="opacity-item" data-opacity="0.6" data-active="0">40</div>
+                            <div class="opacity-item" data-opacity="0.7" data-active="0">30</div>
+                            <div class="opacity-item" data-opacity="0.8" data-active="0">20</div>
+                            <div class="opacity-item" data-opacity="0.9" data-active="0">10</div>
+                            <div class="opacity-item" data-opacity="1" data-active="1">0</div>
+                        </div>
+                        <div class="action-buttons">
+                            <!-- заполняется из layer-list-panel/_import/UserLayer.js -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class=layer-legend style="display:none">
+                <div class=caption><div class=bg-main-contrast>{{layer_legend}}</div></div>
+                <div class=legend-content>
+                </div>
+            </div>
+        </div>
+        `),
+        );
+
+        localThis.template_vectorLayer = $(
+            localizeHtml(
+                '\
+            <div class=layer-item style="border: 2px solid #a2b6cf; border-radius: 4px;" data-id=0 data-url="" data-type=dynamic data-isactive=true data-expanded=false>\
+                <div class=top-panel>\
+                    <div class="move-layer-container">\
+                        <div class="wrap">\
+                            <div class="up-elem" data-action="up"></div>\
+                            <div class="down-elem" data-action="down"></div>\
+                        </div>\
+                    </div>\
+                    <div class=checkbox></div>\
+                    <div class=filter-container title="{{layer_filter_applied}}"></div>\
+                    <div class=caption>NoCaption</div>\
+                    <div class="arrow gr-down-l"></div>\
+                </div>\
+                <div class=tool-panel>\
+                    <div class=layer-tools-control>\
+                        <div class=caption>\
+                            <div>{{layer_settings}}</div>\
+                        </div>\
+                        <div class="opacity-item" data-opacity=0.1 data-active=0>90%</div>\
+                        <div class="opacity-item" data-opacity=0.2 data-active=0>80%</div>\
+                        <div class="opacity-item" data-opacity=0.3 data-active=0>70%</div>\
+                        <div class="opacity-item" data-opacity=0.4 data-active=0>60%</div>\
+                        <div class="opacity-item" data-opacity=0.5 data-active=0>50%</div>\
+                        <div class="opacity-item" data-opacity=0.6 data-active=0>40%</div>\
+                        <div class="opacity-item" data-opacity=0.7 data-active=0>30%</div>\
+                        <div class="opacity-item" data-opacity=0.8 data-active=0>20%</div>\
+                        <div class="opacity-item" data-opacity=0.9 data-active=0>10%</div>\
+                        <div class="opacity-item" data-opacity=1 data-active=1>0%</div>\
+                        \
+                        <div class=tool data-tool=layer-favorite title="{{layer_favorite}}">F</div>\
+                        <div class=tool data-tool=layer-metadata title="{{layer_metadata}}">M</div>\
+                        <div class=tool data-tool=layer-settings>...</div>\
+                    </div>\
+                </div>\
+                <div class=layer-legend>\
+                    <div class=caption><div class=bg-main-contrast>{{layer_legend}}</div></div>\
+                    <div class=legend-content>\
+                    \
+                        <div class="legend-line">\
+                            <div class="left-container">\
+                                <span class="checkbox" data-active="false"></span>\
+                                <div class="legend-image">\
+                                    <img data-field="image" />\
+                                </div>\
+                            </div>\
+                            <div class="right-container">\
+                                <div class="legend-title" data-field="title"></div>\
+                            </div>\
+                        </div>\
+                        \
+                    </div>\
+                </div>\
+                <div class="waiter" data-visible="false" oncontextmenu="false">\
+                    <div class="progress"></div>\
+                </div>\
+            </div>\
+        ',
+            ),
+        );
+
+        loadJS("/resources/funcparts/" + id + "/bundle.js")
+            .then(() => {
+                localThis.layerCityStorage = createLayerCityStorage();
+                window.UlaObject = new UserLayerObject();
+                window.GiLyrObject = new GiLayerObject();
+                window.UlaFiles = new UserLayerFiles();
+                window.LyrEditObject = new LayerEditObject();
+                layerListView = new LayerListView();
+
+                const loadLayersTimerId = setInterval(() => {
+                    loadLayers(() => clearInterval(loadLayersTimerId));
+                }, 500);
+
+                localThis.showHideBtnContextMenu();
+            })
+            .catch((error) => {
+                console.error("Error loading script:", error);
+            });
+    }
+
+    function toggleLayerListOffset(condition) {
+        const elements = document.querySelectorAll('[data-layer-list-offset]');
+        for (const element of elements) {
+            element.setAttribute("data-layer-list-offset", condition);
+        }
+    }
+
+    this.show = function () {
+        /*открыть список слоёв*/
+        if (localThis.panelvisible) return;
+        localThis.layersWindow.attr({ "data-visible": "true" });
+        localThis.layersWindow.css({ left: "10px", opacity: 1.0 });
+
+        $(".layer-list-header-label").css({ left: "50px" });
+        $(".layer-list-hamburger-button").css({ left: "0px" });
+        $(".layer-list-favorites-button").css({ left: "0px" });
+        $(".layer-list-layer-tags-bg").css({ left: "0px" });
+        $(".layer-list-layer-tags").css({ left: "0px" });
+
+        if (localThis.isDocked) {
+            $("div[geointellect-container=tools-head]").css({ left: "620px" });
+        }
+
+        localThis.panelvisible = true;
+        localThis.expandSearch();
+        console.log("applyLayerListFilter call from this.show");
+        localThis.applyLayerListFilter();
+        toggleLayerListOffset(true);
+    };
+
+    this.hide = function () {
+        /*закрыть список слоёв*/
+        localThis.topPanelButton.onEnd();
+        if (!localThis.panelvisible) return;
+        $(".layer-list-layer-tags-bg").css({ left: "-60px" });
+        $(".layer-list-layer-tags").css({ left: "-60px" });
+        $(".layer-list-hamburger-button").css({ left: "-14px" });
+        $(".layer-list-favorites-button").css({ left: "-14px" });
+        $(".layer-list-header-label").css({ left: "-14px" });
+        $("div[geointellect-container=tools-head]").css({ left: "290px" });
+
+        localThis.layersWindow.css({ left: "-600px" });
+        localThis.layersWindow.attr({ "data-visible": "false" });
+        localThis.panelvisible = false;
+        toggleLayerListOffset(false);
+    };
+
+    this.getGroupByUid = function (groupuid) {
+        /*получает группу по айдишнику*/
+        if (!groupuid) return null;
+        var group = null;
+        localThis.groups.forEach(function (o) {
+            if (o.id === groupuid) {
+                group = o;
+            }
+        });
+        return group;
+    };
+
+    this.getGroupByName = function (groupname) {
+        /*получает группу по названию*/
+        if (!groupname) return null;
+        var group = null;
+        localThis.groups.forEach(function (o) {
+            if (o.name === groupname) {
+                group = o;
+            }
+        });
+        return group;
+    };
+
+    this.addTagEnabledLayer = function (_layer) {
+        /*Добавляем группу включенного слоя в отдельный масиив */
+        localThis.enabledLayersTag.push(_layer);
+    };
+    this.removeTagEnabledLayer = function (_layerTag) {
+        /*удаляем группу включенного слоя из массива */
+        var i = localThis.enabledLayersTag.indexOf(_layerTag);
+        localThis.enabledLayersTag.splice(i, 1);
+    };
+
+    this.checkTag = function (_nameTag) {
+        /*Найдем группу слоя в массиве включенные слои */
+        var found = false;
+        localThis.enabledLayersTag.indexOf(_nameTag) !== -1
+            ? (found = true)
+            : (found = false);
+        return found;
+    };
+    this.searchEnabledLayers = function () {
+        /*Найдем все включенные слои: сложим в отдельный массив группы и подсветим их */
+        localThis.layerList.forEach(function (_layer) {
+            if (_layer.isactive) {
+                localThis.enabledLayersTag.push(_layer.tag);
+                localThis
+                    .getTagEnabledLayer(_layer.tag)
+                    .onlightingTagEnabledLayer();
+            }
+        });
+    };
+
+    this.getTagEnabledLayer = function (_nameTag) {
+        /*Получим группу включенного слоя */
+        var tag = null;
+        localThis.tags.forEach(function (_tag) {
+            if (_tag.name === _nameTag) {
+                tag = _tag;
+            }
+        });
+        return tag;
+    };
+    this.addLayer = function (layer, groupuid) {
+        if (typeof groupuid === "undefined" || groupuid === null) {
+            localThis.layerList.push(layer);
+        }
+    };
+
+    this.addLayerGroup = function (_layer) {
+        const tags = _layer?.tags.filter(
+            (tag) => !tag.startsWith("*"),
+        ); /*Массив с папками */
+        /* console.log("tags",tags);*/
+        if (tags?.length) {
+            for (let i = 0; i < tags.length; i++) {
+                var tag = tags[i].trim();
+                if (!tag) continue;
+                const group = layerListViewObject.groups.find(
+                    (item) => item.name === tag,
+                );
+                if (typeof group === "undefined") {
+                    let tagO = {
+                        name: null,
+                        layers_tag: [],
+                    };
+                    tagO.name = tag;
+                    tagO.layers_tag.push(_layer.id);
+                    layerListViewObject.groups.push(tagO);
+                } else {
+                    group.layers_tag.push(_layer.id);
+                }
+            }
+        }
+    };
+
+    this.addUserLayer = function (layer) {
+        /*добавить слой в массив пользовательских слоёв*/
+        localThis.userLayerList.push(layer);
+        /*Добавим метод отключение слоев в ластик*/
+        window.clearActions.push(localThis.offAllUserLayers);
+
+        window.ulaGroup.group_visibility();
+    };
+
+    this.offAllUserLayers = function () {
+        /*Отключить все пользовательские слои*/
+        localThis.userLayerList.forEach(function (v) {
+            var layer = v;
+            if (layer.isactive) {
+                layer.off();
+            }
+        });
+    };
+
+    this.collapseAll = function (exclude) {
+        localThis.layerList.forEach(function (o) {
+            let layerElement = o?.elementLayer ? o.elementLayer : o;
+            console.log("layerElement", layerElement);
+            layerElement.collapse(exclude);
+        });
+    };
+
+    this.getEnabledLayers = function () {
+        /*возвращает массив айдишников включённых слоёв с фильтрами*/
+        var aydishniki = [];
+        var ind = 0;
+        localThis.layerList.forEach(function (_o) {
+            const o = _o.opts;
+            const GetOptions = localThis.globalStore
+                .get()
+                .getOptions(o.id).options;
+
+            if (
+                GetOptions.initialized &&
+                GetOptions.isactive &&
+                [
+                    "dynamic",
+                    "dynamic-empty",
+                    "dynamic-point",
+                    "dynamic-polygon",
+                    "dynamic-line",
+                    "raster",
+                    "vector-point",
+                    "vector-line",
+                    "vector-point-multi-cluster",
+                    "vector-point-cluster-terra",
+                    "vector-point-pie-chart",
+                    /*"vector-point-marker",*/,
+                    "territory-cluster"
+                ].indexOf(o.type) !== -1
+            ) {
+                if (isArray(GetOptions.filter)) {
+                    GetOptions.filter.forEach(function (item) {
+                        if (
+                            item.FieldName.toLowerCase().indexOf("date") !==
+                                -1 &&
+                            isDate("" + item.Value)
+                        ) {
+                            var parts = item.Value.split(".");
+                            if (parts.length === 3) {
+                                item.Value =
+                                    parts[2] + "-" + parts[1] + "-" + parts[0];
+                            }
+                        }
+                    });
+                }
+
+                var list_selected_legends = [];
+
+                if (GetOptions.rules && GetOptions.rules.length > 0) {
+                    var anyChecked = false;
+
+                    for (var i = 0; i < GetOptions.rules.length; i++) {
+                        if (GetOptions.rules[i].is_checked) {
+                            anyChecked = true;
+                            list_selected_legends.push(i);
+                        }
+                    }
+
+                    /*if (!anyChecked) {
+                        list_selected_legends.push(-1000);
+                    }*/
+                }
+
+                aydishniki.push({
+                    Id: o.id,
+                    Name: o.name,
+                    Filter: GetOptions.filter,
+                    LegendItems: list_selected_legends,
+                    Opacity: GetOptions.opacity,
+                    Index: ind,
+                });
+            }
+            ind++;
+        });
+
+        return aydishniki;
+    };
+
+    this.findLayerById = function (id) {
+        console.time("findLayerById");
+        var result = localThis.layerList.find(
+            (layer) => layer.opts.id === id && layer.opts.initialized,
+        );
+        console.timeEnd("findLayerById");
+
+        return result;
+    };
+
+    this.findLayerByIdOld = function (id) {
+        console.time("findLayerByIdOld");
+        var result = null;
+        localThis.layerList.forEach(function (o) {
+            //console.log("Ищем слой в layerList");
+            if (o.initialized && o.id == id) {
+                result = o;
+            }
+            //console.log("Ищем слой в layerList");
+        });
+        console.timeEnd("findLayerByIdOld");
+        return result;
+    };
+
+    this.getLayerByID = function (id) {
+        return localThis.layerList.find((layer) => layer.opts.id === id);
+    };
+
+    this.getLayerList = function () {
+        return localThis.layerList;
+    };
+
+    this.findUserLayerByUid = function (uid) {
+        var result = null;
+        localThis.userLayerList.forEach(function (o) {
+            if (o.initialized && o.Uid === uid) {
+                result = o;
+            }
+        });
+        return result;
+    };
+
+    this.getEnabledUserLayers = function () {
+        /*возвращает массив айдишников включённых ula-слоёв*/
+        var aydishniki = [];
+        localThis.userLayerList.forEach(function (o) {
+            if (o.initialized && o.isactive) {
+                aydishniki.push({ Uid: o.Uid });
+            }
+        });
+        return aydishniki;
+    };
+
+    this.getEnabledEditableUserLayers = function () {
+        /*возвращает массив айдишников включённых ula-слоёв, которые он может редактировать*/
+        /*не используется в запросе к серверу*/
+        var aydishniki = [];
+        localThis.userLayerList.forEach(function (o) {
+            if (
+                o.initialized &&
+                o.isactive &&
+                o.Editors.indexOf(window.UserModule.userData.Info.Login) !== -1
+            ) {
+                aydishniki.push({ Uid: o.Uid });
+            }
+        });
+        return aydishniki;
+    };
+
+    this.applyFiltersById = function (layer_id) {
+        var layer = localThis.findLayerById(layer_id);
+        if (layer !== null) {
+            layer.applyFilters();
+        }
+    };
+
+    var mobileParts = {
+        renderMainButton: function () {
+            /*Кнопка для мобайл версии */
+            var topPanelButton = window.ToolPanelModule.getNewPanelButton({
+                title: gltxt("geodata"),
+                class: "rightRibbonButton ico ico-small gr-layers map-btn-mobile",
+                onClick: function () {
+                    localThis.show();
+                    topPanelButton.off();
+                },
+                mobile: true,
+                order: 2,
+                type: "small",
+                float: "rightPanelCenter",
+                mapContainer: "mapPanel",
+            });
+            topPanelButton.addToTopPanel();
+            topPanelButton.$elemButton.attr("data-help", "layers-list-btn");
+        },
+        renderClearAllLayersButton: function () {
+            /*Добавим в левую плашку кнопку 'Отключить все слои'*/
+            var btnOffLayers = window.ToolPanelModule.getNewPanelButton({
+                title: window.gl.text.menu_turnoff_all,
+                class: "gr-layers-off rightRibbonButton btn-image-color",
+                onClick: function () {
+                    localThis.commonActions["disable-all-layers"]();
+                    btnOffLayers.off();
+                },
+                mobile: true,
+                order: 100,
+                type: "small",
+                float: "rightPanelTop",
+                mapContainer: "mapPanel",
+            });
+            btnOffLayers.addToTopPanel();
+            btnOffLayers.$elemButton.attr("data-help", "clear-all-layers-btn");
+        },
+        inputOffFocus: function (input) {
+            input.blur();
+        },
+        renderOffOnGroupsLayersButton: function () {
+            /*Добавим  кнопку 'Отключить/Включить все группы слоев'*/
+            var button = document.createElement("div");
+            button.classList.add(
+                "layer-button-mobile",
+                "button-on-of-group-layers",
+            );
+            button.setAttribute("data-state", "on");
+            button.innerHTML = gltxt("tags_turnon_all");
+
+            button.addEventListener("click", function () {
+                var state = button.getAttribute("data-state");
+                if (state == "on") {
+                    localThis.commonActions["select-all-tags"]();
+                    button.setAttribute("data-state", "off");
+                    button.innerHTML = gltxt("tags_turnoff_all");
+                } else {
+                    localThis.commonActions["unselect-all-tags"]();
+                    button.setAttribute("data-state", "on");
+                    button.innerHTML = gltxt("tags_turnon_all");
+                }
+            });
+            var timer = setInterval(function () {
+                if (localThis.layersWindow !== null) {
+                    localThis.layersWindow.append(button);
+                    clearInterval(timer);
+                }
+            }, 1000);
+        },
+    };
+
+    init();
+};
+
+window.LayerTag = function (tag, parent) {
+    var localThis = this;
+    var svg;
+    var img = null;
+    this.parent = parent;
+
+    this.name = tag;
+
+    this.isActive = false;
+
+    this.selfelement = $("<div/>", {
+        order: 0,
+        "data-selected": "false",
+        title: this.name,
+    });
+    this.selfelement.addClass("layer-list-layer-tag-item");
+
+    var label = $("<div/>", { tagname: this.name }).addClass("label");
+
+    var icon = $("<div/>")
+        .addClass("icon-group-container")
+        .append($("<div/>", { tagname: this.name }).addClass("icon-group"));
+
+    var circle = $("<div/>").addClass("selected-circle");
+
+    label.append(this.name, circle);
+
+    this.selfelement.append(label, icon);
+
+    this.toggle = function () {
+        if (localThis.isActive) {
+            localThis.off();
+        } else {
+            localThis.on();
+        }
+    };
+
+    this.off = function () {
+        if (localThis.isActive === false) return;
+        localThis.isActive = false;
+        this.selfelement.attr("data-selected", "false");
+    };
+
+    this.on = function () {
+        if (localThis.isActive === true) return;
+        localThis.isActive = true;
+        this.selfelement.attr("data-selected", "true");
+        localThis.parent.tagsmenu.favorites.attr("data-selected", false);
+    };
+
+    this.onlightingTagEnabledLayer = function () {
+        this.selfelement.attr("data-enabledLayer", true);
+    };
+    this.offlightingTagEnabledLayer = function () {
+        this.selfelement.removeAttr("data-enabledLayer");
+    };
+    this.selfelement.on("click", function () {
+        localThis.toggle();
+        console.log("applyLayerListFilter call from self element on click");
+        localThis.parent.applyLayerListFilter();
+        let groups = localThis.parent.parent.layerGroups;
+
+        groups.forEach((_group) => {
+            _group.checkVisibleLayers();
+            _group.group_visibility();
+        });
+    });
+};
+
+window.LayerTagsBar = function (parent) {
+    var localThis = this;
+    this.parent = parent;
+    this.tags = [];
+
+    this.iconmapping = {};
+    this.panel = this.parent.layersWindow.find(".layer-list-layer-tags");
+    this.tagscontainer = this.panel.find(".layer-list-layer-tags-container");
+    this.tagactions = this.panel.find(".layer-list-layer-tags-button");
+
+    this.tagsmenu = {
+        isexpanded: false,
+        button: this.panel.find(".layer-list-hamburger-button"),
+        favorites: this.panel.find(".layer-list-favorites-button"),
+        menu: this.panel.find(".layer-list"),
+        bg: this.parent.layersWindow.find(".layer-list-layer-tags-bg"),
+    };
+
+    this.applyLayerListFilter = localThis.parent.applyLayerListFilter;
+
+    this.layerTypesExpand = function () {
+        /*развернуть левую панель с иконками*/
+        localThis.panel[0].classList.add("view-window-full");
+        localThis.tagsmenu.bg[0].classList.add("view-window-full");
+        localThis.tagsmenu.menu.css({ left: "60px" });
+        $(".layer-list-layer-tag-item > .label").css({ left: "40px" });
+        localThis.tagsmenu.isexpanded = true;
+        localThis.parent.hideContextMenu();
+    };
+
+    this.layerTypesCollapse = function () {
+        /*свернуть левую панель с иконками*/
+        localThis.panel[0].classList.remove("view-window-full");
+        localThis.tagsmenu.bg[0].classList.remove("view-window-full");
+        localThis.tagsmenu.menu.css({ left: "60px" });
+        localThis.tagsmenu.isexpanded = false;
+    };
+
+    this.tagExists = function (name) {
+        var exists = false;
+        localThis.tags.forEach(function (tag) {
+            if (tag.name.toLowerCase() === name.toLowerCase()) {
+                exists = true;
+            }
+        });
+        return exists;
+    };
+
+    this.addTag = function (name, atBottom) {
+        /*добавляет тэг в панельку с тэгами*/
+        /*string name - название тэга, на русском*/
+        /*bool atBottom - поместить в самый низ дива*/
+
+        if (localThis.tagExists(name) === true) {
+            return;
+        }
+
+        var append = atBottom === true;
+
+        var newTag = new window.LayerTag(name, localThis);
+        parent.tags.push(newTag);
+
+        if (append) {
+            localThis.tags.push(newTag);
+        } else {
+            localThis.tags = [newTag].concat(localThis.tags);
+        }
+
+        if (append) {
+            localThis.tagscontainer.prepend(newTag.selfelement);
+        } else {
+            localThis.tagscontainer.append(newTag.selfelement);
+        }
+    };
+
+    this.loadTags = function () {
+        var _done = false;
+
+        var _order = [
+            "Границы",
+            "Кадастр",
+            "Векторизация ортофотоплана",
+            "Демография",
+            "Экология",
+            "Человекопотоки",
+            "Социальные объекты",
+            "Органы местной власти",
+            "Инфраструктура",
+            "Общественный транспорт",
+            "Маршрутная сеть",
+            "Культурное наследие",
+            "ЖКХ",
+            "ДТП",
+            "Пожары",
+            "Минобороны",
+            "Фонд ZAMIN",
+            "Платежеспособность",
+            "Заявки",
+            "Xalq Nazorati",
+            "Транспорт",
+            "Школы",
+        ];
+
+        var _order0 = [];
+
+        var _order_final = [];
+
+        localThis.parent.layerList.forEach(function (o) {
+            /*бежим по всем слоям*/
+            if (
+                [
+                    "dynamic",
+                    "dynamic-empty",
+                    "dynamic-point",
+                    "dynamic-polygon",
+                    "dynamic-line",
+                    "raster",
+                    "wmts",
+                    "wmts-empty",
+                    "vector-point",
+                    "vector-line",
+                    "vector-polygon",
+                    "vector-point-cluster",
+                    "vector-point-multi-cluster",
+                    "vector-point-cluster-terra",
+                    "marker",
+                    "territory-cluster",
+                ].indexOf(o.type) !== -1
+            ) {
+                if (_order0.indexOf(o.tag) == -1) {
+                    _order0.push(o.tag);
+                }
+            } else if (o.type === "group") {
+                o.layerList.forEach(function (o2) {
+                    /*бежим по слоям в группе*/
+                    if (
+                        [
+                            "dynamic",
+                            "dynamic-empty",
+                            "dynamic-point",
+                            "dynamic-polygon",
+                            "dynamic-line",
+                            "raster",
+                            "wmts",
+                            "wmts-empty",
+                            "vector-point",
+                            "vector-line",
+                            "vector-polygon",
+                            "vector-point-cluster",
+                            "vector-point-multi-cluster",
+                            "vector-point-cluster-terra",
+                            "marker",
+                            "territory-cluster",
+                        ].indexOf(o.type) !== -1
+                    ) {
+                        if (_order0.indexOf(o2.tag) == -1) {
+                            _order0.push(o2.tag);
+                        }
+                    }
+                });
+            }
+        });
+
+        _order.forEach(function (item) {
+            if (_order0.indexOf(item) != -1) {
+                _order_final.push(item);
+            }
+        });
+
+        _order0.forEach(function (item) {
+            if (_order_final.indexOf(item) == -1) {
+                _order_final.push(item);
+            }
+        });
+
+        _order_final.forEach(function (item) {
+            localThis.addTag(item, false);
+        });
+
+        localThis.parent.commonActions["select-all-tags"] =
+            localThis.enableAllTags;
+        localThis.parent.commonActions["unselect-all-tags"] =
+            localThis.disableAllTags;
+
+        DoWebApiAction("/layers/group_icons", {
+            groups: _order_final.join(";"),
+        }).done(function (r) {
+            if (r.success) {
+                for (var s in r.results) {
+                    const tag = layerListPanel.layersWindow.find(
+                        '.icon-group[tagname="' + s + '"]',
+                    );
+
+                    tag.css("background-image", "url('" + r.results[s] + "')");
+
+                    if (!r.results[s]) {
+                        tag[0].innerHTML = s.slice(0, 2).toUpperCase();
+                    }
+                }
+            }
+        });
+
+        localThis.disableAllTags();
+        localThis.enableTagByName("Проживание");
+        /* parent.searchEnabledLayers();*/
+    };
+
+    this.findTag = function (tagname) {
+        var thetag = null;
+        localThis.tags.forEach(function (tag) {
+            if (tag.name.toLowerCase() === tagname.toLowerCase()) {
+                thetag = tag;
+            }
+        });
+        return thetag;
+    };
+
+    this.selectedTagNames = function () {
+        var tags = [];
+        localThis.tags.forEach(function (tag) {
+            if (tag.isActive === true) {
+                tags.push("" + tag.name);
+            }
+        });
+        return tags;
+    };
+
+    this.enableAllTags = function () {
+        localThis.tags.forEach(function (tag) {
+            tag.on();
+        });
+        console.log("applyLayerListFilter call from enable all tags");
+        localThis.applyLayerListFilter();
+        $(".layer-list-layer-tags")
+            .find("[data-action=select-all-tags]")
+            .attr("data-selected", "false");
+        $(".layer-list-layer-tags")
+            .find("[data-action=unselect-all-tags]")
+            .attr("data-selected", "true");
+    };
+
+    this.disableAllTags = function () {
+        localThis.tags.forEach(function (tag) {
+            tag.off();
+        });
+        console.log("applyLayerListFilter call from disable all tags");
+        localThis.applyLayerListFilter();
+        $(".layer-list-layer-tags")
+            .find("[data-action=select-all-tags]")
+            .attr("data-selected", "true");
+        $(".layer-list-layer-tags")
+            .find("[data-action=unselect-all-tags]")
+            .attr("data-selected", "false");
+    };
+
+    this.enableTagByName = function (tagname) {
+        localThis.tags.forEach(function (tag) {
+            if (tag.name.toLowerCase() === tagname.toLowerCase()) {
+                tag.on();
+            }
+        });
+        console.log("applyLayerListFilter call from enable tag by name");
+        localThis.applyLayerListFilter();
+    };
+
+    this.disableTagByName = function (tagname) {
+        localThis.tags.forEach(function (tag) {
+            if (tag.name.toLowerCase() === tagname.toLowerCase()) {
+                tag.off();
+            }
+        });
+        console.log("applyLayerListFilter call from disable tag by name");
+        localThis.applyLayerListFilter();
+    };
+
+    this.tagactions.on("click", function () {
+        var actionName = $(this).attr("data-action");
+        if (localThis.parent.commonActions.hasOwnProperty(actionName)) {
+            localThis.parent.commonActions[actionName]();
+        }
+    });
+
+    this.tagsmenu.button.on("click", function () {
+        if (localThis.tagsmenu.isexpanded === true) {
+            localThis.layerTypesCollapse();
+        } else {
+            localThis.layerTypesExpand();
+        }
+    });
+
+    this.tagsmenu.favorites.on("click", function () {
+        // localThis.parent.layerList.forEach(function (layer) {
+        //     try {
+        //         let _layer = layer;
+        //         if (layer?.opts) { _layer = layer.opts; }
+
+        //         if (_layer.isFavorite == true) {
+        //             layer.show();
+        //         }
+        //         else {
+        //             layer.hide();
+        //         }
+        //     } catch (e) {
+        //         console.warn(e);
+        //     }
+        // });
+
+        const { getOptions } = window.layerListPanel.globalStore.get();
+
+        console.log("tags", localThis.parent.tags);
+
+        localThis.disableAllTags();
+
+        localThis.tagsmenu.favorites.attr("data-selected", true);
+
+        for (const layer of localThis.parent.layerList) {
+            if (getOptions(layer.id).options.isFavorite) {
+                try {
+                    layer.show();
+                } catch (e) {
+                    console.warn(e);
+                }
+
+                continue;
+            }
+
+            try {
+                layer.hide();
+            } catch (e) {
+                console.warn(e);
+            }
+        }
+    });
+};
+
+document.addEventListener("DOMContentLoaded", function () {
+    setTimeout(function () {
+        window.layerListPanel = new LayerListPanel();
+        var prepare = getParameterByName("prepare");
+        if (typeof prepare === "undefined" || prepare === null) {
+            DoNothing();
+        } else {
+            setTimeout(function () {
+                window.layerListPanel.show();
+            }, 3000);
+        }
+    }, 1000);
+});
